@@ -1,15 +1,6 @@
 # 需求分析品質契約
 
-本契約是產生需求分析文件前的二元品質門檻。它借鏡 [ISO/IEC/IEEE 29148:2018](https://www.iso.org/standard/72089.html) 的需求工程觀念與 [IIBA《The Business Analysis Standard》](https://www.iiba.org/globalassets/business-analysis-resources/the-business-analysis-standard/files/the-business-analysis-standard.pdf) 的商業分析實務，但不代表取得認證，也不構成對任何標準、法規或合約的符合性聲明。
-
-## 狀態定義
-
-- `Draft—Not ready`：仍有實質需求缺口、矛盾或不可驗收內容。
-- `Blocked`：關鍵決策者、必要事實、一手規範來源或適格審查者不可得，無法可靠完成。
-- `Candidate—Awaiting confirmation`：AI 品質門檻已通過，完整內容正等待使用者確認。
-- `Ready`：AI 品質門檻已通過，且使用者已確認完整文件內容；可交給技術規劃。
-
-任一關鍵檢查失敗都不得標示 `Candidate—Awaiting confirmation` 或 `Ready`。
+本契約只判定需求分析是否通過二元品質門檻；文件狀態、展示與寫檔規則由[交付協定](delivery-protocol.md)定義。契約借鏡 [ISO/IEC/IEEE 29148:2018](https://www.iso.org/standard/72089.html) 的需求工程觀念與 [IIBA《The Business Analysis Standard》](https://www.iiba.org/globalassets/business-analysis-resources/the-business-analysis-standard/files/the-business-analysis-standard.pdf) 的商業分析實務，但不代表取得認證，也不構成對任何標準、法規或合約的符合性聲明。
 
 ## 單一需求品質門檻
 
@@ -31,7 +22,7 @@
 
 ## 整份文件品質門檻
 
-只有以下各項全部通過，文件才是候選 Ready 文件：
+只有以下各項全部通過，整份文件品質門檻才算通過：
 
 - 問題、目前影響、為何現在做與預期業務成果彼此一致。
 - 利害關係人、使用者、系統角色與決策責任清楚。
@@ -77,11 +68,12 @@
 | 驗收證據 | 可檢查的紀錄、行為、報告或控制結果 |
 | 人工審查 | 負責角色、審查範圍與尚待確認事項 |
 
-## 最終判定程序
+## 二元判定
 
-1. 逐條驗證單一需求與驗收情境。
-2. 驗證整份文件完整性與雙向追溯。
-3. 若適用，執行高風險與規範加強門檻。
-4. 有任何失敗即回到探索；使用者要求提前結束時只能標成 `Draft—Not ready` 或 `Blocked`。
-5. 全部通過後，在對話中標成 `Candidate—Awaiting confirmation` 並展示完整內容與精確路徑。
-6. 只有使用者看過並明確確認該版本後，才改成 `Ready` 並允許寫檔。
+依序逐條驗證單一需求、驗收情境、整份文件與雙向追溯；高風險或受規範需求再執行加強門檻。
+
+- **通過：** 每個適用檢查都有可核對的需求內容、來源或驗收證據，沒有失敗項目。
+- **未通過：** 任一適用檢查缺少證據或不符合門檻。把失敗項目轉回覆蓋圖中的 `未知` 或 `矛盾`，繼續一次一題的探索。
+- **無法完成：** 關鍵決策者、必要事實、一手來源或適格審查者不可得。依[交付協定](delivery-protocol.md)進入阻塞分支。
+
+品質契約通過只授權進入交付分支，不構成寫檔或實作授權。
