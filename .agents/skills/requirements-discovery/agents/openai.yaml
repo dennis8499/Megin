@@ -1,0 +1,7 @@
+interface:
+  display_name: "需求探索"
+  short_description: "逐題釐清產品與軟體需求，產出可驗收、可追溯的需求分析文件"
+  default_prompt: "使用 $requirements-discovery，逐題探索我的產品或軟體需求，直到可產出能進入技術規劃的需求分析文件。"
+
+policy:
+  allow_implicit_invocation: true
