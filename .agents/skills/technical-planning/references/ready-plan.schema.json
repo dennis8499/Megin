@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.skills/technical-planning/ready-plan.schema.json",
+  "title": "ready-plan/v1 handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidate",
+    "approval",
+    "planning_baseline",
+    "primary_plan",
+    "artifacts",
+    "sources",
+    "contract_index",
+    "commands",
+    "work_packages",
+    "revision_impact"
+  ],
+  "properties": {
+    "schema": {"const": "ready-plan/v1"},
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "payload_sha256"],
+      "properties": {
+        "revision": {"type": "string", "minLength": 1},
+        "payload_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "actor", "confirmed_at", "evidence"],
+      "properties": {
+        "status": {"enum": ["Candidate", "Ready"]},
+        "actor": {"type": ["string", "null"]},
+        "confirmed_at": {"type": ["string", "null"], "format": "date-time"},
+        "evidence": {"type": ["string", "null"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "Ready"}}},
+          "then": {
+            "properties": {
+              "actor": {"type": "string", "minLength": 1},
+              "confirmed_at": {"type": "string", "format": "date-time"},
+              "evidence": {"type": "string", "minLength": 1}
+            }
+          },
+          "else": {
+            "properties": {
+              "actor": {"type": "null"},
+              "confirmed_at": {"type": "null"},
+              "evidence": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "planning_baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo_id", "head_sha", "status_sha256"],
+      "properties": {
+        "repo_id": {"$ref": "#/$defs/sha256"},
+        "head_sha": {"$ref": "#/$defs/gitSha"},
+        "status_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "primary_plan": {"$ref": "#/$defs/pathHash"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "contract_index": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/contract"}
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/command"}
+    },
+    "work_packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/workPackage"}
+    },
+    "revision_impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "changes"],
+      "properties": {
+        "revision": {"type": "string", "minLength": 1},
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["changed_ref", "scope", "affected_wp_refs"],
+            "properties": {
+              "changed_ref": {"$ref": "#/$defs/impactRef"},
+              "scope": {"enum": ["wp-local", "global-baseline"]},
+              "affected_wp_refs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"$ref": "#/$defs/wpId"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "gitSha": {"type": "string", "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"},
+    "normalizedPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\.|(?:(?!\\.{1,2}(?:/|$))[^/:\\\\]+)(?:/(?!(?:\\.{1,2})(?:/|$))[^/:\\\\]+)*/?)$"
+    },
+    "sourceLocation": {
+      "anyOf": [
+        {"$ref": "#/$defs/normalizedPath"},
+        {"type": "string", "minLength": 1, "pattern": "^[A-Za-z][A-Za-z0-9+.-]+:[^\\s\\\\]+$"}
+      ]
+    },
+    "srcId": {"type": "string", "pattern": "^SRC-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "wpId": {"type": "string", "pattern": "^WP-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "commandId": {"type": "string", "pattern": "^CMD-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "contractId": {
+      "type": "string",
+      "pattern": "^(BDD-FWK|BOOT|BDD|TEST|CMD|WP)-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "impactRef": {
+      "type": "string",
+      "pattern": "^(SRC|BDD-FWK|BOOT|BDD|TEST|CMD|WP|TD|MOD|SEAM|REQ|AC|CON|IMP)-[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "pathHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "approval_status", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "role": {"enum": ["primary", "supporting", "handoff"]},
+        "approval_status": {"enum": ["Candidate", "Ready"]},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"role": {"const": "handoff"}}},
+          "then": {"properties": {"sha256": {"type": "null"}}},
+          "else": {"properties": {"sha256": {"$ref": "#/$defs/sha256"}}}
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "kind", "location", "revision", "sha256", "plan_refs", "wp_refs"],
+      "properties": {
+        "source_id": {"$ref": "#/$defs/srcId"},
+        "kind": {"enum": ["spec", "governance", "adr", "project", "platform", "contract", "supporting"]},
+        "location": {"$ref": "#/$defs/sourceLocation"},
+        "revision": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "plan_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "wp_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/wpId"}}
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_id", "kind", "source_refs", "wp_refs"],
+      "properties": {
+        "contract_id": {"$ref": "#/$defs/contractId"},
+        "kind": {"enum": ["bdd-framework", "bootstrap", "bdd-scenario", "inner-test", "command", "work-package"]},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/srcId"}},
+        "wp_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/wpId"}}
+      }
+    },
+    "allowedWrite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "cleanup"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "kind": {"enum": ["ignored", "temporary"]},
+        "cleanup": {"type": "string", "minLength": 1}
+      }
+    },
+    "externalEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "effect", "reversible", "authorization"],
+      "properties": {
+        "target": {"type": "string", "minLength": 1},
+        "effect": {"type": "string", "minLength": 1},
+        "reversible": {"type": "boolean"},
+        "authorization": {"type": "string", "minLength": 1}
+      }
+    },
+    "absenceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probe", "outcome", "source_ref"],
+      "properties": {
+        "probe": {"type": "string", "minLength": 1},
+        "outcome": {"type": "string", "minLength": 1},
+        "source_ref": {"$ref": "#/$defs/srcId"}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_id",
+        "purpose",
+        "status",
+        "cwd",
+        "command",
+        "environment_prerequisites",
+        "timeout_seconds",
+        "network_policy",
+        "allowed_writes",
+        "external_side_effects",
+        "success_criteria",
+        "completeness_criteria",
+        "absence_evidence"
+      ],
+      "properties": {
+        "command_id": {"$ref": "#/$defs/commandId"},
+        "purpose": {"enum": ["bdd-install", "bdd-discovery", "bdd-focused", "bdd-full", "bootstrap", "tdd-focused", "related", "build-full", "test-full", "governance", "ci"]},
+        "status": {"enum": ["Observed", "Proposed"]},
+        "cwd": {"$ref": "#/$defs/normalizedPath"},
+        "command": {"type": "string", "minLength": 1},
+        "environment_prerequisites": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "timeout_seconds": {"type": "integer", "minimum": 1},
+        "network_policy": {"enum": ["forbidden", "optional", "required"]},
+        "allowed_writes": {"type": "array", "items": {"$ref": "#/$defs/allowedWrite"}},
+        "external_side_effects": {"type": "array", "items": {"$ref": "#/$defs/externalEffect"}},
+        "success_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "completeness_criteria": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "absence_evidence": {"type": "array", "items": {"$ref": "#/$defs/absenceEvidence"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "Proposed"}}},
+          "then": {"properties": {"absence_evidence": {"minItems": 1}}},
+          "else": {"properties": {"absence_evidence": {"maxItems": 0}}}
+        }
+      ]
+    },
+    "workPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wp_id", "blocked_by", "contract_refs", "source_refs", "command_refs"],
+      "properties": {
+        "wp_id": {"$ref": "#/$defs/wpId"},
+        "blocked_by": {"type": "array", "items": {"$ref": "#/$defs/wpId"}},
+        "contract_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contractId"}},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/srcId"}},
+        "command_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/commandId"}}
+      }
+    }
+  },
+  "x-required-command-purposes": ["bdd-discovery", "bdd-focused", "bdd-full", "tdd-focused", "related", "build-full", "test-full"]
+}

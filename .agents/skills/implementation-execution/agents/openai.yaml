@@ -1,0 +1,7 @@
+interface:
+  display_name: "實作執行"
+  short_description: "執行 ready-plan/v1，完成 BDD／TDD、全量驗證與 fresh review"
+  default_prompt: "使用 $implementation-execution，依指定的 ready-plan/v1 完成實作、全量驗證與 fresh 唯讀審查。"
+
+policy:
+  allow_implicit_invocation: true

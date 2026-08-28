@@ -1,81 +1,49 @@
 # 技術規劃品質契約
 
-本契約只判定內容是否具備 Candidate 資格。狀態、路徑、展示與寫入行為由[交付協定](delivery-protocol.md)唯一管理。
-
-所有檢查皆為二元判定；每個適用項目都要有可核對的內容或來源。
+本契約只判定 Candidate 資格，不重新定義規則。設計語義見[撰寫準則](candidate-authoring.md)，交接資料見[`ready-plan/v1`](ready-plan-contract.md)，狀態與寫入見[交付協定](delivery-protocol.md)。每項只回報 `Pass` 或帶證據的 `Fail`。
 
 ## 1. 來源與證據門檻
 
-- 本次只有一份可引用的來源規格，規劃範圍與規格範圍一致。
-- 規格的目標、範圍外項目、規範性需求、驗收情境、品質限制與相容／移轉條件已擷取。
-- 會改變使用者可見行為或驗收的需求缺口為零。
-- 會改變設計、測試或工作包的阻塞未知為零。
-- 規格、專案證據、ADR、治理與技術限制沒有未解衝突。
+- 唯一來源、範圍、規範性要求、驗收、品質限制及相容／移轉條件可引用。
+- 每項 Required oracle 均由適用環境的一手平台規範支持為可保證；被平台允許抑制或改變的要求已走需求缺口分支，沒有 Candidate。
+- 需求缺口、阻塞未知與規格／現況／治理／平台衝突均為零。
 
 ### 證據品質
 
-- 適用的 `AGENTS.md`、治理、README、領域詞彙與 ADR 已檢查。
-- 與範圍相關的 manifests、lockfiles、版本、入口、模組、資料、契約、測試與 CI 已檢查。
-- Brownfield 的 current-state 主張都能連到專案相對路徑、符號、設定或歷史。
-- Greenfield 明確記錄不存在的現況，不把假想結構描述成既有事實。
-- 時效敏感的外部技術事實來自官方文件、標準、上游原始碼或第一方 API，並包含版本／日期與直接連結。
-- `Observed`、`Required` 與 `Proposed` 沒有混用。
-- 沒有秘密值、憑證、token 或不必要的敏感內容進入規劃。
+- 影響範圍內的治理、ADR、專案結構、版本、契約、測試、BDD、CI 與 Git baseline 已查證；未查區域未宣稱已理解。
+- Brownfield current state 與 greenfield absence 都有 `SRC-*`；時效敏感事實含版本／日期與一手來源。
+- `Observed`／`Required`／`Proposed` 分明；輸出不含秘密值。
 
 ## 2. 技術設計
 
-- Current state、target state 與變更影響足以解釋方案。
-- 每個具實質取捨的技術決策都有需求、證據、選定方案、理由、替代方案與影響。
-- Modules 各有清楚責任與小而一致的 caller-facing contract；必要 entrypoints 皆有專案或需求依據，Interface 包含 invariants、錯誤及品質特性。
-- Seams 位於真實可替換或可觀察的位置；抽象對應實際的執行位置、所有權或 contract 隔離需求。
-- Adapter 策略符合依賴性質，測試用替身沒有穿透 Module Interface。
-- 資料、狀態、契約、錯誤、品質屬性、營運與移轉只在適用時出現，且完整涵蓋來源規格。
-- 新檔案、介面與架構均標為 Proposed；沒有把提案寫成既有事實。
-- 沒有與來源規格無關的重構、套件替換或 future-proofing。
+- Current／target state、change impact 與每個 `TD-*` 足以由證據重建方案及取捨。
+- Module、Interface、Seam 與 Adapter 選擇符合撰寫準則，公開 contract 可觀察且完整。
+- 所有適用的資料、狀態、錯誤、品質、營運及移轉義務有設計；不適用內容未擴張範圍。
+- 新形狀均為 `Proposed`；沒有無關重構、套件替換或 future-proofing。
 
 ## 3. 測試與工作包
 
-### 測試策略
-
-- 每項適用規範性需求與驗收情境至少映射到一個可判定的驗證。
-- 每個驗證都有目的、層級、Seam、fixture／輸入、前置狀態、oracle、環境及預期結果。
-- 自動化命令使用專案已有命令，或清楚標成 Proposed；未執行的命令沒有被宣稱通過。
-- 正常、邊界、失敗、復原及適用的品質屬性都有驗證。
-- 測試觀察公開行為，不依賴 private methods、內部呼叫次數或旁路狀態。
-- 不同測試層沒有無理由重複證明同一風險。
-- 使用 mock／fake／local substitute 時，選擇與限制已有理由。
-- 人工驗證具有角色、環境、步驟、預期結果與證據保存方式，不以「手動檢查」含糊帶過。
-
-### 工作包
-
-- 每個 `WP-*` 都交付一個窄而完整、可獨立驗證的行為切片。
-- 每個工作包都有需求、驗收情境、交付結果、影響範圍、介面契約、驗證方式及完成證據。
-- `Blocked by` 只包含真正前置依賴，依賴圖無循環。
-- Setup、設定、文件與測試沒有脫離其需求工作包成為孤立活動。
-- Prefactor 只在能讓規格變更更安全時存在，且本身可驗證。
-- 所有來源需求都有工作包；所有工作包都能回溯來源需求。
-- 沒有 `TBD`、`TODO`、「適當處理」、「補上測試」、「同前」或其他不可執行佔位語。
-- 相鄰工作包使用的名稱、types、Interface 與契約一致。
+- `BDD-FWK-*` 的既有或一手相容證據完整；每項適用驗收有可執行 `BDD-*`、正確 oracle red、映射的 `TEST-*` 與順序化 slice。
+- Greenfield `BOOT-*` 符合撰寫準則且與全部 oracle 互斥，或以 current-state evidence 證明不適用。
+- 每個 `CMD-*` 符合 [`ready-plan/v1`](ready-plan-contract.md)；獨立 BDD discovery、零 skipped、side effects、allowed writes 與 Proposed absence evidence 都可判定。
+- 每個 `WP-*` 是可獨立驗證的垂直 slice；DAG 無環，setup／test／docs 跟隨行為，prefactor 可獨立證明降低本次風險。
+- 正常、邊界、失敗、復原與適用品質屬性均有唯一最適測試層或具名人工程序，沒有不可執行佔位語。
 
 ## 4. Artifacts、追溯與風險
 
-- `plan.md` 是唯一 Primary artifact，能獨立說明目標、範圍、方案、狀態與 artifact manifest。
-- Supporting artifacts 各自符合[模板的拆分判準](technical-plan-template.md#拆分判準)，且都由 Primary artifact 連結。
-- 每項資訊只有一個權威位置；摘要與詳細內容不矛盾。
-- 不存在空白、純 `N/A`、佔位或沒有讀取條件的 artifact。
-- 追溯完整連接 `來源需求 → 技術決策／Module → 測試 → 工作包`。
-- 沒有孤立需求、測試、工作包、風險或未引用的 supporting artifact。
+- `plan.md` 是唯一 primary，`handoff.json` 是唯一 handoff；supporting artifacts 符合模板拆分判準且由 primary 連結。
+- Artifact manifest 只用 `role` 與 `approval_status`；沒有空白、佔位、重複權威或未引用 artifact。
+- `handoff.json` 通過 schema 與 [`ready-plan/v1`](ready-plan-contract.md)跨欄位不變量，包括 approval identity、payload digest、baseline、hashes、sources、contract index、DAG、impact map 與 commands。
+- `SRC-* → plan refs → contracts → WP-* → CMD-*／evidence` 可雙向追溯，沒有孤立項目。
 
 ### 風險與安全
 
-- 風險包含觸發條件、影響及具體 mitigation；取捨不被包裝成無成本決策。
-- 只記錄有證據或經確認的假設；未確認假設不得藏在正文。
-- 高風險或受規範領域引用適用的一手規範並指定人工專業審查，不宣稱已合法、合規或認證。
-- Candidate 清楚區分已觀察結果與實作階段才會產生的證據。
-- 規劃過程沒有修改產品程式碼、設定、外部 tracker 或部署狀態。
+- 每項風險含 trigger、impact 與可驗證 mitigation；假設有證據或明確確認。
+- 高風險／受規範領域引用一手規範並指定專業審查，不提前宣稱合規或認證。
+- Observed 與未來 execution evidence 分明；規劃過程的產品與外部狀態雜湊不變。
 
 ## 二元判定
 
-- `通過`：所有適用項目都有可核對的內容或來源，沒有失敗項目；內容具備 Candidate 資格。
-- `未通過`：把失敗項目送回來源與證據、未知處理、設計、測試、工作包或 artifact 組裝階段修正。
-- `無法通過`：必要規格、專案證據、一手資料或決策者不可得；依交付協定進入 `Blocked`。
+- `Pass`：全部項目通過，形成 Candidate。
+- `Fail`：記錄項目、證據與擁有規則的 reference，回到該階段修正。
+- 必要證據或決策不可得：依交付協定進入 `Blocked`。
