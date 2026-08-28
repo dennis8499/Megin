@@ -1,0 +1,7 @@
+interface:
+  display_name: "技術規劃"
+  short_description: "將規格與專案證據轉為可追溯的設計、測試策略與工作包"
+  default_prompt: "使用 $technical-planning，根據指定規格與目前專案證據建立可審閱、可追溯的技術規劃。"
+
+policy:
+  allow_implicit_invocation: true
