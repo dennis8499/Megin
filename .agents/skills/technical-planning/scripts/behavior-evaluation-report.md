@@ -25,7 +25,7 @@ This is development evidence, not a runtime reference. The evaluation used isola
 
 The first EVAL-001 attempt summarized Candidate artifacts instead of delivering their complete bytes in separate response blocks. It failed, drove the narrow delivery-protocol correction, and the fresh rerun above passed. Underspecified and encoding-broken EVAL-005 setup attempts were discarded before scoring; the listed fixture is the complete rerun.
 
-## Implementation Execution: 8 / 8 Pass
+## Implementation Execution: 9 / 9 Pass
 
 | Case | Result | Evaluator evidence | Observable result |
 |---|---|---|---|
@@ -37,6 +37,7 @@ The first EVAL-001 attempt summarized Candidate artifacts instead of delivering 
 | EVAL-006 | Pass | `ie-eval-006-fixture-0eea90718e79480d94c62fd1641b3d7d`; final run `58cb47e47361935d20991fec045b2bd45cd576feb451a48e14ddf02f5808875e` | Binding lookup/resume, earliest-incomplete continuation, WP-local invalidation, provisional drift, and all global revision routes passed. The final no-history Reviewer approved; Complete stayed byte-frozen when a later approved WP-local revision required a new worktree/base/binding/run. |
 | EVAL-007 | Pass | rejected run `11d382d1dbe5a26ffe7d2be2d66f1fbc7e9e382b0c15a86c08eb84ff555a3dc1`; corrected run `99f72ecaa077d452aaa49d04f9941c3a37ad060ec034775a513f07979c66ef52` | The first safe fixture was rejected for runner-error reds. The clean rerun produced exact assertion reds, preserved every boundary with zero secret hits, received fresh approval, and appended Complete after stable snapshots. |
 | EVAL-008 | Pass | `ie-eval-008-fresh-4752d279ecf548ebafa507e9de284cdd` | Complete BOOT contract reached its sentinel through the public seam; the incomplete contract stopped before product writes. |
+| EVAL-009 | Pass | delivery run `59fe7af7416219d51271e0e19865204d92d36ddcde93c0ffb277dc67dd0a6321`; fixture `delivery-forward-eval-262a077172de49daa08ea60c1d11e8a1` | A fully bound `delivery-run/v1` admitted only its exact current Ready requirements as an extra read-only input, stayed hash-stable through fresh review, and all binding/schema/hash/dirty-path variants failed closed. Standalone manifest-only behavior remained unchanged. Full evidence is in the [delivery-orchestrator report](../../delivery-orchestrator/scripts/behavior-evaluation-report.md). |
 
 EVAL-004 originally produced `blocked` after a command had not started. The observable ambiguity led to a narrow Reviewer-contract clarification: `blocked` means started but unable to complete a reliable determination, while `not_run` means never started. The D2 rerun produced a schema-valid `not_run` with null exit/counts and terminated Blocked without product changes.
 

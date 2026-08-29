@@ -17,7 +17,7 @@ description: 執行已核准的 `ready-plan/v1`：依 WP 以 outside-in BDD／in
 
 ## 1. Preflight
 
-完整讀取[Preflight 與 Ledger](references/preflight-and-ledger.md)。它是 execution workspace、binding、run identity、baseline、resume 與 revision 的唯一權威。驗證 `ready-plan/v1` schema／核准／hashes／base SHA／DAG／commands、fresh Reviewer 能力、專用 worktree、排他 binding、dirty baseline、工具及全部適用 Observed baseline。
+完整讀取[Preflight 與 Ledger](references/preflight-and-ledger.md)。它是 execution workspace、binding、run identity、baseline、resume 與 revision 的唯一權威。驗證 `ready-plan/v1` schema／核准／hashes／base SHA／DAG／commands、fresh Reviewer 能力、專用 worktree、排他 binding、dirty baseline、工具及全部適用 Observed baseline。Standalone run 維持 manifest-only dirty 規則；只有合法 `delivery-run/v1` 綁定可額外接受其 current Ready requirements 作為唯讀 upstream input。
 
 任一檢查失敗時，在零產品變更下進入 `Awaiting upstream reapproval` 或 `Blocked`。全部通過且 Ledger 已保存原始證據時才能 `Preflight → Executing`。
 

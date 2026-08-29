@@ -26,11 +26,23 @@
 1. 宿主能建立 fresh、無實作歷史、唯讀、不得委派且能執行必要命令的 Reviewer；否則 `Blocked`。
 2. Git 可用。解析 `git rev-parse --path-format=absolute --git-common-dir` 的 symlink／case、正規化 `/` 後取 UTF-8 SHA-256 得 `repo_id`；`canonical_worktree` 是同樣 canonical 化的 absolute toplevel。Artifact 只保存 repo ID，absolute common-dir path 只留 host-temp probe evidence。目前 root 必須精確匹配 `git worktree list --porcelain` 的 linked、非 primary worktree；branch attached，且不同於治理或 remote HEAD 所識別的 repository default branch，也不同於 primary worktree 的 attached branch。
 3. `initial_base_sha = HEAD = handoff.planning_baseline.head_sha`，`repo_id` 也與 handoff 相同。無可證明差異進入 `Awaiting upstream reapproval`。
-4. 首次 run 的 porcelain v2／untracked 狀態只可包含 handoff manifest 所列且 hash 相同的 Ready artifacts；產品、測試、設定及其他檔案均 clean。Resume 只接受最後 Ledger snapshot 中 hash 相同的 executor-owned changes。
+4. 首次 run 的 porcelain v2／untracked 狀態只可包含 handoff manifest 所列且 hash 相同的 Ready artifacts；產品、測試、設定及其他檔案均 clean。唯一額外例外是下述「Orchestrated requirements gate」。Resume 只接受最後 Ledger snapshot 中 hash 相同的 executor-owned changes。
 5. Git、runtime、compiler、runner、package manager 與 commands 所需工具可用。Observed BDD runner 現在可用；Proposed 內建 framework 執行核准的 availability probe，需額外安裝者只驗證核准的安裝前提，兩者都不在 Preflight 修改 manifest。
 6. 每個 command 的 network／外部副作用已有本次請求範圍內的授權；未授權副作用進入 `Blocked`，不執行命令。
 
 任一 workspace、工具、能力或未記錄 dirty state 失敗進入 `Blocked`。唯一允許的處理是保存證據並停止；不 stash、reset、clean、覆寫、建立／切換／刪除 worktree。
+
+### Orchestrated requirements gate
+
+Standalone execution 不使用此例外，原 manifest-only 規則完全不變。只有全部條件同時成立時，首次 run 可把一個 requirements 檔視為額外的唯讀 upstream input：
+
+1. 使用者或上游明示提供 host-temp run record；它完整符合 [`delivery-run/v1`](../../delivery-orchestrator/references/delivery-run.schema.json)，不是 repository 內檔案，且 status／phase 精確為 `active/implementation`。
+2. Record 的 `repo_id`、current generation `canonical_worktree`／`worktree_key`／attached branch／base SHA 與本次 execution probes、binding 及 `handoff.planning_baseline` 全部相同；generation 為 `ready`。不由 branch 名、相似 path 或 Work ID 猜測 record。
+3. 唯一例外 path 精確等於 record 的 current Ready requirements revision，形狀只能是 `docs/work/<work_id>/requirements.md` 或最小 `requirements-N.md`；Work ID 與 record、artifact root、current plan path 均一致。該 revision 具有非空且已遮蔽的 approval evidence refs，實際 bytes SHA-256 與 record 相同。
+4. Current handoff 精確等於 record 的 current Ready plan revision；其 `approval.evidence` 存在於 record 的 plan approval refs，且 `sources` 恰有一個 `kind: spec` source，其 repository-relative `location` 與 `sha256` 分別等於 current requirements path 與實際 hash。重新計算 Candidate payload digest與全部既有 Ready/source hashes仍通過。
+5. 該 path 不是產品、測試、設定、dependency manifest／lockfile或 command allowed-write。Porcelain 中除原 manifest Ready artifacts與這一個 requirements path之外仍為空；requirements 在 Preflight、execution及 review 全程不可修改。
+
+任一 record 欄位、核准 evidence、Work ID、workspace、branch、base、path、source kind、SHA 或 current ref 缺失／不符，就不套用例外並以未記錄 dirty path進入 `Blocked`。Record 與 probe 只寫 host-temp Ledger evidence；不把 absolute path 加入 repository artifacts。
 
 ## 3. Binding 與 run identity
 

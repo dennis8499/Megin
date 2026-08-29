@@ -7,10 +7,10 @@
 | 檢查 | Pass |
 |---|---|
 | Ready contract | schema、approval／digest、artifacts／sources hashes、contracts／commands／DAG／impact 與 base binding 全部成立 |
-| Workspace | fresh Reviewer capability、linked non-primary worktree、branch、dirty-state、tools 與 side-effect probes 全部成立 |
+| Workspace | fresh Reviewer capability、linked non-primary worktree、branch、dirty-state、tools 與 side-effect probes 全部成立；若使用 orchestrated requirements 例外，`delivery-run/v1`、Work ID、generation、核准 evidence、path／SHA 與 handoff `kind: spec` binding 全部相同 |
 | Ledger identity | host-temp root、repo／worktree／run IDs、atomic binding 與 resume lookup 全部可重算；競爭者沒有 record |
 | Baseline | 每個適用 Observed command fresh 通過 success／completeness，failure／skipped 為零；Proposed absence evidence 有效 |
-| Zero-write gate | 產品、測試、dependencies、Ready、秘密與外部狀態 hashes 不變 |
+| Zero-write gate | 產品、測試、dependencies、Ready、orchestrated requirements、秘密與外部狀態 hashes 不變 |
 
 ## BDD／TDD 與 WP
 

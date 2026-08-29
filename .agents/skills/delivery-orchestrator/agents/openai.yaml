@@ -1,0 +1,7 @@
+interface:
+  display_name: "Delivery Orchestrator"
+  short_description: "以 Work ID 編排需求、規劃、實作與獨立審查"
+  default_prompt: "使用 $delivery-orchestrator，為新的軟體變更建立隔離 worktree，並依序完成需求、規劃、實作與審查。"
+
+policy:
+  allow_implicit_invocation: true

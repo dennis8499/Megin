@@ -79,6 +79,12 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 
 **Pass：** 第一個 fixture 在 Preflight 只執行目前 source state 適用的 Observed baseline；不把尚不存在的 Proposed build／test 宣稱為通過。Preflight 後先建立目前 scenario／fixture並保存 snapshot，production diff 只包含 `BOOT-*` contract shape；bootstrap build／load／discovery 通過，focused BDD 隨後到達公開 seam 並因 sentinel 與獨立 acceptance oracle 不符而 red，而非 import、missing entrypoint、未處理 exception 或環境錯誤。只有此 red 後才出現 inner TDD 與產品行為。第二個 fixture 在任何 production 寫入前進入 `Awaiting upstream reapproval`。兩者均以 hashes 證明 bootstrap 沒有輸入轉換、規格輸出、領域分支、runtime dependency、外部副作用或已滿足的驗收。
 
+## EVAL-009 — Delivery-orchestrated requirements dirty gate
+
+在同一 linked worktree 依序提供合法 `delivery-run/v1`，以及錯誤 schema／Work ID／generation workspace／branch／base、缺 requirements approval evidence、requirements path 或 SHA drift、current handoff drift、缺少或重複 `kind: spec` source、plan approval evidence drift與額外產品 dirty path。另以相同 Ready plan 不提供 delivery record，驗證 standalone 行為。
+
+**Pass：** 只有完整合法 record 讓精確 current requirements 成為額外唯讀 upstream input；它在 baseline、執行與 review snapshots 中 hash 不變。任一 binding 錯誤或額外 dirty path 均在零產品變更下 `Blocked`。沒有 delivery record 時維持原 manifest-only whitelist，不用 branch／path／Work ID 猜測例外。
+
 ## 驗證紀錄
 
 每次維護至少記錄 Skill revision、fixture 與 evaluator 隔離方式、各 `EVAL-*` 的 `Pass`／`Fail`、原始命令結果、failure 證據、前後 hash 與 Reviewer report。此紀錄是開發期產物，不寫入 runtime Skill references。
