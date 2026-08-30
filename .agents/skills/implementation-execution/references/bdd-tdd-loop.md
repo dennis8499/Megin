@@ -21,17 +21,9 @@ BDD 邊界依 framework 生命週期建立：
 
 安裝／availability 失敗或實際 framework contract 與 Ready plan 不符時，停止產品變更並依證據進入 `Awaiting upstream reapproval` 或 `Blocked`。
 
-### 僅限 code-empty greenfield 的 seam bootstrap
+### Code-empty greenfield 分支
 
-一般情況不得在第一個正確 red 前建立 production shape。唯一例外是 source manifest 已證明第一個公開 seam／必要 entrypoint 不存在，且 Ready plan 已核准完整 `BOOT-*`。主代理必須依序：
-
-1. 先建立目前 `BDD-*` 的 feature、bindings、fixture 與獨立 oracle，但不執行任何未經授權的 production 寫入。
-2. 保存完整 tracked／unignored snapshot；只新增 `BOOT-*` 明列的 paths、公開 declaration／signature、最小宿主 wiring 與 deterministic `Unimplemented` sentinel／outcome。
-3. 在執行前檢查 bootstrap diff：不得有領域分支、輸入轉換、規格輸出、production runtime dependency、外部呼叫、網路、持久化、狀態變更或任何能滿足目前或下游驗收 oracle 的內容。
-4. 執行 `CMD-BOOT-*` build／load／discovery。失敗只可修正核准 contract shape 內的 declaration／wiring；不得加入產品行為。無法在該邊界內成功時進入 `Awaiting upstream reapproval`。
-5. 保存 bootstrap command、完整輸出及前後 diff，再執行第一個 focused BDD command。runner 必須到達 `SEAM-*`，fixture 將 sentinel 當作 observed actual，report 以 assertion mismatch 證明目標行為缺失；未處理 exception、load、runtime、fixture 或 runner error 不算 red。
-
-`BOOT-*` 是讓 oracle 可觀察「尚未實作」的 contract shape，不是產品行為、TDD green 或工作包完成證據。若 bootstrap 已讓 scenario green、sentinel 可能等於任何驗收結果、diff 超出核准範圍，立即進入 `Awaiting upstream reapproval`，不得擴大或修補 production。取得第一個正確 BDD red 後，才可由內層 TDD 以最小 green 取代 sentinel；後續 scenarios 不得重用 bootstrap 例外來跳過各自的 red。
+Source manifest 證明第一個公開 seam／entrypoint 不存在時，先完整讀取 [Greenfield Bootstrap 契約](greenfield-bootstrap.md)。只有該契約完成條件成立，第一個 focused BDD 才可把核准 sentinel 的 assertion mismatch 視為正確 red；其他 production shape 仍維持不變。
 
 ## 2. 每個行為切片的外層 red
 

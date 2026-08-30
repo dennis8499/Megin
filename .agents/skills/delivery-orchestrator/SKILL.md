@@ -1,38 +1,60 @@
 ---
 name: delivery-orchestrator
-description: 為新的軟體行為或架構變更建立或續接 Work ID 專用 Git worktree，並編排 requirements-discovery、technical-planning、implementation-execution 至 fresh review。用於要求落地的新功能、修錯、實質重構與介面／資料／依賴變更；純解說、診斷、審查、plan-only、格式或微小文字修改不適用。
+description: 交付新的軟體行為或架構變更：建立或續接 Work ID 專用 Git worktree，並路由需求探索、技術規劃、實作執行與 fresh review。適用於新功能、修錯、實質重構及介面／資料／依賴變更；純解說、診斷、審查、plan-only、格式與微小文字修改不適用。
 ---
+
+<!-- authority: delivery-entrypoint -->
 
 # Delivery Orchestrator
 
-以一個穩定 `work_id` 把需求、規劃與實作留在同一個隔離 workspace。既有三個階段 Skill 各自擁有內容與核准規則；本 Skill 只擁有 workspace、跨階段狀態與交接。
+以穩定 work_id 保存 workspace identity、兩次人工核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state 與 routing。
 
-## 不可變邊界
+## 呼叫邊界
 
-- 新 work 只從嚴格 clean、attached 的 primary worktree 建立；resume 只依既有 record，不以 primary dirty state 阻擋。
-- Worktree／branch 建立是唯一自動 Git mutation；不 stash、reset、clean、stage、commit、push、merge、部署、刪除或清理 worktree。
-- 需求與計畫各保留一次完整人工核准。計畫成為 Ready 後，原始落地請求與兩次核准共同授權直接進入實作，不再詢問第三次。
-- Runtime record 位於 host temp，不提交；秘密只保存遮蔽事件或 digest，不保存原值。
-- 相同 `work_id`、path、branch 或 registry 有無法證明一致的碰撞時停止，不接管或覆寫。
+| 請求 | 路由 |
+|---|---|
+| 新功能、修錯、實質重構、介面／資料／依賴行為變更 | 本 Skill |
+| 純解說、診斷、唯讀審查、plan-only | 對應一般／階段工作流 |
+| 格式或微小文字修改 | 直接處理，不建立 delivery run |
 
-## 1. 決定 new 或 resume
+完成條件：請求唯一落在一列；不適用時沒有 registry、branch 或 worktree mutation。
 
-完整讀取[Workspace 與 Run 契約](references/workspace-and-run.md)。優先使用本對話已綁定或使用者提供的 `work_id`；否則執行 helper 的 `locate`：只有一個 active work 時續跑，多個時只請使用者選擇，沒有時才建立新 work。使用者明確要求另一個新 work 時不得誤接既有 record。
+## 不變量
 
-新 work 先以 `probe` 取得 repo／HEAD／clean evidence 與建議 ID，再以 `start` 建立。任何後續 repo 命令與寫入都以回傳的 delivery worktree 為 cwd；不能取得 sibling path 寫入授權時，在 Git mutation 前停止。
+- New work 的 base 是 strict-clean attached primary；resume 只接受可驗證 record。
+- 唯一自動 Git mutation 是 helper 建立 worktree／branch。嚴禁 stash、reset、clean、stage、commit、push、merge、deploy、delete 或 cleanup。
+- Requirements 與 Plan 各有一次完整人工核准；第二次核准直接授權 Implementation。
+- Runtime record 在 host temp；repository artifacts 只存相對路徑，秘密只存 digest、byte count 或遮蔽事件。
+- ID、path、branch、registry 與 generation continuity 必須可證明；collision／drift 保留現場並停止。
 
-## 2. 依 phase 編排
+## 1. 取得 identity
 
-Workspace ready 後完整讀取[階段路由契約](references/stage-routing.md)，並只載入目前 phase 對應的既有 Skill：
+完整讀取 [Workspace 與 Run](references/workspace-and-run.md)。優先使用已綁定或明示 work_id；否則 locate：唯一 active 就 resume，多個只列 ID，沒有才 new work。
 
-1. `requirements`：完整讀取並遵守 `../requirements-discovery/SKILL.md`，指定 `docs/work/<work_id>/requirements.md` 或最小 revision 後綴。
-2. `planning`：需求 Ready 後完整讀取並遵守 `../technical-planning/SKILL.md`，指定 `docs/work/<work_id>/plan/` 或最小 revision 後綴。
-3. `implementation`：技術計畫 Ready 後完整讀取並遵守 `../implementation-execution/SKILL.md`；fresh Reviewer 與 terminal ordering 仍由該 Skill 擁有。
+New work／generation 再讀取 [Workspace 建立](references/workspace-creation.md)，以 probe／start 建立。GIT_TRUST_REQUIRED 時取得 unsandboxed Git 授權後原樣重跑，不新增或繞過 safe.directory。
 
-每個可重現的 approval、artifact、阻塞與 child Ledger 先持久化，再用 helper `transition` 追加 event。Technical Planning 發現需求缺口時回 `requirements`；Implementation 要求上游重新核准時回 `planning`。`Complete` record 不重開。
+完成條件：schema-valid record 的 repo、worktree、branch、base 與 registry binding 全相符；new generation 另為 ready。後續 repository 命令以該 worktree 為 cwd。
 
-## 3. 交付與維護
+## 2. 路由 phase
 
-中斷、等待核准或 Blocked 時回報 `work_id`、worktree、branch、phase／status、目前 artifacts、blocker 與 run record path。Complete 時另回報 requirements、Ready handoff、implementation Ledger、fresh review 結果及未提交 diff；保留 workspace 原狀。
+Workspace ready 後讀取 [階段路由](references/stage-routing.md)，只載入目前 child：
 
-維護本 Skill 時才讀取[行為驗證契約](references/behavior-evaluation.md)，執行其中的靜態檢查、隔離 Git fixtures 與 fresh evaluator；一般 runtime 不載入。
+- requirements → requirements-discovery
+- planning → technical-planning
+- implementation → implementation-execution
+
+Child 先持久化結果；orchestrator 再以一次 atomic transition 保存 refs／state。
+
+完成條件：record phase/status 與 child 狀態一致，current refs 可重算 hash；未完成 child 沒有被越過或重跑。
+
+## 3. Resume／Blocked／Complete
+
+Resume 從最早未完成 action 繼續。Blocked 追加 blocker evidence；解除時在同 phase 追加 recovery evidence。Complete 先保存 implementation Ledger／review refs，再轉 complete/complete 並凍結。
+
+交付回報 work_id、generation、worktree／branch、phase／status、current refs、next action 與 record path；Complete 另含 fresh verdict 與未提交 diff。
+
+完成條件：terminal ordering、schema 與 append-only semantics 通過；workspace 保留且沒有 terminal Git／發布動作。
+
+## 維護
+
+修改本 bundle 才讀取 [行為驗證契約](references/behavior-evaluation.md)，執行 static、unit、integration、forward evaluator 與 fresh review。完成條件：適用案例有隔離 evidence，schema bytes／CLI 相容，報告只記實際結果。

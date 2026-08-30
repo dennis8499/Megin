@@ -57,3 +57,19 @@ git diff --cached --check
 ```
 
 The checker uses only the Python standard library. Its five unit tests cover repository contracts, Ready cross-references/digest/time/source materialization, review outcomes/advisories, Ledger/snapshot/state semantics, and mutation detection without fixed prose or output-length assertions.
+
+## 2026-08-30 validator ownership revision
+
+- Base HEAD: `7353419975c5a0df47bf28697b419f643c890fee`.
+- `ready-plan/v1` schema SHA-256 remains `9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3`.
+- Producer validator: Pass; producer tests: 3/3 Pass.
+- Execution schema, Ledger and review semantics now run from `implementation-execution/scripts/`; Technical Planning runtime behavior is unchanged.
+- Technical Planning EVAL-001..007 fresh rerun and final Reviewer verdict remain pending until recorded; pending is not a Pass.
+
+### Closure revision — producer compatibility evaluation
+
+The pending snapshot above is retained. A separate read-only evaluator subsequently confirmed Technical Planning EVAL-001..007 at **7/7 Pass**, the producer validator at Pass, and its focused tests at **3/3 Pass**. Technical Planning runtime files remained byte-for-byte unchanged; only maintenance ownership, shared JSON-schema helpers, the Ready fixture, links and reports changed.
+
+`ready-plan/v1` remains SHA-256 `9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3`. Final maintenance corpus: **13 files, 101,821 bytes, SHA-256 `5f0c4094f8c346ad122b4334a047f60831a8a17096f63c094374568e81db039d`**, excluding this behavior report and cache files under the sorted `relative-path<TAB>byte-count<TAB>file-sha256<LF>` algorithm.
+
+Closure evaluator attestation: `independent=true`, `read_only=true`, `report_as_oracle=false`, `write_actions=false`.

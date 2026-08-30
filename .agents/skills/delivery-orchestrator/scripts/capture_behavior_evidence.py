@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -12,13 +11,11 @@ from typing import Any
 
 
 sys.dont_write_bytecode = True
-TEST_SCRIPT = Path(__file__).with_name("test_delivery_workspace.py")
-SPEC = importlib.util.spec_from_file_location("delivery_workspace_evidence_fixture", TEST_SCRIPT)
-if SPEC is None or SPEC.loader is None:  # pragma: no cover - import infrastructure
-    raise RuntimeError(f"cannot import {TEST_SCRIPT}")
-fixture = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = fixture
-SPEC.loader.exec_module(fixture)
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+import _delivery_test_support as fixture  # noqa: E402
+from test_delivery_worktree import DeliveryWorktreeTests  # noqa: E402
 
 
 def sha256(value: bytes) -> str:
@@ -38,7 +35,7 @@ def normalized_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 def main() -> int:
-    case = fixture.DeliveryWorkspaceTests(methodName="test_clean_start_preserves_primary_and_dirty_resume")
+    case = DeliveryWorktreeTests(methodName="test_clean_start_preserves_primary_and_dirty_resume")
     case.setUp()
     try:
         primary = case.make_repo("hash-witness")

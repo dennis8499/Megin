@@ -31,7 +31,7 @@ Preflight → Executing → Verifying → Reviewing → Complete
 
 ## Complete
 
-`Complete` 必須依序發生：Reviewer response received → 寫入前重算 snapshot 且相同 → 原樣保存 raw response／outputs／report → 保存後重算 snapshot 且相同 → append `Complete`。任一步失敗走 Reviewer 契約的 drift 或 `Blocked` 分支，不先凍結 run。
+`Complete` 必須依序發生：Reviewer response received → 寫入前重算 snapshot 且相同 → 原樣保存 raw response／outputs／report → 保存後重算 snapshot 且相同 → append `Complete`。前六步各寫一份有序`terminal/<sequence>-<step>.json` machine witness，最後的Ledger transition證明`complete_appended`。Machine ordering的`report_persisted`代表current round raw response、report宣告的每個raw output ref與schema-valid report整組均已有可讀bytes；consumer validator以canonical run root驗證terminal index、capability／baseline、main command raw outputs與六個witness的精確集合，不接受phantom ref或只列部分outputs。最後transition使用[Ledger terminal index](preflight-and-ledger.md)逐一引用；任一步失敗走 Reviewer 契約的 drift 或 `Blocked` 分支，不先凍結 run。
 
 交付回報：
 

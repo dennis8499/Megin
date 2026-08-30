@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Development-only consistency checks for the planning/execution skill pair."""
+"""Producer-owned validation for ready-plan/v1 and shared JSON Schema helpers."""
 
 from __future__ import annotations
 
@@ -19,12 +19,8 @@ AUTHORITY_FILES = {
     "planning-entrypoint": "technical-planning/SKILL.md",
     "ready-plan": "technical-planning/references/ready-plan-contract.md",
     "planning-state": "technical-planning/references/delivery-protocol.md",
-    "execution-ledger": "implementation-execution/references/preflight-and-ledger.md",
-    "execution-loop": "implementation-execution/references/bdd-tdd-loop.md",
-    "execution-review": "implementation-execution/references/reviewer-contract.md",
-    "execution-state": "implementation-execution/references/delivery-protocol.md",
 }
-
+READY_SCHEMA_SHA256 = "9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3"
 READY_ROOT_REQUIRED = {
     "schema",
     "candidate",
@@ -71,97 +67,6 @@ READY_OBJECT_REQUIRED = {
     "planning_baseline": {"repo_id", "head_sha", "status_sha256"},
     "revision_impact": {"revision", "changes"},
 }
-
-EXECUTION_DEF_REQUIRED = {
-    "ledger": {
-        "schema",
-        "run_id",
-        "binding",
-        "handoff_path",
-        "capability_evidence_refs",
-        "baseline_evidence_refs",
-        "attempts",
-        "current_attempt_id",
-    },
-    "snapshot": {
-        "schema",
-        "repo_id",
-        "worktree_key",
-        "base_sha",
-        "head_sha",
-        "ready_hashes",
-        "source_hashes",
-        "tracked_diff_sha256",
-        "unignored_files",
-        "snapshot_id",
-    },
-    "reviewReport": {
-        "schema",
-        "round",
-        "verdict",
-        "snapshot_before",
-        "snapshot_after",
-        "attestation",
-        "command_outcomes",
-        "raw_output_refs",
-        "requirement_coverage",
-        "findings",
-        "summary",
-    },
-    "binding": {"repo_id", "canonical_worktree", "worktree_key", "branch", "initial_base_sha", "run_id"},
-    "attempt": {"attempt_id", "candidate_revision", "state", "wp_states", "state_history"},
-    "stateTransition": {"sequence", "from", "to", "evidence_refs"},
-    "commandOutcome": {"command_id", "outcome", "exit_code", "failure_count", "skipped_count", "output_ref", "not_run_reason"},
-    "reviewerAttestation": {"agent_id", "fresh_session", "read_only", "implementation_conversation_received", "delegation_used", "write_actions"},
-    "findingKeyInputs": {"category", "source_refs", "affected_loci", "required_outcome"},
-    "finding": {"finding_id", "finding_key", "key_inputs", "severity", "blocking", "message", "evidence_refs", "wp_refs", "bdd_refs", "test_refs"},
-    "coverage": {"source_ref", "obligation_ref", "bdd_refs", "test_refs", "wp_refs", "code_evidence", "result"},
-    "breakerFinding": {"finding_key", "consecutive_unresolved_rounds", "no_progress_rounds", "last_evidence_sha256"},
-    "breaker": {"schema", "findings", "global_no_progress_rounds"},
-}
-
-EXPECTED_STATES = {
-    "Preflight",
-    "Executing",
-    "Verifying",
-    "Reviewing",
-    "Fixing",
-    "Complete",
-    "Awaiting upstream reapproval",
-    "Blocked",
-}
-
-EXPECTED_TRANSITIONS = {
-    "Preflight": ["Executing", "Awaiting upstream reapproval", "Blocked"],
-    "Executing": ["Verifying", "Awaiting upstream reapproval", "Blocked"],
-    "Verifying": ["Reviewing", "Fixing", "Awaiting upstream reapproval", "Blocked"],
-    "Reviewing": ["Complete", "Fixing", "Verifying", "Awaiting upstream reapproval", "Blocked"],
-    "Fixing": ["Verifying", "Awaiting upstream reapproval", "Blocked"],
-    "Complete": [],
-    "Awaiting upstream reapproval": [],
-    "Blocked": [],
-}
-
-REQUIRED_STATE_EDGES = {
-    ("Preflight", "Executing"),
-    ("Executing", "Verifying"),
-    ("Verifying", "Reviewing"),
-    ("Verifying", "Fixing"),
-    ("Reviewing", "Complete"),
-    ("Reviewing", "Fixing"),
-    ("Reviewing", "Verifying"),
-    ("Fixing", "Verifying"),
-}
-
-TERMINAL_ORDER = [
-    "review_received",
-    "snapshot_recomputed_before_persist",
-    "snapshot_matched_before_persist",
-    "report_persisted",
-    "snapshot_recomputed_after_persist",
-    "snapshot_matched_after_persist",
-    "complete_appended",
-]
 
 LINK_RE = re.compile(r"!?(?<!\\)\[[^\]]*\]\(([^)]+)\)")
 AUTHORITY_RE = re.compile(r"<!--\s*authority:\s*([a-z0-9-]+)\s*-->")
@@ -310,17 +215,6 @@ def ready_payload_sha256(data: dict[str, Any]) -> str:
     for artifact in payload.get("artifacts", []):
         artifact["approval_status"] = "Candidate"
     return canonical_sha256(payload)
-
-
-def finding_key(key_inputs: dict[str, Any]) -> str:
-    normalize_text = lambda value: " ".join(value.strip().split())
-    normalized = {
-        "category": normalize_text(key_inputs["category"]).lower(),
-        "source_refs": sorted(normalize_text(item) for item in key_inputs["source_refs"]),
-        "affected_loci": sorted(normalize_text(item).replace("\\", "/") for item in key_inputs["affected_loci"]),
-        "required_outcome": normalize_text(key_inputs["required_outcome"]),
-    }
-    return canonical_sha256(normalized)
 
 
 def repository_path_error(value: Any, *, allow_dot: bool = False, allow_trailing_slash: bool = False) -> str | None:
@@ -593,205 +487,6 @@ def validate_ready_cross_references(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def validate_execution_record_semantics(data: dict[str, Any]) -> list[str]:
-    """Check canonical identities and verdict invariants that JSON Schema cannot express."""
-    errors: list[str] = []
-    schema_name = data.get("schema")
-    if schema_name == "implementation-ledger/v1":
-        if data.get("run_id") != data.get("binding", {}).get("run_id"):
-            errors.append("ledger: run_id differs from binding.run_id")
-        attempts = data.get("attempts", [])
-        attempt_ids = [attempt.get("attempt_id") for attempt in attempts]
-        if len(attempt_ids) != len(set(attempt_ids)):
-            errors.append("ledger: duplicate attempt_id")
-        if data.get("current_attempt_id") not in set(attempt_ids):
-            errors.append("ledger: current_attempt_id does not identify an attempt")
-        for attempt in attempts:
-            history = attempt.get("state_history", [])
-            sequences = [transition.get("sequence") for transition in history]
-            if sequences != list(range(1, len(history) + 1)):
-                errors.append(f"ledger: {attempt.get('attempt_id')} state transition sequence is not contiguous")
-            previous: str | None = None
-            for index, transition in enumerate(history):
-                if transition.get("from") != previous:
-                    errors.append(f"ledger: {attempt.get('attempt_id')} state history is discontinuous at {index + 1}")
-                target = transition.get("to")
-                if previous is None:
-                    if target != "Preflight":
-                        errors.append(f"ledger: {attempt.get('attempt_id')} must start at Preflight")
-                elif target not in EXPECTED_TRANSITIONS.get(previous, []):
-                    errors.append(f"ledger: illegal transition {previous} -> {target}")
-                previous = target
-            if history and history[-1].get("to") != attempt.get("state"):
-                errors.append(f"ledger: {attempt.get('attempt_id')} current state differs from history")
-    elif schema_name == "implementation-snapshot/v1":
-        ready_refs = [item.get("ref") for item in data.get("ready_hashes", [])]
-        source_refs = [item.get("ref") for item in data.get("source_hashes", [])]
-        paths = [item.get("path") for item in data.get("unignored_files", [])]
-        if ready_refs != sorted(ready_refs):
-            errors.append("snapshot: ready_hashes are not sorted by ref")
-        if source_refs != sorted(source_refs):
-            errors.append("snapshot: source_hashes are not sorted by ref")
-        if paths != sorted(paths, key=lambda value: value.encode("utf-8")):
-            errors.append("snapshot: unignored_files are not sorted by UTF-8 path bytes")
-        for label, values in (("ready ref", ready_refs), ("source ref", source_refs), ("unignored path", paths)):
-            if len(values) != len(set(values)):
-                errors.append(f"snapshot: duplicate {label}")
-        payload = dict(data)
-        actual = payload.pop("snapshot_id", None)
-        if actual != canonical_sha256(payload):
-            errors.append("snapshot: snapshot_id does not match canonical content")
-    elif schema_name == "implementation-review/v1":
-        raw_refs = set(data.get("raw_output_refs", []))
-        outcomes = data.get("command_outcomes", [])
-        for outcome in outcomes:
-            output_ref = outcome.get("output_ref")
-            if output_ref is not None and output_ref not in raw_refs:
-                errors.append(f"review: {outcome.get('command_id')} output_ref is absent from raw_output_refs")
-        for finding in data.get("findings", []):
-            if finding.get("finding_key") != finding_key(finding.get("key_inputs", {})):
-                errors.append(f"review: finding {finding.get('finding_id')} has a non-canonical finding_key")
-        if data.get("verdict") == "APPROVED":
-            if any(item.get("outcome") != "passed" for item in outcomes):
-                errors.append("review: APPROVED requires every command outcome to be passed")
-            if any(item.get("result") != "covered" for item in data.get("requirement_coverage", [])):
-                errors.append("review: APPROVED requires complete covered requirement evidence")
-            if any(item.get("blocking") is True for item in data.get("findings", [])):
-                errors.append("review: APPROVED cannot contain a blocking finding")
-            if data.get("snapshot_before") != data.get("snapshot_after"):
-                errors.append("review: APPROVED requires identical before/after snapshots")
-        if data.get("verdict") == "CHANGES_REQUIRED" and not any(
-            item.get("blocking") is True for item in data.get("findings", [])
-        ):
-            errors.append("review: CHANGES_REQUIRED requires a blocking finding")
-    return errors
-
-
-def validate_review_against_ready(report: dict[str, Any], ready: dict[str, Any]) -> list[str]:
-    """Validate report coverage and full-command outcomes against its producer handoff."""
-    errors: list[str] = []
-    commands = {item["command_id"]: item for item in ready.get("commands", [])}
-    review_purposes = {"build-full", "test-full", "bdd-full", "governance", "ci"}
-    required_commands = {command_id for command_id, item in commands.items() if item.get("purpose") in review_purposes}
-    outcome_ids = [item.get("command_id") for item in report.get("command_outcomes", [])]
-    if len(outcome_ids) != len(set(outcome_ids)):
-        errors.append("review: duplicate command outcome")
-    unknown_commands = set(outcome_ids) - set(commands)
-    if unknown_commands:
-        errors.append(f"review: unknown command outcomes {sorted(unknown_commands)}")
-    missing_commands = required_commands - set(outcome_ids)
-    if missing_commands:
-        errors.append(f"review: missing full command outcomes {sorted(missing_commands)}")
-
-    sources = {item["source_id"]: item for item in ready.get("sources", [])}
-    contracts = {item["contract_id"]: item for item in ready.get("contract_index", [])}
-    packages = {item["wp_id"] for item in ready.get("work_packages", [])}
-    expected_coverage = {
-        (source_id, plan_ref)
-        for source_id, source in sources.items()
-        for plan_ref in source.get("plan_refs", [])
-    }
-    actual_coverage: set[tuple[str, str]] = set()
-    for item in report.get("requirement_coverage", []):
-        key = (item.get("source_ref"), item.get("obligation_ref"))
-        if key in actual_coverage:
-            errors.append(f"review: duplicate coverage entry {key}")
-        actual_coverage.add(key)
-        if key[0] not in sources or key[1] not in sources.get(key[0], {}).get("plan_refs", []):
-            errors.append(f"review: coverage entry {key} is absent from the source manifest")
-        for ref, expected_kind in (
-            *((ref, "bdd-scenario") for ref in item.get("bdd_refs", [])),
-            *((ref, "inner-test") for ref in item.get("test_refs", [])),
-        ):
-            if ref not in contracts or contracts[ref].get("kind") != expected_kind:
-                errors.append(f"review: coverage entry {key} has unknown {expected_kind} ref {ref}")
-        for ref in item.get("wp_refs", []):
-            if ref not in packages:
-                errors.append(f"review: coverage entry {key} has unknown work package {ref}")
-    missing_coverage = expected_coverage - actual_coverage
-    if missing_coverage:
-        errors.append(f"review: missing source obligations {sorted(missing_coverage)}")
-    for finding in report.get("findings", []):
-        for ref in finding.get("key_inputs", {}).get("source_refs", []):
-            if ref not in sources:
-                errors.append(f"review: finding {finding.get('finding_id')} has unknown source {ref}")
-        for ref, expected_kind in (
-            *((ref, "bdd-scenario") for ref in finding.get("bdd_refs", [])),
-            *((ref, "inner-test") for ref in finding.get("test_refs", [])),
-        ):
-            if ref not in contracts or contracts[ref].get("kind") != expected_kind:
-                errors.append(f"review: finding {finding.get('finding_id')} has unknown {expected_kind} ref {ref}")
-        for ref in finding.get("wp_refs", []):
-            if ref not in packages:
-                errors.append(f"review: finding {finding.get('finding_id')} has unknown work package {ref}")
-    return errors
-
-
-def _validate_links(skills_root: Path, errors: list[str]) -> None:
-    markdown_files = [
-        *skills_root.glob("technical-planning/**/*.md"),
-        *skills_root.glob("implementation-execution/**/*.md"),
-    ]
-    for markdown in sorted(markdown_files):
-        text = markdown.read_text(encoding="utf-8")
-        for match in LINK_RE.finditer(text):
-            raw = match.group(1).strip()
-            if raw.startswith("<") and raw.endswith(">"):
-                raw = raw[1:-1]
-            target = raw.split("#", 1)[0]
-            if not target or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
-                continue
-            resolved = (markdown.parent / unquote(target)).resolve()
-            if not resolved.exists():
-                errors.append(f"broken local link: {markdown.relative_to(skills_root)} -> {target}")
-
-
-def _validate_authorities(skills_root: Path, errors: list[str]) -> None:
-    found: dict[str, list[str]] = {}
-    markdown_files = [
-        *skills_root.glob("technical-planning/**/*.md"),
-        *skills_root.glob("implementation-execution/**/*.md"),
-    ]
-    for markdown in sorted(markdown_files):
-        relative = markdown.relative_to(skills_root).as_posix()
-        for name in AUTHORITY_RE.findall(markdown.read_text(encoding="utf-8")):
-            found.setdefault(name, []).append(relative)
-    for name, expected in AUTHORITY_FILES.items():
-        actual = found.get(name, [])
-        if actual != [expected]:
-            errors.append(f"authority {name!r}: expected [{expected}], got {actual}")
-    for name in found.keys() - AUTHORITY_FILES.keys():
-        errors.append(f"unknown authority marker {name!r} in {found[name]}")
-
-
-def _validate_structural_pointers(skills_root: Path, errors: list[str]) -> None:
-    required_fragments = {
-        "implementation-execution/references/preflight-and-ledger.md": [
-            "../../technical-planning/references/ready-plan-contract.md",
-            "../../technical-planning/references/ready-plan.schema.json",
-        ],
-        "technical-planning/references/behavior-evaluation.md": [
-            ".agents/skills/technical-planning/scripts/validate_contracts.py",
-            ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
-        ],
-        "implementation-execution/references/behavior-evaluation.md": [
-            ".agents/skills/technical-planning/scripts/validate_contracts.py",
-            ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
-        ],
-        "technical-planning/agents/openai.yaml": ["allow_implicit_invocation: true"],
-        "implementation-execution/agents/openai.yaml": ["allow_implicit_invocation: true"],
-    }
-    for relative, fragments in required_fragments.items():
-        path = skills_root / relative
-        if not path.is_file():
-            errors.append(f"missing structural pointer owner: {relative}")
-            continue
-        text = path.read_text(encoding="utf-8")
-        for fragment in fragments:
-            if fragment not in text:
-                errors.append(f"{relative}: missing structural pointer {fragment}")
-
-
 def _validate_schema_refs(schema: dict[str, Any], label: str, errors: list[str]) -> None:
     for node in _walk(schema):
         if isinstance(node, dict) and "$ref" in node:
@@ -863,87 +558,75 @@ def _validate_ready_schema(schema: dict[str, Any], errors: list[str]) -> None:
         if not validate_instance(value, schema, "sourceLocation"):
             errors.append(f"ready schema: sourceLocation accepts unsafe local value {value!r}")
 
+def _validate_links(skills_root: Path, errors: list[str]) -> None:
+    for markdown in sorted(skills_root.glob("technical-planning/**/*.md")):
+        for match in LINK_RE.finditer(markdown.read_text(encoding="utf-8")):
+            raw = match.group(1).strip().strip("<>")
+            target = raw.split("#", 1)[0]
+            if not target or re.match(r"^[a-z][a-z0-9+.-]*:", target, re.IGNORECASE):
+                continue
+            if not (markdown.parent / unquote(target)).resolve().exists():
+                errors.append(
+                    f"broken local link: {markdown.relative_to(skills_root)} -> {target}"
+                )
 
-def _validate_execution_schema(schema: dict[str, Any], errors: list[str]) -> None:
-    defs = schema.get("$defs", {})
-    for name, expected in EXECUTION_DEF_REQUIRED.items():
-        actual = _required(defs.get(name, {}))
-        if not expected <= actual:
-            errors.append(f"execution schema: {name} missing required fields {sorted(expected - actual)}")
 
-    state_enum = set(defs.get("state", {}).get("enum", []))
-    if state_enum != EXPECTED_STATES:
-        errors.append(f"execution schema: state enum drift {sorted(state_enum ^ EXPECTED_STATES)}")
-    transitions = schema.get("x-state-transitions", {})
-    if set(transitions) != EXPECTED_STATES:
-        errors.append("execution schema: transition sources do not equal state enum")
-    if transitions != EXPECTED_TRANSITIONS:
-        errors.append("execution schema: state transitions differ from the authoritative graph")
-    edges = {(source, target) for source, targets in transitions.items() for target in targets}
-    for source, target in edges:
-        if target not in EXPECTED_STATES:
-            errors.append(f"execution schema: transition {source} -> {target} targets unknown state")
-    if not REQUIRED_STATE_EDGES <= edges:
-        errors.append(f"execution schema: missing required state edges {sorted(REQUIRED_STATE_EDGES - edges)}")
-    for state in EXPECTED_STATES - {"Complete", "Awaiting upstream reapproval", "Blocked"}:
-        for terminal in ("Awaiting upstream reapproval", "Blocked"):
-            if terminal not in transitions.get(state, []):
-                errors.append(f"execution schema: incomplete state {state} cannot reach {terminal}")
-    for terminal in ("Complete", "Awaiting upstream reapproval", "Blocked"):
-        if transitions.get(terminal):
-            errors.append(f"execution schema: terminal state {terminal} has outgoing transitions")
+def _validate_authorities(skills_root: Path, errors: list[str]) -> None:
+    found: dict[str, list[str]] = {}
+    for markdown in sorted(skills_root.glob("technical-planning/**/*.md")):
+        relative = markdown.relative_to(skills_root).as_posix()
+        for name in AUTHORITY_RE.findall(markdown.read_text(encoding="utf-8")):
+            found.setdefault(name, []).append(relative)
+    for name, expected in AUTHORITY_FILES.items():
+        actual = found.get(name, [])
+        if actual != [expected]:
+            errors.append(f"authority {name!r}: expected [{expected}], got {actual}")
+    for name in found.keys() - AUTHORITY_FILES.keys():
+        errors.append(f"unknown authority marker {name!r} in {found[name]}")
 
-    wp_edges = {(source, target) for source, targets in schema.get("x-wp-state-transitions", {}).items() for target in targets}
-    for edge in (("Invalidated", "Executing"), ("Executing", "Verified"), ("Verified", "Invalidated")):
-        if edge not in wp_edges:
-            errors.append(f"execution schema: missing WP transition {edge[0]} -> {edge[1]}")
 
-    if schema.get("x-terminal-ordering") != TERMINAL_ORDER:
-        errors.append("execution schema: terminal ordering drift")
-
-    outcomes = set(defs.get("commandOutcome", {}).get("properties", {}).get("outcome", {}).get("enum", []))
-    if outcomes != {"passed", "failed", "blocked", "not_run"}:
-        errors.append("execution schema: command outcomes cannot represent every review result")
-    for field in ("exit_code", "failure_count", "skipped_count"):
-        types = defs.get("commandOutcome", {}).get("properties", {}).get(field, {}).get("type", [])
-        if set(types) != {"integer", "null"}:
-            errors.append(f"execution schema: {field} must be integer|null")
-    if defs.get("finding", {}).get("properties", {}).get("blocking", {}).get("type") != "boolean":
-        errors.append("execution schema: finding.blocking is not a boolean")
-    severities = set(defs.get("finding", {}).get("properties", {}).get("severity", {}).get("enum", []))
-    if "advisory" not in severities:
-        errors.append("execution schema: advisory finding is not representable")
+def _validate_structural_pointers(skills_root: Path, errors: list[str]) -> None:
+    required_fragments = {
+        "technical-planning/references/behavior-evaluation.md": [
+            ".agents/skills/technical-planning/scripts/validate_contracts.py",
+            ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+        ],
+        "technical-planning/agents/openai.yaml": [
+            "allow_implicit_invocation: true",
+            "$technical-planning",
+        ],
+    }
+    for relative, fragments in required_fragments.items():
+        path = skills_root / relative
+        if not path.is_file():
+            errors.append(f"missing structural pointer owner: {relative}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        for fragment in fragments:
+            if fragment not in text:
+                errors.append(f"{relative}: missing structural pointer {fragment}")
 
 
 def validate_all(skills_root: Path) -> list[str]:
     skills_root = skills_root.resolve()
     errors: list[str] = []
     ready_path = skills_root / "technical-planning/references/ready-plan.schema.json"
-    execution_path = skills_root / "implementation-execution/references/execution-records.schema.json"
-    for path in (ready_path, execution_path):
-        if not path.is_file():
-            errors.append(f"missing schema: {path}")
-    if errors:
-        return errors
-
+    if not ready_path.is_file():
+        return [f"missing schema: {ready_path}"]
+    if hashlib.sha256(ready_path.read_bytes()).hexdigest() != READY_SCHEMA_SHA256:
+        errors.append("ready-plan/v1 schema bytes drifted")
     try:
         ready = _json(ready_path)
-        execution = _json(execution_path)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         return [f"schema parse failed: {exc}"]
-
-    ids = [ready.get("$id"), execution.get("$id")]
-    if None in ids or len(ids) != len(set(ids)):
-        errors.append("schema $id values must be present and unique")
+    if not ready.get("$id"):
+        errors.append("ready schema $id must be present")
     _validate_links(skills_root, errors)
     _validate_authorities(skills_root, errors)
     _validate_structural_pointers(skills_root, errors)
     _validate_schema_refs(ready, "ready schema", errors)
-    _validate_schema_refs(execution, "execution schema", errors)
     _validate_ready_schema(ready, errors)
-    _validate_execution_schema(execution, errors)
     return errors
-
 
 def _default_skills_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -959,7 +642,7 @@ def main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"- {error}", file=sys.stderr)
         return 1
-    print("contract validation passed")
+    print("technical-planning contracts: PASS")
     return 0
 
 

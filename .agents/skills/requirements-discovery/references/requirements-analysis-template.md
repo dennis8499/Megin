@@ -1,3 +1,5 @@
+<!-- authority: requirements-document-shape -->
+
 # 需求分析文件模板
 
 用此模板產生一份自足、精簡的需求分析文件。文件狀態、展示與寫檔授權以[交付協定](delivery-protocol.md)為準。以使用者的主要語言撰寫，穩定識別碼保持 ASCII；成品必須替換所有提示文字與標記。

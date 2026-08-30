@@ -1,0 +1,3 @@
+.agents/skills/delivery-orchestrator/references/delivery-run.schema.json text eol=lf
+.agents/skills/implementation-execution/references/execution-records.schema.json text eol=lf
+.agents/skills/technical-planning/references/ready-plan.schema.json text eol=lf

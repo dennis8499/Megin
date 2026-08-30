@@ -19,7 +19,7 @@
 
 1. 固定 `repo_id`、`worktree_key`、`base_sha`、`head_sha`。
 2. Ready artifacts（含實際 handoff hash）按 normalized ref 排序；sources 按 `SRC-*` 排序並重算 SHA-256。
-3. 以 `git diff --binary --full-index --no-ext-diff <base_sha> --` 取得 base 至工作樹的 tracked bytes，SHA-256 寫入 `tracked_diff_sha256`。
+3. 以 `git diff --binary --full-index --no-ext-diff --no-textconv <base_sha> --` 取得 base 至工作樹的原始 tracked bytes，禁止 external diff與textconv driver，SHA-256 寫入 `tracked_diff_sha256`。
 4. 以 `git ls-files --others --exclude-standard -z` 取得全部未忽略新檔；path 正規化為 `/`、依 Git path bytes 排序，逐檔雜湊原始 bytes。Snapshot 前清除 command contract 要求清除的 temporary outputs；只排除 Ledger、timestamps 與 handoff 明列的 allowed ignored build outputs。
 5. 對不含 `snapshot_id` 的 object 使用 UTF-8（無 BOM）、object keys 字典序、arrays 依上述 ref/path 排序、`/` 分隔符、無額外 whitespace 或尾端 newline的 JSON：等價於 `ensure_ascii=false, sort_keys=true, separators=(",", ":")`。其 SHA-256 為 `snapshot_id`。
 
@@ -66,11 +66,13 @@ Command outcome 語義：
 - `blocked`：命令已啟動，但因環境、權限、side-effect 或可靠性阻塞而無法完成可信判定；不可取得欄位為 `null`。
 - `not_run`：命令未啟動；無論原因是前置能力／權限不成立、外部取消或其他可定位事件，counts 與 exit 均為 `null`，`not_run_reason` 必填。`blocked` 或 `not_run` 都不能支持 APPROVED。
 
-Finding 的 `blocking` 是 JSON boolean；`false` 可表達 advisory。`finding_key` 是 `key_inputs = {category, sorted source_refs, sorted affected_loci, normalized required_outcome}` 的 canonical JSON SHA-256，沿用第 1 節 UTF-8／sorted keys／compact separators 規則：`category` 另轉小寫，所有文字 trim 並將連續 whitespace 壓成一格，path 分隔符轉為 `/`。`affected_loci` 只用穩定 path＋symbol／test／contract ID，不含 line number 或 diff hunk；每輪可變的精確 lines、diffs、tests 與 outputs 放在 `evidence_refs`。Reviewer 自己的 `finding_id` 可變，key 不因措辭、行號或 round 改變。
+每個已執行command outcome使用不同且非空的raw output ref；`raw_output_refs`自身也不得重複。共用同一output或只改路徑不能冒充多個獨立command證據。
+
+Finding 的 `blocking` 是 JSON boolean；`false` 可表達 advisory。`finding_key` 是 `key_inputs = {category, sorted unique source_refs, sorted unique affected_loci, normalized required_outcome}` 的 canonical JSON SHA-256，沿用第 1 節 UTF-8／sorted keys／compact separators 規則：`category` 另轉小寫，所有文字 trim 並將連續 whitespace 壓成一格，path 分隔符轉為 `/`；duplicate normalized refs直接拒絕，不能藉重複元素改key。`affected_loci` 只用穩定 path＋symbol／test／contract ID，不含 line number 或 diff hunk；每輪可變的精確 lines、diffs、tests 與 outputs 放在 `evidence_refs`。Reviewer 自己的 `finding_id` 可變，key 不因措辭、行號或 round 改變。
 
 Verdict 只依下列分支：
 
-- `APPROVED`：全部 required commands `passed`、coverage 全部 covered、snapshot-before 等於 snapshot-after，且沒有 `blocking: true` finding。
+- `APPROVED`：全部 required commands `passed`；每個covered obligation都有非空BDD、TEST、WP與code evidence，且BDD／TEST contract與WP都直接擁有同一`source_ref`，不得借用另一來源的有效ID；snapshot-before 等於 snapshot-after，且沒有 `blocking: true` finding。
 - `CHANGES_REQUIRED`：snapshot 可審，且至少一個可由目前執行範圍修正的 blocking finding；advisory 可同時存在。
 - `BLOCKED`：來源、能力、環境、snapshot 或上游決策使可靠判定不可完成。主代理依原始證據分流至 `Awaiting upstream reapproval` 或 `Blocked`。
 
@@ -83,10 +85,14 @@ Ledger 以 `finding_key` 保存每輪原始 ID、alias 與 transition。只有 k
 - 同一 blocking finding 在三份連續 report 中仍未達 required outcome：`Blocked`。
 - Review round 1 只建立 blocking baseline，no-progress streak 初始化為 0，不算一次無進展。
 - 從 round 2 起，每一輪只與前一份 report 比較；若同時沒有 blocking finding 數量下降、沒有既有 blocking finding 轉為 resolved、也沒有足以改變判定的全新 command／test／diff／source-decision 證據，no-progress streak 加 1，否則歸零。
+- 每輪必要的新`output_ref`只是傳輸位置，不是進展；validator只比較passed command、covered obligation、code evidence與來源決策等語義結果。
 - no-progress streak 到 2（即兩次連續 report-to-report transition 都無進展）：`Blocked`。
 - 新 finding 不自動代表進展；必須仍依上述三項判斷。
+- 舊key消失但由新blocking key等量取代時，只有伴隨全新語義證據才算進展；A→B→C無證據輪換持續累積global no-progress。
 
 resolved transition 必須有新命令、測試、diff 或來源決策證據。到達熔斷時保存 counters、所有 reports 與最後 snapshot，停止修改並依交付協定回報。
+
+`breaker.json`只保存latest blocking keys；validator以round 1起連續保存的reports重算trailing unresolved與no-progress counters。`last_evidence_sha256`是latest report中該key的round、snapshot、key inputs、finding evidence、command outcomes與coverage之canonical JSON SHA-256；缺report chain、round缺口、key集合或digest不一致都不可作熔斷證據。
 
 ## 6. Accepted 與 invalid report
 

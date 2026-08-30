@@ -1,6 +1,8 @@
+<!-- authority: execution-quality -->
+
 # 實作執行品質契約
 
-本文件只做二元檢查；規則分別由 [Preflight／Ledger](preflight-and-ledger.md)、[BDD／TDD](bdd-tdd-loop.md)、[Reviewer](reviewer-contract.md)與[狀態／交付](delivery-protocol.md)擁有。每格必須有原始 evidence ref；缺少即 `Fail`。
+本文件只做二元檢查；規則分別由 [Preflight／Ledger](preflight-and-ledger.md)、[Orchestrated Delivery](orchestrated-delivery.md)、[Resume／Revision](resume-and-revision.md)、[Greenfield Bootstrap](greenfield-bootstrap.md)、[BDD／TDD](bdd-tdd-loop.md)、[Reviewer](reviewer-contract.md)與[狀態／交付](delivery-protocol.md)擁有。每格必須有原始 evidence ref；缺少即 `Fail`。
 
 ## Preflight
 

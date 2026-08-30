@@ -59,3 +59,9 @@ Implementation Execution after this change loads:
 | Terminal delivery | 13,493 | 10,467 | -3,026 |
 
 The effective Preflight branch intentionally gains the versioned producer contract that did not exist before. It replaces consumer-side handoff semantics rather than duplicating them; the combined deduplicated runtime corpus still falls by 6.6%.
+
+## 2026-08-30 consumer ownership split
+
+Technical Planning runtime contracts are unchanged in the predictability-first refactor. Its maintenance validator now owns only ready-plan/v1 plus shared JSON-schema helpers; execution schema, Ledger and review semantics moved to the Implementation consumer. Current cross-bundle branch bytes are recorded in the [Delivery context-load report](../../delivery-orchestrator/scripts/context-load-report.md).
+
+The final closure measurement supersedes any mid-refactor Implementation figures above. Against base HEAD `7353419975c5a0df47bf28697b419f643c890fee`, Technical Planning runtime bytes remain byte-for-byte unchanged; the final Implementation aggregate and every current branch are recorded in the linked owner report. Its late increase is the documented cost of physical terminal-evidence, reviewer-output and breaker-chain invariants added after independent adversarial findings, not a return of producer-side execution ownership.

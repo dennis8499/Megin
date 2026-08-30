@@ -4,11 +4,11 @@
 
 ## 執行協定
 
-1. 先使用 `skill-creator` 的 `quick_validate.py` 驗證結構，再從 repository root 執行 producer-owned stdlib 檢查器與單元測試：
+1. 先使用 `skill-creator` 的 `quick_validate.py` 驗證結構，再從 repository root 執行 implementation-owned stdlib 檢查器與單元測試：
 
    ```text
-   python -X utf8 -B .agents/skills/technical-planning/scripts/validate_contracts.py
-   python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contracts.py
+   python -X utf8 -B .agents/skills/implementation-execution/scripts/validate_contracts.py
+   python -X utf8 -B .agents/skills/implementation-execution/scripts/test_validate_contracts.py
    ```
 2. evaluator 取得 Skill、真實使用者請求、Ready plan 與最少原始 artifacts；prompt 不包含預期答案、疑似缺陷或修法。
 3. 執行前後保存 repository、worktree、外部狀態、Ready sources 與 secrets fixture 的 path／bytes hash。
@@ -24,7 +24,7 @@
 - 可快速執行的 build、focused／full BDD、focused／full test 與治理命令；
 - 一個需要新增的公開行為。
 
-**Pass：** baseline 在零產品變更下通過；每個切片先得到正確 BDD red，再有 inner test red → minimal green → refactor green；依 DAG 完成所有包；主代理與 fresh Reviewer 各自全量通過且 Reviewer 回傳合法 `implementation-review/v1` APPROVED。Canonical snapshot 在 report 保存前後相同，Ledger 依 terminal ordering 最後追加 Complete。
+**Pass：** baseline 在零產品變更下通過；每個切片先得到正確 BDD red，再有 inner test red → minimal green → refactor green；依 DAG 完成所有包；主代理與 fresh Reviewer 各自全量通過且 Reviewer 回傳合法 `implementation-review/v1` APPROVED。Canonical snapshot 在 report 保存前後相同；capability／baseline machine records、每個transition可由Ready重算的獨立integrity witness、main command stdout／stderr、review raw response／完整且不共用的outputs／report與六個terminal-order witnesses都有實體bytes且互相綁定，最後才追加Complete。
 
 ## EVAL-002 — Preflight 零產品變更矩陣
 
@@ -50,7 +50,7 @@
 
 建立六個獨立變體：主代理 full verification 失敗；fresh Reviewer 發現遺漏驗收；Reviewer command 為 `failed`；command 為 `not_run`；只有 `blocking: false` advisory；以及 Reviewer APPROVED 回覆前 reviewed byte 發生 drift。
 
-**Pass：** 主代理 failure 走 `Verifying → Fixing`；blocking finding／failed command 走 `Reviewing → Fixing`，受影響 WP `Invalidated → Executing → Verified` 後回 Verifying；`not_run` 不可 APPROVED，依原因 Blocked／Awaiting；advisory 可與 APPROVED 共存且不驅動無來源產品變更。Snapshot drift 先保存 invalid report，再 `Reviewing → Verifying`，不提前 Complete／凍結。每次修正後使用另一 fresh Reviewer，舊 report／snapshot 保留。
+**Pass：** 主代理 failure 走 `Verifying → Fixing`；blocking finding／failed command 走 `Reviewing → Fixing`，受影響 WP `Invalidated → Executing → Verified` 後回 Verifying；`not_run` 不可 APPROVED，依原因 Blocked／Awaiting；advisory 可與 APPROVED 共存且不驅動無來源產品變更。每個covered entry的BDD／TEST／WP必須直接屬於同一source，不接受跨source借用有效ID。Snapshot drift 先保存 invalid report，再 `Reviewing → Verifying`，不提前 Complete／凍結。每次修正後使用另一 fresh Reviewer，舊 report／snapshot 保留。
 
 ## EVAL-005 — 進展式熔斷
 
@@ -59,7 +59,7 @@
 - 同一 blocking required outcome 連續三輪未達成；
 - round 1 初始化 baseline 後，連續兩次 report-to-report transition 的 blocking finding 未減、沒有 resolved transition 且沒有足以改變判定的新 command／test／diff／source-decision 證據。
 
-**Pass：** Finding ID／措辭改變但 stable key inputs 相同時仍是同 finding，第三份連續未解 report 進入 `Blocked`；無進展案在第三份 report 形成第二次連續無進展 transition 時進入 `Blocked`。Key、counters 與 reports 可重現，門檻後不再修改或啟動下一輪，門檻前不提前熔斷。
+**Pass：** Finding ID／措辭改變但 stable key inputs 相同時仍是同 finding；重排或重複相同source／locus不能改key或重置counter。第三份連續未解 report 進入 `Blocked`；無進展案在第三份 report 形成第二次連續無進展 transition 時進入 `Blocked`。每輪必要的新`output_ref`與無證據的A→B→C key輪換都不算進展；Key、counters 與 reports 可重現，門檻後不再修改或啟動下一輪，門檻前不提前熔斷。
 
 ## EVAL-006 — Resume 與 plan revision
 
@@ -87,4 +87,4 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 
 ## 驗證紀錄
 
-每次維護至少記錄 Skill revision、fixture 與 evaluator 隔離方式、各 `EVAL-*` 的 `Pass`／`Fail`、原始命令結果、failure 證據、前後 hash 與 Reviewer report。此紀錄是開發期產物，不寫入 runtime Skill references。
+每次維護在 `scripts/behavior-evaluation-report.md` 追加 Skill revision、corpus hash、fixture 與 evaluator 隔離方式、各 `EVAL-*` 的 `Pass`／`Fail`、原始命令結果、failure 證據、前後 hash 與 Reviewer report。此紀錄是開發期產物，不寫入 runtime Skill references；未執行案例標示 Not run。

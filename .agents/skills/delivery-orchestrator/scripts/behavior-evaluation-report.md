@@ -113,3 +113,73 @@ Before raising that finding, the Reviewer independently established all substant
 - Four quick validations, both static validators, the five technical-planning tests, and `git diff --check` passed. Per review instruction, the already-recorded 21-test runs were not repeated.
 
 Closure Reviewer attestation: `read_only=true`, `write_actions=false`, `delegation_used=false`.
+
+## 2026-08-30 predictability-first refactor
+
+- Base HEAD: `7353419975c5a0df47bf28697b419f643c890fee`; isolated Work ID: `work-20260830-delivery-skills-refactor-e6fcd882`.
+- Public helper commands remain `probe`, `start`, `locate`, `transition`; existing success JSON is covered by the split suites.
+- `delivery-run/v1` SHA-256 remains `cd1dd99aa2a9e4524b046f4860e50cd3b2b2fb6a48d29b27cfe5a2c507a03f12`.
+- Owner/integration validator: Pass; validator mutation tests: 7/7 Pass; split Git/transition suites: 23/23 Pass.
+- A real sandboxed probe returned `GIT_TRUST_REQUIRED`; the same helper command at the authorized unsandboxed boundary succeeded without changing `safe.directory`.
+- EVAL-DEL-001..009, final corpus hash, complete command transcript and fresh Reviewer verdict remain pending until recorded; pending is not a Pass.
+
+### Closure revision — independent dual evaluation
+
+The pending state above is retained as historical evidence. The latest independent, read-only closure evaluated the current contracts and fixtures without treating this report as an oracle.
+
+- EVAL-DEL-001..009: **9/9 Pass**.
+- Owner validator: Pass; validator mutation tests: **11/11 Pass**.
+- Split suites: worktree **8/8**, transition/approval **10/10**, safety **10/10**; public compatibility facade: **28/28**.
+- Ten additional adversarial probes passed, including source-manifest, WP-Ledger, capability, integrity, terminal-output and trust-routing mutations.
+- `GIT_TRUST_REQUIRED` was observed at the sandbox boundary; the identical authorized unsandboxed probe succeeded. A non-repository remained `NOT_A_REPOSITORY`, and the `safe.directory` list was unchanged.
+- Complete was accepted only with the physical host-temp Ledger, capability/baseline/integrity records, exact command/review outputs, six ordered terminal witnesses, snapshot equality and Ready/source/WP continuity.
+- The evaluator observed the same file set and status digest before and after review; no write action, staging, commit, push, merge, deployment or cleanup occurred.
+
+Earlier independent rounds correctly rejected the candidate when terminal validation trusted record references without proving all physical artifacts and continuity. Those findings drove the source/WP/capability/integrity drift guards and exact output-set checks; they are preserved here rather than rewritten as first-pass success.
+
+Final owner corpus: **20 files, 248,318 bytes, SHA-256 `aa65e52afa59a893150ef10e41a12754f1c0c1d146029766c832fabdb20c9ca8`**. The corpus excludes this behavior report and cache files; it hashes the sorted UTF-8 manifest `relative-path<TAB>byte-count<TAB>file-sha256<LF>`. Across the four maintained skills, the same algorithm yields **56 files, 555,412 bytes, SHA-256 `fbbffa562ef8a13dcf70b290326da2c51fc09aa8632b148c3c8e8891c862f766`**.
+
+Latest closure commands:
+
+```text
+python -X utf8 -B <skill-creator>/scripts/quick_validate.py .agents/skills/delivery-orchestrator
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/validate_contracts.py
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_worktree.py
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_safety.py
+python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py
+```
+
+Closure evaluator attestation: `independent=true`, `read_only=true`, `report_as_oracle=false`, `write_actions=false`.
+
+### Final local verification capture
+
+- Four `quick_validate` runs and four owner validators exited 0.
+- Focused owner suites passed **29/29**: Delivery mutations 11, Requirements 8, Implementation 7, Technical Planning 3.
+- Delivery split suites passed **28/28**: worktree 8, transition/approval 10, safety 10. The preserved public runner independently repeated them at **28/28** in 140.527 seconds. Total recorded unittest executions: **85/85**.
+- Syntax compilation read **19** Python files with bytecode disabled; `git diff --check` exited 0 and the staged diff was empty.
+- Clean-start capture exited 0 with `primary_unchanged=true`, `strict_clean=true`, `registered_non_primary=true`, primary status SHA-256 `e3b0c44298fc1c149afbf4e8996fb92427ae41e4649b934ca495991b7852b855`, files SHA-256 `2d0619ecba853f226926a3612a99c689cd207079c5da8d27d03168ba765ffd9d`, index SHA-256 `39550282aa4bfef72d2818091f0f79d346827f2f9bb9383cbc66a31e3fcae1c0`, and run-record SHA-256 `fab63367306ea06a5c738024d51230fd9b592ac13dbf89fe55020415bdb75a62`.
+- The real sandbox probe exited 1 with only `GIT_TRUST_REQUIRED`; the byte-for-byte same command at the authorized boundary exited 0. The non-repository control exited 1 with `NOT_A_REPOSITORY`. Global `safe.directory` remained the same four entries before and after.
+- Schema byte checks passed: `delivery-run/v1` `cd1dd99aa2a9e4524b046f4860e50cd3b2b2fb6a48d29b27cfe5a2c507a03f12`; implementation records `c9e5a408129ee7dc8a79ede2b926c63fefac393d24d5e9d0d1e30621bfccf7ab`; `ready-plan/v1` `9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3`. All three schema content diffs are empty.
+
+### Post-closure security correction
+
+A later findings-first Reviewer returned **Fail** because `--no-ext-diff` alone still allowed a configured `diff.<driver>.textconv` during terminal snapshot recomputation. Its isolated fixture created an external sentinel containing `invokedinvoked`, proving both side effects and transformed rather than raw tracked evidence. The same review also found that LF/EOF normalization had made the recorded runtime byte table stale by ten bytes.
+
+The runtime now invokes `git diff --binary --full-index --no-ext-diff --no-textconv <base_sha> --`; the Reviewer authority states the same command. A new isolated malicious-driver test proves that no sentinel is created and `tracked_diff_sha256` equals the raw no-textconv diff. A new validator mutation proves removal of the flag is rejected. The failed verdict and probe are retained here as evidence rather than replaced.
+
+Corrected local closure:
+
+- Delivery validator and Implementation validator: Pass.
+- Delivery mutation suite: **12/12**; safety suite: **11/11**, including the real textconv fixture.
+- Full post-fix matrix: focused owner suites **30/30**, Delivery split suites **29/29**, public facade **29/29** in 144.030 seconds; total unittest executions **88/88**.
+- Post-fix clean-start capture exited 0 with `primary_unchanged=true`, `strict_clean=true`, `registered_non_primary=true`, empty-status SHA-256 `e3b0c44298fc1c149afbf4e8996fb92427ae41e4649b934ca495991b7852b855` and run-record SHA-256 `dcfe10647dbf8efebb1e58c842c41db4b24b40a6ed427b865f09a34a2ac21c28`.
+- Final runtime measurement: Delivery 14,914→14,841; Requirements 22,410→20,613; Implementation 39,509→41,967; aggregate 76,833→77,421 (**+588**). The increase is explicitly attributed in the context-load report to enforceable terminal evidence and external-driver suppression.
+- Corrected owner corpus: **20 files, 250,751 bytes, SHA-256 `330410996df941d447801957bf1951d4bdc7ae1e4c7ecdfd380084c4bf0f28fa`**. Corrected four-skill corpus: **56 files, 557,906 bytes, SHA-256 `1a913c9c58b10be682b08a8ac3690d3d5e5a4e9244b1ab59fd1e89810769189a`**, under the same report-excluding manifest algorithm.
+
+### Final post-fix Reviewer verdict
+
+**PASS — no blocking findings.** The independent findings-first Reviewer used a live sentinel-writing textconv control, then proved `_current_implementation_snapshot` did not execute the driver, its raw diff hash matched exactly, and the snapshot ID remained valid. The flag-removal mutation was rejected. Fresh LF-normalized recomputation matched all **18/18** aggregate and branch rows, including total 76,833→77,421 (+588).
+
+The Reviewer also recorded quick validation 4/4, owner validators 4/4, focused terminal regressions 3/3 and schema compatibility 3/3. HEAD, file set, `safe.directory` count and zero-cache state were unchanged; no edit, stage, commit, clean, push, merge, deploy or worktree deletion occurred. Attestation: `independent=true`, `read_only=true`, `report_as_oracle=false`, `write_actions=false`.
