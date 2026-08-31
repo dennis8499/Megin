@@ -34,6 +34,7 @@
 - `plan.md` 是唯一 primary，`handoff.json` 是唯一 handoff；supporting artifacts 符合模板拆分判準且由 primary 連結。
 - Artifact manifest 只用 `role` 與 `approval_status`；沒有空白、佔位、重複權威或未引用 artifact。
 - `handoff.json` 通過 schema 與 [`ready-plan/v1`](ready-plan-contract.md)跨欄位不變量，包括 approval identity、payload digest、baseline、hashes、sources、contract index、DAG、impact map 與 commands。
+- Bug plan另通過assessment binding、唯一bug source、bug-reproduction command、regression refs與target-specific safeguards；standard plan缺BUG欄位時仍完整有效。
 - `SRC-* → plan refs → contracts → WP-* → CMD-*／evidence` 可雙向追溯，沒有孤立項目。
 
 ### 風險與安全

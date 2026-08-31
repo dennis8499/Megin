@@ -20,7 +20,7 @@ AUTHORITY_FILES = {
     "ready-plan": "technical-planning/references/ready-plan-contract.md",
     "planning-state": "technical-planning/references/delivery-protocol.md",
 }
-READY_SCHEMA_SHA256 = "9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3"
+READY_SCHEMA_SHA256 = "c3e90430e69acb6a06795f1855ab6fd045281ce555627061bd877c00d3f5c13b"
 READY_ROOT_REQUIRED = {
     "schema",
     "candidate",
@@ -59,6 +59,20 @@ READY_DEF_REQUIRED = {
     "allowedWrite": {"path", "kind", "cleanup"},
     "externalEffect": {"target", "effect", "reversible", "authorization"},
     "absenceEvidence": {"probe", "outcome", "source_ref"},
+    "bugAssessmentBinding": {"path", "sha256", "markdown_path", "markdown_sha256"},
+    "partialSafeguards": {"reason", "proxy_bdd_refs", "proxy_test_refs", "residual_risks", "follow_up"},
+    "bugContext": {
+        "bug_id",
+        "assessment",
+        "reproduction_status",
+        "root_cause_status",
+        "root_cause_confidence",
+        "verification_target",
+        "original_reproduction_command_ref",
+        "regression_bdd_refs",
+        "regression_test_refs",
+        "partial_safeguards",
+    },
 }
 
 READY_OBJECT_REQUIRED = {
@@ -70,6 +84,27 @@ READY_OBJECT_REQUIRED = {
 
 LINK_RE = re.compile(r"!?(?<!\\)\[[^\]]*\]\(([^)]+)\)")
 AUTHORITY_RE = re.compile(r"<!--\s*authority:\s*([a-z0-9-]+)\s*-->")
+PARTIAL_OVERCLAIM_RE = re.compile(
+    r"(?ix)(?:"
+    r"\b(?:conclusive(?:ly)?|definitive(?:ly)?|certain(?:ly)?|remediated|validated|verified|confirmed|fixed|resolved|repaired|proven|eliminated|eradicated|corrected)\b"
+    r"|\bno\s+longer\b"
+    r"|\b(?:bug|defect|issue|symptom)\b.{0,20}\b(?:is|was)\s+(?:gone|absent|closed)\b"
+    r"|\b(?:verified|confirmed|proven)\s+(?:(?:as|and)\s+|to\s+be\s+)?(?:fully\s+)?(?:fixed|resolved|repaired)\b"
+    r"|\b(?:bug|defect|issue|symptom)\b.{0,32}\b(?:has\s+been|is|was)\s+(?:(?:now|already|successfully)\s+)*(?:fully\s+)?(?:fixed|resolved|repaired)\b"
+    r"|\b(?:fixed|resolved|repaired)\s+(?:the\s+)?(?:bug|defect|issue|symptom)\b"
+    r"|(?:BUG|錯誤|缺陷|問題|症狀)[^。；;\n]{0,24}(?:已(?:經)?(?:被)?(?:驗證|確認)(?:為|已)?|已(?:經)?)(?:完成)?(?:修復|解決|排除)"
+    r"|(?:已|完全|徹底)[^。；;\n]{0,12}(?:修復|解決|排除|驗證|確認|消除|完成)"
+    r")"
+)
+PARTIAL_REASON_UNCERTAINTY_RE = re.compile(
+    r"(?ix)(?:\b(?:cannot|can\s+not|unable\s+to|not|never|intermittent|flaky|inconclusive|uncertain|unknown|low[- ]confidence|insufficient)\b|無法|未能|尚未|間歇|不穩定|不確定|未知|低信心|證據不足)"
+)
+PARTIAL_RISK_UNCERTAINTY_RE = re.compile(
+    r"(?ix)(?:\b(?:may|might|could|risk|unknown|uncertain|inconclusive|unverified|intermittent|remain|persist)\b|可能|風險|未知|不確定|仍|尚未|未驗證|間歇)"
+)
+PARTIAL_FOLLOW_UP_ACTION_RE = re.compile(
+    r"(?ix)(?:\b(?:verify|validate|test|run|check|observe|monitor|investigate|reproduce|measure|compare|collect)\b|confirm\s+whether|驗證|測試|執行|檢查|觀察|監控|調查|重現|量測|比對|蒐集|確認是否)"
+)
 
 
 def _json(path: Path) -> dict[str, Any]:
@@ -94,6 +129,39 @@ def _walk(value: Any) -> Iterable[Any]:
     elif isinstance(value, list):
         for child in value:
             yield from _walk(child)
+
+
+def partial_overclaim(value: Any) -> bool:
+    """Return whether partial-only prose asserts a conclusive fix."""
+    return any(
+        isinstance(candidate, str) and PARTIAL_OVERCLAIM_RE.search(candidate)
+        for candidate in _walk(value)
+    )
+
+
+def partial_safeguard_prose_errors(safeguards: Any) -> list[str]:
+    """Fail closed unless partial prose remains uncertain and action-oriented."""
+    if not isinstance(safeguards, dict):
+        return []
+    errors: list[str] = []
+    reason = safeguards.get("reason")
+    if isinstance(reason, str) and reason and not PARTIAL_REASON_UNCERTAINTY_RE.search(reason):
+        errors.append("partial reason lacks explicit uncertainty wording (overclaim risk)")
+    residual_risks = safeguards.get("residual_risks")
+    if isinstance(residual_risks, list):
+        for index, value in enumerate(residual_risks):
+            if isinstance(value, str) and value and not PARTIAL_RISK_UNCERTAINTY_RE.search(value):
+                errors.append(
+                    f"partial residual_risks[{index}] lacks an uncertainty or risk marker (overclaim risk)"
+                )
+    follow_up = safeguards.get("follow_up")
+    if isinstance(follow_up, list):
+        for index, value in enumerate(follow_up):
+            if isinstance(value, str) and value and not PARTIAL_FOLLOW_UP_ACTION_RE.search(value):
+                errors.append(
+                    f"partial follow_up[{index}] lacks an explicit verification action (overclaim risk)"
+                )
+    return errors
 
 
 def _type_matches(value: Any, expected: str) -> bool:
@@ -372,6 +440,105 @@ def validate_ready_cross_references(data: dict[str, Any]) -> list[str]:
         for evidence in command.get("absence_evidence", []):
             if evidence.get("source_ref") not in sources:
                 errors.append(f"ready: command {command['command_id']} absence evidence has unknown source")
+
+    bug_context = data.get("bug_context")
+    bug_sources = [source for source in sources.values() if source.get("kind") == "bug"]
+    bug_commands = [command for command in commands.values() if command.get("purpose") == "bug-reproduction"]
+    if bug_context is None:
+        if bug_sources or bug_commands:
+            errors.append("ready: kind bug sources and bug-reproduction commands require bug_context")
+    else:
+        if len(bug_sources) != 1:
+            errors.append("ready: bug_context requires exactly one kind bug assessment source")
+        else:
+            bug_source = bug_sources[0]
+            assessment = bug_context.get("assessment", {})
+            if (
+                assessment.get("path") != bug_source.get("location")
+                or assessment.get("sha256") != bug_source.get("sha256")
+            ):
+                errors.append("ready: bug_context assessment path/hash differs from kind bug source")
+            bug_id = bug_context.get("bug_id")
+            match = re.fullmatch(
+                rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.json",
+                str(assessment.get("path")),
+            )
+            markdown_match = re.fullmatch(
+                rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.md",
+                str(assessment.get("markdown_path")),
+            )
+            if (
+                match is None
+                or markdown_match is None
+                or match.group(1) != markdown_match.group(1)
+                or bug_source.get("revision") != (match.group(1) if match is not None else None)
+            ):
+                errors.append(
+                    "ready: bug_context assessment paths must identify one bug revision using a canonical positive integer"
+                )
+
+        if not bug_commands:
+            errors.append("ready: bug_context requires a bug-reproduction command")
+
+        def validate_bug_contract_refs(field: str, expected_kind: str) -> None:
+            for ref in bug_context.get(field, []):
+                contract = contracts.get(ref)
+                if contract is None:
+                    errors.append(f"ready: bug_context {field} has unknown regression ref {ref}")
+                elif contract.get("kind") != expected_kind:
+                    errors.append(f"ready: bug_context {field} ref {ref} has wrong contract kind")
+                elif bug_sources and bug_sources[0]["source_id"] not in contract.get("source_refs", []):
+                    errors.append(f"ready: bug_context {field} ref {ref} is not owned by the bug source")
+
+        validate_bug_contract_refs("regression_bdd_refs", "bdd-scenario")
+        validate_bug_contract_refs("regression_test_refs", "inner-test")
+
+        original_ref = bug_context.get("original_reproduction_command_ref")
+        if original_ref is not None:
+            original = commands.get(original_ref)
+            if original is None or original.get("purpose") != "bug-reproduction":
+                errors.append("ready: original reproduction command must reference purpose bug-reproduction")
+
+        safeguards = bug_context.get("partial_safeguards", {})
+        target = bug_context.get("verification_target")
+        if target == "verified":
+            if bug_context.get("reproduction_status") not in {"reproduced", "intermittent"}:
+                errors.append("ready: verified target requires an original reproduced or intermittent symptom")
+            if original_ref is None:
+                errors.append("ready: verified target requires an original bug-reproduction command")
+            if safeguards.get("reason") is not None or any(
+                safeguards.get(field)
+                for field in ("proxy_bdd_refs", "proxy_test_refs", "residual_risks", "follow_up")
+            ):
+                errors.append("ready: verified target must not carry partial safeguards")
+        elif target == "partial":
+            required_partial = {
+                "reason": safeguards.get("reason"),
+                "proxy_bdd_refs": safeguards.get("proxy_bdd_refs"),
+                "proxy_test_refs": safeguards.get("proxy_test_refs"),
+                "residual_risks": safeguards.get("residual_risks"),
+                "follow_up": safeguards.get("follow_up"),
+            }
+            if any(not value for value in required_partial.values()):
+                errors.append("ready: partial target requires reason, proxy red-green refs, residual risks and follow-up")
+            for field in ("reason", "residual_risks", "follow_up"):
+                if partial_overclaim(safeguards.get(field)):
+                    errors.append(f"ready: partial {field} contains a verified-fix overclaim")
+            errors.extend(
+                f"ready: {error}"
+                for error in partial_safeguard_prose_errors(safeguards)
+            )
+            if bug_context.get("root_cause_status") == "confirmed" or bug_context.get("root_cause_confidence") == "high":
+                errors.append("ready: partial target must describe the approved low-confidence branch")
+            for field, expected_kind in (("proxy_bdd_refs", "bdd-scenario"), ("proxy_test_refs", "inner-test")):
+                for ref in safeguards.get(field, []):
+                    contract = contracts.get(ref)
+                    if contract is None:
+                        errors.append(f"ready: partial {field} has unknown regression ref {ref}")
+                    elif contract.get("kind") != expected_kind:
+                        errors.append(f"ready: partial {field} ref {ref} has wrong contract kind")
+                    elif bug_sources and bug_sources[0]["source_id"] not in contract.get("source_refs", []):
+                        errors.append(f"ready: partial {field} ref {ref} is not owned by the bug source")
     for wp in packages.values():
         if wp["wp_id"] in wp.get("blocked_by", []):
             errors.append(f"ready: {wp['wp_id']} blocks itself")
@@ -537,6 +704,20 @@ def _validate_ready_schema(schema: dict[str, Any], errors: list[str]) -> None:
     required_purposes = set(schema.get("x-required-command-purposes", []))
     if "bdd-discovery" not in required_purposes or not required_purposes <= purpose_enum:
         errors.append("ready schema: required command purposes are incomplete or outside enum")
+    if "bug-reproduction" not in purpose_enum:
+        errors.append("ready schema: bug-reproduction purpose is missing")
+    source_kind_enum = set(defs.get("source", {}).get("properties", {}).get("kind", {}).get("enum", []))
+    if "bug" not in source_kind_enum:
+        errors.append("ready schema: kind bug source is missing")
+    bug_source_rules = defs.get("source", {}).get("allOf", [])
+    if not any(
+        rule.get("if", {}).get("properties", {}).get("kind", {}).get("const") == "bug"
+        and rule.get("then", {}).get("properties", {}).get("revision", {}).get("pattern")
+        == "^[1-9][0-9]*$"
+        for rule in bug_source_rules
+        if isinstance(rule, dict)
+    ):
+        errors.append("ready schema: kind bug source lacks a canonical positive revision rule")
 
     path_pattern = defs.get("normalizedPath", {}).get("pattern", "")
     try:

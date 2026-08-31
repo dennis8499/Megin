@@ -94,6 +94,19 @@ Bundle 必須包含獨立的 `purpose: bdd-discovery` 命令；它只列出／�
 
 ## Consumer 不變量
 
+## Conditional `bug_context`
+
+Standard plan省略`bug_context`，也不得使用`kind: bug` source或`purpose: bug-reproduction` command。Bug plan三者同時存在，且唯一bug source的location／SHA精確等於`bug_context.assessment.path`／`sha256`；JSON／Markdown paths必須屬於同一`bug_id`與revision。Assessment revision只能是無前導零的正整數`[1-9][0-9]*`，bug source的`revision`必須精確等於path中的`N`；`0`、`00`或`01`一律拒絕。
+
+`regression_bdd_refs`與`regression_test_refs`必須指向由同一bug source直接擁有的BDD／TEST contracts。`original_reproduction_command_ref`若非null，必須指向`bug-reproduction` command。
+
+- `verification_target: verified`要求`reproduction_status`為`reproduced | intermittent`、original reproduction command非null，partial safeguards全部為空。
+- `verification_target: partial`要求root cause不是confirmed high-confidence，且`reason`、非空proxy BDD／TEST refs、residual risks與follow-up完整。`reason`必須明示無法重現／不確定／低信心，逐項residual risk必須含不確定性或風險語意，逐項follow-up必須是明確的驗證動作；任何`conclusive`、`remediated`、`validated`或中英文等價的確定修復宣稱皆fail closed。Proxy refs同樣直接屬於bug source。
+
+`partial`只核准低信心交付分支，不代表症狀已驗證修復；consumer必須另外產生`bug-verification/v1`。
+
+## Consumer 不變量
+
 Implementation Preflight 在任何產品寫入前驗證：
 
 1. JSON Schema、版本與本文件跨欄位不變量。

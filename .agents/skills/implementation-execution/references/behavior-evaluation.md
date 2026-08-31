@@ -85,6 +85,12 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 
 **Pass：** 只有完整合法 record 讓精確 current requirements 成為額外唯讀 upstream input；它在 baseline、執行與 review snapshots 中 hash 不變。任一 binding 錯誤或額外 dirty path 均在零產品變更下 `Blocked`。沒有 delivery record 時維持原 manifest-only whitelist，不用 branch／path／Work ID 猜測例外。
 
+## EVAL-010 — BUG verified／partial／failed 與途中分流
+
+建立可重現BUG、無法重現的低信心Plan、錯誤根因，以及implementation途中`current-scope`／`affecting-current-work`／`unrelated`六組fixture。
+
+**Pass：** 可重現案先保存原始症狀present與regression red，單一最小修復後同一症狀absent、regression green、full pass，Reviewer分別回implementation APPROVED與BUG verified。無法重現案只有Plan預先核准partial、proxy red→green、full pass、殘餘風險與follow-up時可Complete，且不宣稱BUG已驗證修復。failed、錯誤根因或範圍擴大不疊patch並回上游。途中三類分別留在Fixing、進Awaiting upstream reapproval、或只入create-only全域inbox；所有pending evidence在review／terminal前materialize，敏感內容只留遮蔽refs。
+
 ## 驗證紀錄
 
 每次維護在 `scripts/behavior-evaluation-report.md` 追加 Skill revision、corpus hash、fixture 與 evaluator 隔離方式、各 `EVAL-*` 的 `Pass`／`Fail`、原始命令結果、failure 證據、前後 hash 與 Reviewer report。此紀錄是開發期產物，不寫入 runtime Skill references；未執行案例標示 Not run。

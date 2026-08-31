@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -21,6 +20,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 from _delivery_runtime import (  # noqa: E402
     DeliveryError,
+    BUG_ID_RE,
     EVIDENCE_REF_RE,
     EVENT_RE,
     GIT_SHA_RE,
@@ -35,6 +35,7 @@ from _delivery_runtime import (  # noqa: E402
     _is_aware_datetime,
     _is_relative_to,
     _is_utc_datetime,
+    _known_secret_values_from_env,
     _logical_refs,
     _normalized_repo_path,
     _read_json,
@@ -51,6 +52,7 @@ from _delivery_runtime import (  # noqa: E402
     topic_slug,
     utc_now,
     validate_sha256,
+    validate_bug_id,
     validate_work_id,
     workspace_label,
 )
@@ -103,6 +105,8 @@ def start_workspace(
     *,
     root: Path | None = None,
     generation: int = 1,
+    work_kind: str | None = None,
+    bug_id: str | None = None,
 ) -> dict[str, Any]:
     work_id = validate_work_id(work_id)
     validate_sha256(request_sha256, "request_sha256")
@@ -120,6 +124,11 @@ def start_workspace(
         record = load_record(record_path)
         if record["repo_id"] != primary_probe["repo_id"] or record["request_sha256"] != request_sha256:
             raise DeliveryError("existing work_id registry belongs to different inputs", code="REGISTRY_COLLISION")
+        recorded_kind = record.get("work_kind", "standard")
+        if work_kind is not None and recorded_kind != work_kind:
+            raise DeliveryError("existing work_id has a different work_kind", code="REGISTRY_COLLISION")
+        if bug_id is not None and record.get("bugs", {}).get("primary_bug_id") != bug_id:
+            raise DeliveryError("existing work_id has a different bug_id", code="REGISTRY_COLLISION")
         _validate_ready_generation(record, primary_probe)
         if record["generations"][-1]["status"] == "ready":
             _approved_upstream_materialization(record)
@@ -132,7 +141,15 @@ def start_workspace(
     if generation == 1:
         _assert_new_work_probe(requested_probe)
         _assert_no_collision(primary_probe, destination, branch)
-        record = _new_record(primary_probe, work_id, request_sha256, destination, branch)
+        record = _new_record(
+            primary_probe,
+            work_id,
+            request_sha256,
+            destination,
+            branch,
+            work_kind=work_kind,
+            bug_id=bug_id,
+        )
         record_errors = validate_record(record)
         if record_errors:
             raise DeliveryError(
@@ -167,6 +184,11 @@ def start_workspace(
                 raise DeliveryError("Complete delivery records cannot add a generation", code="COMPLETE_FROZEN")
             if record["repo_id"] != primary_probe["repo_id"] or record["request_sha256"] != request_sha256:
                 raise DeliveryError("delivery record belongs to different inputs", code="REGISTRY_COLLISION")
+            recorded_kind = record.get("work_kind", "standard")
+            if work_kind is not None and recorded_kind != work_kind:
+                raise DeliveryError("later generation work_kind differs from its record", code="REGISTRY_COLLISION")
+            if bug_id is not None and record.get("bugs", {}).get("primary_bug_id") != bug_id:
+                raise DeliveryError("later generation bug_id differs from its record", code="REGISTRY_COLLISION")
             if generation != record["current_generation"] + 1:
                 raise DeliveryError("generation must be the next contiguous number", code="INVALID_GENERATION")
             if primary_probe["head_sha"] != record["generations"][-1]["base_sha"]:
@@ -416,6 +438,22 @@ def transition_record(
     requirements_path: str | None = None,
     requirements_sha256: str | None = None,
     requirements_approval_refs: Sequence[str] = (),
+    bug_assessment_id: str | None = None,
+    bug_assessment_path: str | None = None,
+    bug_assessment_sha256: str | None = None,
+    bug_assessment_markdown_path: str | None = None,
+    bug_assessment_markdown_sha256: str | None = None,
+    deferred_bug_id: str | None = None,
+    deferred_bug_relation: str | None = None,
+    deferred_bug_status: str | None = None,
+    deferred_bug_evidence_refs: Sequence[str] = (),
+    deferred_bug_sensitive: bool = False,
+    deferred_bug_redacted_summary: str | None = None,
+    deferred_bug_human_reviewer: str | None = None,
+    deferred_bug_assessment_path: str | None = None,
+    deferred_bug_assessment_sha256: str | None = None,
+    deferred_bug_assessment_markdown_path: str | None = None,
+    deferred_bug_assessment_markdown_sha256: str | None = None,
     handoff_path: str | None = None,
     candidate_revision: str | None = None,
     payload_sha256: str | None = None,
@@ -423,6 +461,10 @@ def transition_record(
     implementation_run_id: str | None = None,
     implementation_ledger_ref: str | None = None,
     implementation_status: str | None = None,
+    bug_verification_path: str | None = None,
+    bug_verification_sha256: str | None = None,
+    bug_verification_result: str | None = None,
+    known_secret_values: Sequence[str] = (),
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
     validate_work_id(work_id)
@@ -442,6 +484,22 @@ def transition_record(
             requirements_path=requirements_path,
             requirements_sha256=requirements_sha256,
             requirements_approval_refs=requirements_approval_refs,
+            bug_assessment_id=bug_assessment_id,
+            bug_assessment_path=bug_assessment_path,
+            bug_assessment_sha256=bug_assessment_sha256,
+            bug_assessment_markdown_path=bug_assessment_markdown_path,
+            bug_assessment_markdown_sha256=bug_assessment_markdown_sha256,
+            deferred_bug_id=deferred_bug_id,
+            deferred_bug_relation=deferred_bug_relation,
+            deferred_bug_status=deferred_bug_status,
+            deferred_bug_evidence_refs=deferred_bug_evidence_refs,
+            deferred_bug_sensitive=deferred_bug_sensitive,
+            deferred_bug_redacted_summary=deferred_bug_redacted_summary,
+            deferred_bug_human_reviewer=deferred_bug_human_reviewer,
+            deferred_bug_assessment_path=deferred_bug_assessment_path,
+            deferred_bug_assessment_sha256=deferred_bug_assessment_sha256,
+            deferred_bug_assessment_markdown_path=deferred_bug_assessment_markdown_path,
+            deferred_bug_assessment_markdown_sha256=deferred_bug_assessment_markdown_sha256,
             handoff_path=handoff_path,
             candidate_revision=candidate_revision,
             payload_sha256=payload_sha256,
@@ -449,6 +507,10 @@ def transition_record(
             implementation_run_id=implementation_run_id,
             implementation_ledger_ref=implementation_ledger_ref,
             implementation_status=implementation_status,
+            bug_verification_path=bug_verification_path,
+            bug_verification_sha256=bug_verification_sha256,
+            bug_verification_result=bug_verification_result,
+            known_secret_values=tuple(known_secret_values),
         )
 
 
@@ -492,6 +554,8 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--work-id", required=True)
     start.add_argument("--request-sha256", required=True)
     start.add_argument("--generation", type=int, default=1)
+    start.add_argument("--work-kind", choices=["standard", "bug"])
+    start.add_argument("--bug-id")
     start.add_argument("--registry-root")
 
     locate = subparsers.add_parser("locate", help="Locate an active delivery record")
@@ -510,6 +574,22 @@ def _parser() -> argparse.ArgumentParser:
     transition.add_argument("--requirements-path")
     transition.add_argument("--requirements-sha256")
     transition.add_argument("--requirements-approval-ref", action="append", default=[])
+    transition.add_argument("--bug-assessment-id")
+    transition.add_argument("--bug-assessment-path")
+    transition.add_argument("--bug-assessment-sha256")
+    transition.add_argument("--bug-assessment-markdown-path")
+    transition.add_argument("--bug-assessment-markdown-sha256")
+    transition.add_argument("--deferred-bug-id")
+    transition.add_argument("--deferred-bug-relation", choices=["current-scope", "affecting-current-work", "unrelated"])
+    transition.add_argument("--deferred-bug-status", choices=["pending", "materialized"])
+    transition.add_argument("--deferred-bug-evidence-ref", action="append", default=[])
+    transition.add_argument("--deferred-bug-sensitive", action="store_true")
+    transition.add_argument("--deferred-bug-redacted-summary")
+    transition.add_argument("--deferred-bug-human-reviewer")
+    transition.add_argument("--deferred-bug-assessment-path")
+    transition.add_argument("--deferred-bug-assessment-sha256")
+    transition.add_argument("--deferred-bug-assessment-markdown-path")
+    transition.add_argument("--deferred-bug-assessment-markdown-sha256")
     transition.add_argument("--handoff-path")
     transition.add_argument("--candidate-revision")
     transition.add_argument("--payload-sha256")
@@ -517,6 +597,10 @@ def _parser() -> argparse.ArgumentParser:
     transition.add_argument("--implementation-run-id")
     transition.add_argument("--implementation-ledger-ref")
     transition.add_argument("--implementation-status")
+    transition.add_argument("--bug-verification-path")
+    transition.add_argument("--bug-verification-sha256")
+    transition.add_argument("--bug-verification-result", choices=["verified", "partial", "failed"])
+    transition.add_argument("--known-secret-env", action="append", default=[])
     return parser
 
 
@@ -532,6 +616,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.request_sha256,
                 root=registry_root(args.registry_root),
                 generation=args.generation,
+                work_kind=args.work_kind,
+                bug_id=args.bug_id,
             )
         elif args.command == "locate":
             result = locate_workspace(
@@ -551,6 +637,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 requirements_path=args.requirements_path,
                 requirements_sha256=args.requirements_sha256,
                 requirements_approval_refs=args.requirements_approval_ref,
+                bug_assessment_id=args.bug_assessment_id,
+                bug_assessment_path=args.bug_assessment_path,
+                bug_assessment_sha256=args.bug_assessment_sha256,
+                bug_assessment_markdown_path=args.bug_assessment_markdown_path,
+                bug_assessment_markdown_sha256=args.bug_assessment_markdown_sha256,
+                deferred_bug_id=args.deferred_bug_id,
+                deferred_bug_relation=args.deferred_bug_relation,
+                deferred_bug_status=args.deferred_bug_status,
+                deferred_bug_evidence_refs=args.deferred_bug_evidence_ref,
+                deferred_bug_sensitive=args.deferred_bug_sensitive,
+                deferred_bug_redacted_summary=args.deferred_bug_redacted_summary,
+                deferred_bug_human_reviewer=args.deferred_bug_human_reviewer,
+                deferred_bug_assessment_path=args.deferred_bug_assessment_path,
+                deferred_bug_assessment_sha256=args.deferred_bug_assessment_sha256,
+                deferred_bug_assessment_markdown_path=args.deferred_bug_assessment_markdown_path,
+                deferred_bug_assessment_markdown_sha256=args.deferred_bug_assessment_markdown_sha256,
                 handoff_path=args.handoff_path,
                 candidate_revision=args.candidate_revision,
                 payload_sha256=args.payload_sha256,
@@ -558,6 +660,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 implementation_run_id=args.implementation_run_id,
                 implementation_ledger_ref=args.implementation_ledger_ref,
                 implementation_status=args.implementation_status,
+                bug_verification_path=args.bug_verification_path,
+                bug_verification_sha256=args.bug_verification_sha256,
+                bug_verification_result=args.bug_verification_result,
+                known_secret_values=_known_secret_values_from_env(args.known_secret_env),
             )
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
         return 0

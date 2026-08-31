@@ -20,6 +20,76 @@ from _ready_fixture import HASH, ready_example, validator
 SKILLS_ROOT = SCRIPT_DIR.parents[1]
 
 
+def bug_ready_example(target: str = "verified") -> dict:
+    example = ready_example()
+    example["sources"].append(
+        {
+            "source_id": "SRC-BUG-001",
+            "kind": "bug",
+            "location": "docs/bugs/bug-sample-failure/assessment-1.json",
+            "revision": "1",
+            "sha256": "b" * 64,
+            "plan_refs": ["BUG-001", "BDD-001", "TEST-001"],
+            "wp_refs": ["WP-001"],
+        }
+    )
+    example["work_packages"][0]["source_refs"].append("SRC-BUG-001")
+    for contract in example["contract_index"]:
+        if contract["contract_id"] in {"BDD-001", "TEST-001", "WP-001"}:
+            contract["source_refs"].append("SRC-BUG-001")
+    command = {
+        "command_id": "CMD-BUG-REPRO-001",
+        "purpose": "bug-reproduction",
+        "status": "Observed",
+        "cwd": ".",
+        "command": "tool reproduce-bug",
+        "environment_prerequisites": [],
+        "timeout_seconds": 30,
+        "network_policy": "forbidden",
+        "allowed_writes": [],
+        "external_side_effects": [],
+        "success_criteria": ["command distinguishes symptom present from absent"],
+        "completeness_criteria": ["original symptom oracle executed"],
+        "absence_evidence": [],
+    }
+    example["commands"].append(command)
+    example["contract_index"].append(
+        {
+            "contract_id": "CMD-BUG-REPRO-001",
+            "kind": "command",
+            "source_refs": ["SRC-001", "SRC-BUG-001"],
+            "wp_refs": ["WP-001"],
+        }
+    )
+    example["work_packages"][0]["contract_refs"].append("CMD-BUG-REPRO-001")
+    example["work_packages"][0]["command_refs"].append("CMD-BUG-REPRO-001")
+    example["bug_context"] = {
+        "bug_id": "bug-sample-failure",
+        "assessment": {
+            "path": "docs/bugs/bug-sample-failure/assessment-1.json",
+            "sha256": "b" * 64,
+            "markdown_path": "docs/bugs/bug-sample-failure/assessment-1.md",
+            "markdown_sha256": "c" * 64,
+        },
+        "reproduction_status": "reproduced" if target == "verified" else "not-reproduced",
+        "root_cause_status": "confirmed" if target == "verified" else "hypothesized",
+        "root_cause_confidence": "high" if target == "verified" else "low",
+        "verification_target": target,
+        "original_reproduction_command_ref": "CMD-BUG-REPRO-001" if target == "verified" else None,
+        "regression_bdd_refs": ["BDD-001"],
+        "regression_test_refs": ["TEST-001"],
+        "partial_safeguards": {
+            "reason": None if target == "verified" else "The original symptom cannot be reproduced reliably.",
+            "proxy_bdd_refs": [] if target == "verified" else ["BDD-001"],
+            "proxy_test_refs": [] if target == "verified" else ["TEST-001"],
+            "residual_risks": [] if target == "verified" else ["Original symptom may persist outside the proxy seam."],
+            "follow_up": [] if target == "verified" else ["Run the original journey manually in staging."],
+        },
+    }
+    example["candidate"]["payload_sha256"] = validator.ready_payload_sha256(example)
+    return example
+
+
 class ReadyPlanContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -165,6 +235,103 @@ class ReadyPlanContractTests(unittest.TestCase):
             )
             self.assertTrue(any("broken local link" in error for error in errors), errors)
             self.assertTrue(any("authority 'ready-plan'" in error for error in errors), errors)
+
+
+class BugReadyPlanContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.ready_schema = json.loads(
+            (SKILLS_ROOT / "technical-planning/references/ready-plan.schema.json").read_text(encoding="utf-8")
+        )
+
+    def assert_valid(self, value: dict) -> None:
+        self.assertEqual([], validator.validate_instance(value, self.ready_schema))
+        self.assertEqual([], validator.validate_ready_cross_references(value))
+
+    def test_verified_and_partial_bug_plans_are_conditionally_valid(self) -> None:
+        self.assert_valid(bug_ready_example("verified"))
+        self.assert_valid(bug_ready_example("partial"))
+        self.assert_valid(ready_example())
+
+    def test_bug_source_or_reproduction_command_requires_bug_context(self) -> None:
+        missing = bug_ready_example()
+        missing.pop("bug_context")
+        missing["candidate"]["payload_sha256"] = validator.ready_payload_sha256(missing)
+        errors = validator.validate_ready_cross_references(missing)
+        self.assertTrue(any("bug_context" in error for error in errors), errors)
+
+    def test_bug_context_binds_assessment_regression_and_reproduction(self) -> None:
+        wrong_hash = bug_ready_example()
+        wrong_hash["bug_context"]["assessment"]["sha256"] = "d" * 64
+        wrong_hash["candidate"]["payload_sha256"] = validator.ready_payload_sha256(wrong_hash)
+        errors = validator.validate_ready_cross_references(wrong_hash)
+        self.assertTrue(any("assessment" in error and "source" in error for error in errors), errors)
+
+        wrong_revision = bug_ready_example()
+        next(source for source in wrong_revision["sources"] if source["kind"] == "bug")["revision"] = "2"
+        wrong_revision["candidate"]["payload_sha256"] = validator.ready_payload_sha256(wrong_revision)
+        errors = validator.validate_ready_cross_references(wrong_revision)
+        self.assertTrue(any("one bug revision" in error for error in errors), errors)
+
+        for invalid_revision in ("0", "01"):
+            invalid = bug_ready_example()
+            bug_source = next(source for source in invalid["sources"] if source["kind"] == "bug")
+            bug_source["location"] = (
+                f"docs/bugs/bug-sample-failure/assessment-{invalid_revision}.json"
+            )
+            bug_source["revision"] = invalid_revision
+            invalid["bug_context"]["assessment"]["path"] = bug_source["location"]
+            invalid["bug_context"]["assessment"]["markdown_path"] = (
+                f"docs/bugs/bug-sample-failure/assessment-{invalid_revision}.md"
+            )
+            invalid["candidate"]["payload_sha256"] = validator.ready_payload_sha256(invalid)
+            schema_errors = validator.validate_instance(invalid, self.ready_schema)
+            semantic_errors = validator.validate_ready_cross_references(invalid)
+            self.assertTrue(
+                schema_errors or semantic_errors,
+                (invalid_revision, schema_errors, semantic_errors),
+            )
+            self.assertTrue(
+                any(
+                    "positive" in error or "pattern" in error
+                    for error in [*schema_errors, *semantic_errors]
+                ),
+                (invalid_revision, schema_errors, semantic_errors),
+            )
+
+        missing_regression = bug_ready_example()
+        missing_regression["bug_context"]["regression_bdd_refs"] = ["BDD-MISSING"]
+        missing_regression["candidate"]["payload_sha256"] = validator.ready_payload_sha256(missing_regression)
+        errors = validator.validate_ready_cross_references(missing_regression)
+        self.assertTrue(any("regression" in error and "unknown" in error for error in errors), errors)
+
+        wrong_command = bug_ready_example()
+        wrong_command["bug_context"]["original_reproduction_command_ref"] = "CMD-BDD-FULL-001"
+        wrong_command["candidate"]["payload_sha256"] = validator.ready_payload_sha256(wrong_command)
+        errors = validator.validate_ready_cross_references(wrong_command)
+        self.assertTrue(any("bug-reproduction" in error for error in errors), errors)
+
+    def test_partial_requires_proxy_red_green_residual_risk_and_follow_up(self) -> None:
+        for field in ("reason", "proxy_bdd_refs", "proxy_test_refs", "residual_risks", "follow_up"):
+            broken = bug_ready_example("partial")
+            broken["bug_context"]["partial_safeguards"][field] = None if field == "reason" else []
+            broken["candidate"]["payload_sha256"] = validator.ready_payload_sha256(broken)
+            errors = validator.validate_ready_cross_references(broken)
+            self.assertTrue(any("partial" in error for error in errors), (field, errors))
+
+        for value in (
+            "The BUG has been verified as fixed.",
+            "The defect has been conclusively remediated and the repair conclusively validated.",
+            "缺陷已徹底排除，修復結果已確認。",
+        ):
+            for field in ("reason", "residual_risks", "follow_up"):
+                overclaim = bug_ready_example("partial")
+                overclaim["bug_context"]["partial_safeguards"][field] = (
+                    value if field == "reason" else [value]
+                )
+                overclaim["candidate"]["payload_sha256"] = validator.ready_payload_sha256(overclaim)
+                errors = validator.validate_ready_cross_references(overclaim)
+                self.assertTrue(any("overclaim" in error for error in errors), (value, field, errors))
 
 
 if __name__ == "__main__":

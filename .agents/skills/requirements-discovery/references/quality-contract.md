@@ -41,6 +41,7 @@
 - 每個成功指標有基準或取得方式、目標、期間與責任來源。
 - 沒有衝突、重複需求、未定義關鍵詞、空白章節、未確認假設或阻塞性問題。
 - 沒有純 HOW；外部強制限制除外。
+- Bug run的observed／expected、impact、severity、scope與acceptance完整，且assessment path/hash與同一Requirements approval可追溯；assessment沒有取代WHAT或提前鎖定修法。
 - 追溯完整連接 `業務成果 → 使用者旅程 → 需求 → 驗收情境 → 成功指標`，沒有孤立需求。
 - 狀態、日期、範圍、來源與確認者可識別。
 

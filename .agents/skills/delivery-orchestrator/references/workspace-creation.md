@@ -40,6 +40,6 @@ git worktree add --no-track -b <branch> <destination> <exact-base-sha>
 
 只有未 Complete 的既有 record可建立 contiguous `N`。Primary HEAD 必須仍等於上一 generation 的 approved base；current Ready requirements／plan approvals、paths、payload及 source hashes全部重驗。
 
-新 generation只以 create-only materialize已核准 upstream bytes；不複製舊 generation 的產品、測試、設定或 dependency diff。非 bundle／requirements local source在 Git mutation前讀取recorded-base blob並核對manifest SHA；不存在或bytes不符即停止。任何 collision／drift保留 Blocked現場。
+新 generation只以 create-only materialize已核准 upstream bytes；primary bug run assessment與任何已materialize的途中assessment都連同Markdown／JSON及hash複製，pending evidence不假裝成repository artifact。它不複製舊 generation 的產品、測試、設定或 dependency diff。非 bundle／requirements local source在 Git mutation前讀取recorded-base blob並核對manifest SHA；不存在或bytes不符即停止。任何 collision／drift保留 Blocked現場。
 
 完成條件：新 generation是 `ready`、核准 upstream bytes hash相同、產品 diff為空，舊 generation與歷史 record保持不變。

@@ -26,6 +26,7 @@ from _delivery_git import (
 )
 from _delivery_runtime import (
     DeliveryError,
+    BUG_ID_RE,
     EVIDENCE_REF_RE,
     EVENT_RE,
     GIT_SHA_RE,
@@ -42,6 +43,8 @@ from _delivery_runtime import (
     _logical_refs,
     _normalized_repo_path,
     _read_json,
+    _stable_materialize_file,
+    _stable_read_file,
     _validate_registry_root,
     canonical_json,
     canonical_path,
@@ -52,6 +55,7 @@ from _delivery_runtime import (
     sha256_bytes,
     utc_now,
     validate_sha256,
+    validate_bug_id,
     validate_work_id,
     workspace_label,
 )
@@ -62,6 +66,46 @@ _EXECUTION_VALIDATOR: Any | None = None
 _READY_PLAN_SCHEMA: dict[str, Any] | None = None
 _DELIVERY_RUN_SCHEMA: dict[str, Any] | None = None
 _EXECUTION_RECORDS_SCHEMA: dict[str, Any] | None = None
+_BUG_CONTRACT_VALIDATOR: Any | None = None
+
+
+class _DuplicateBugJSONKey(ValueError):
+    pass
+
+
+def _strict_bug_json_object(
+    raw: bytes,
+    *,
+    label: str,
+    code: str,
+    known_secret_values: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Scan stable raw bytes before parsing and reject last-key-wins ambiguity."""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError as exc:
+        raise DeliveryError(f"{label} is not valid UTF-8 JSON", code=code) from exc
+    if any(secret and secret in text for secret in known_secret_values) or _contains_sensitive_material(text):
+        raise DeliveryError(f"{label} contains sensitive material", code=code)
+
+    def reject_duplicates(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise _DuplicateBugJSONKey("duplicate JSON object key")
+            value[key] = item
+        return value
+
+    try:
+        value = json.loads(text, object_pairs_hook=reject_duplicates)
+    except _DuplicateBugJSONKey as exc:
+        raise DeliveryError(f"{label} contains a duplicate JSON object key", code=code) from exc
+    except json.JSONDecodeError as exc:
+        raise DeliveryError(f"{label} is not readable JSON", code=code) from exc
+    if not isinstance(value, dict):
+        raise DeliveryError(f"{label} is not a JSON object", code=code)
+    return value
+
 
 def _contract_validator() -> Any:
     """Load the producer-owned standard-library contract validator once."""
@@ -83,6 +127,29 @@ def _contract_validator() -> Any:
     except (OSError, ImportError, SyntaxError) as exc:
         raise DeliveryError("contract validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE") from exc
     _CONTRACT_VALIDATOR = module
+    return module
+
+
+def _bug_contract_validator() -> Any:
+    """Load the diagnosis-owned assessment validator once."""
+    global _BUG_CONTRACT_VALIDATOR
+    if _BUG_CONTRACT_VALIDATOR is not None:
+        return _BUG_CONTRACT_VALIDATOR
+    module_path = (
+        Path(__file__).resolve().parents[2]
+        / "bug-diagnosis"
+        / "scripts"
+        / "validate_contracts.py"
+    )
+    spec = importlib.util.spec_from_file_location("delivery_bug_contract_validator", module_path)
+    if spec is None or spec.loader is None:
+        raise DeliveryError("BUG assessment validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, SyntaxError) as exc:
+        raise DeliveryError("BUG assessment validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE") from exc
+    _BUG_CONTRACT_VALIDATOR = module
     return module
 
 
@@ -256,19 +323,50 @@ def _ledger_evidence_path(run_dir: Path, relative: str) -> Path | None:
     return resolved
 
 
-def _snapshot_file(worktree: Path, relative: str) -> Path:
+def _snapshot_file(worktree: Path, relative: str) -> bytes:
     normalized = _normalized_repo_path(relative)
     lexical = worktree / Path(*normalized.split("/"))
-    is_junction = getattr(lexical, "is_junction", lambda: False)
-    resolved = canonical_path(lexical)
-    if (
-        lexical.is_symlink()
-        or is_junction()
-        or not _is_relative_to(resolved, worktree)
-        or not resolved.is_file()
-    ):
+    if _has_reparse_component(lexical, worktree):
         raise DeliveryError("snapshot input is missing or redirected", code="INVALID_IMPLEMENTATION_REF")
-    return resolved
+    try:
+        return _stable_read_file(worktree, lexical)
+    except DeliveryError as exc:
+        raise DeliveryError("snapshot input is missing or redirected", code="INVALID_IMPLEMENTATION_REF") from exc
+
+
+def _is_reparse_path(path: Path) -> bool:
+    """Inspect one lexical component without following its redirect target."""
+    if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
+        return True
+    try:
+        attributes = path.lstat().st_file_attributes
+    except FileNotFoundError:
+        return False
+    except (AttributeError, OSError):
+        return True
+    return os.name == "nt" and bool(attributes & 0x400)
+
+
+def _has_reparse_component(path: Path, root: Path) -> bool:
+    """Reject lexical redirects before any resolve, stat-following, or read."""
+    root_lexical = Path(os.path.abspath(root))
+    path_lexical = Path(os.path.abspath(path))
+    if _is_reparse_path(root_lexical):
+        return True
+    try:
+        relative = path_lexical.relative_to(root_lexical)
+    except ValueError:
+        return True
+    current = root_lexical
+    for part in relative.parts:
+        current = current / part
+        if _is_reparse_path(current):
+            return True
+    try:
+        path_lexical.resolve(strict=False).relative_to(root_lexical.resolve(strict=False))
+    except (OSError, RuntimeError, ValueError):
+        return True
+    return False
 
 
 def _current_implementation_snapshot(
@@ -281,9 +379,7 @@ def _current_implementation_snapshot(
     ready_hashes = [
         {
             "ref": _normalized_repo_path(artifact["path"]),
-            "sha256": sha256_bytes(
-                _snapshot_file(worktree, artifact["path"]).read_bytes()
-            ),
+            "sha256": sha256_bytes(_snapshot_file(worktree, artifact["path"])),
         }
         for artifact in ready.get("artifacts", [])
     ]
@@ -295,9 +391,7 @@ def _current_implementation_snapshot(
         if urlparse(location).scheme:
             actual = source["sha256"]
         else:
-            actual = sha256_bytes(
-                _snapshot_file(worktree, location).read_bytes()
-            )
+            actual = sha256_bytes(_snapshot_file(worktree, location))
         if actual != source["sha256"]:
             raise DeliveryError("Ready source drifted before Complete", code="INVALID_IMPLEMENTATION_REF")
         source_hashes.append({"ref": source["source_id"], "sha256": actual})
@@ -332,9 +426,7 @@ def _current_implementation_snapshot(
         unignored_files.append(
             {
                 "path": relative,
-                "sha256": sha256_bytes(
-                    _snapshot_file(worktree, relative).read_bytes()
-                ),
+                "sha256": sha256_bytes(_snapshot_file(worktree, relative)),
             }
         )
     unignored_files.sort(key=lambda item: item["path"].encode("utf-8"))
@@ -358,6 +450,7 @@ def _complete_implementation_errors(
     record: dict[str, Any],
     current_run: dict[str, Any],
     delivery_evidence_refs: Sequence[str],
+    known_secret_values: tuple[str, ...] = (),
 ) -> list[str]:
     """Verify a persisted Complete Ledger and the accepted review it names."""
     errors: list[str] = []
@@ -394,6 +487,7 @@ def _complete_implementation_errors(
             validator.validate_execution_record_semantics(
                 ledger,
                 evidence_root=run_dir,
+                known_secret_values=known_secret_values,
             )
         )
     except (AttributeError, KeyError, TypeError, ValueError, DeliveryError):
@@ -451,18 +545,15 @@ def _complete_implementation_errors(
 
     ready: dict[str, Any] | None = None
     if isinstance(current_handoff_path, str):
-        handoff_path = canonical_path(
-            Path(generation["canonical_worktree"])
-            / Path(*current_handoff_path.split("/"))
-        )
-        if _is_relative_to(handoff_path, canonical_path(generation["canonical_worktree"])) and handoff_path.is_file():
-            try:
-                candidate = json.loads(handoff_path.read_text(encoding="utf-8"))
-                if isinstance(candidate, dict):
-                    _validate_ready_contract(candidate)
-                    ready = candidate
-            except (OSError, UnicodeError, json.JSONDecodeError, DeliveryError):
-                ready = None
+        worktree = Path(generation["canonical_worktree"])
+        handoff_path = worktree / Path(*current_handoff_path.split("/"))
+        try:
+            candidate = json.loads(_stable_read_file(worktree, handoff_path).decode("utf-8"))
+            if isinstance(candidate, dict):
+                _validate_ready_contract(candidate)
+                ready = candidate
+        except (OSError, UnicodeError, json.JSONDecodeError, DeliveryError):
+            ready = None
     if ready is None:
         errors.append("Complete implementation review has no valid Ready handoff")
     else:
@@ -472,6 +563,7 @@ def _complete_implementation_errors(
                     ledger,
                     run_dir,
                     ready=ready,
+                    known_secret_values=known_secret_values,
                 )
             )
         except (AttributeError, KeyError, OSError, TypeError, ValueError):
@@ -525,6 +617,51 @@ def _complete_implementation_errors(
     if not accepted_snapshot_paths:
         errors.append("Complete transition lacks the canonical current workspace snapshot")
 
+    bug_verification_binding = (
+        record.get("bugs", {}).get("verification")
+        if record.get("work_kind", "standard") == "bug"
+        else None
+    )
+    bug_verification_valid = record.get("work_kind", "standard") != "bug"
+    verification_record: dict[str, Any] | None = None
+    if isinstance(bug_verification_binding, dict) and ready is not None:
+        try:
+            verification_relative = bug_verification_binding["path"]
+            verification_bytes = _verify_repo_file(
+                record,
+                verification_relative,
+                bug_verification_binding["sha256"],
+            )
+            candidate_verification = _strict_bug_json_object(
+                verification_bytes,
+                label="BUG verification",
+                code="INVALID_BUG_VERIFICATION",
+                known_secret_values=known_secret_values,
+            )
+            verification_record = candidate_verification
+            verification_errors = list(
+                validator.validate_instance(verification_record, schema, "bugVerification")
+            )
+            verification_errors.extend(
+                validator.validate_bug_verification_against_ready(
+                    verification_record,
+                    ready,
+                    expected_work_id=record["work_id"],
+                    expected_handoff_path=str(current_handoff_path),
+                    known_secret_values=known_secret_values,
+                    raw_json_bytes=verification_bytes,
+                    evidence_root=run_dir,
+                    terminal_evidence_refs=terminal_refs,
+                )
+            )
+            if verification_record.get("result") != bug_verification_binding.get("result"):
+                verification_errors.append("result binding differs")
+            bug_verification_valid = not verification_errors
+        except (OSError, UnicodeError, json.JSONDecodeError, DeliveryError, AttributeError, KeyError, TypeError, ValueError):
+            bug_verification_valid = False
+    if not bug_verification_valid:
+        errors.append("Complete BUG verification is missing, drifted, or invalid")
+
     approved_review_paths: set[str] = set()
     for relative, evidence_path in persisted_paths.items():
         try:
@@ -535,9 +672,20 @@ def _complete_implementation_errors(
             continue
         try:
             report_errors = list(validator.validate_instance(report, schema, "reviewReport"))
-            report_errors.extend(validator.validate_execution_record_semantics(report))
+            report_errors.extend(
+                validator.validate_execution_record_semantics(
+                    report,
+                    known_secret_values=known_secret_values,
+                )
+            )
             if ready is not None:
-                report_errors.extend(validator.validate_review_against_ready(report, ready))
+                report_errors.extend(
+                    validator.validate_review_against_ready(
+                        report,
+                        ready,
+                        known_secret_values,
+                    )
+                )
         except (AttributeError, KeyError, TypeError, ValueError):
             continue
         raw_output_paths = {
@@ -551,6 +699,19 @@ def _complete_implementation_errors(
             report_errors.append("review raw output refs are not canonical Ledger paths")
         if not raw_output_paths <= set(persisted_paths):
             report_errors.append("review raw outputs are not all persisted")
+        if (
+            isinstance(bug_verification_binding, dict)
+            and (
+                report.get("bug_verification_ref") != bug_verification_binding.get("path")
+                or report.get("bug_verification_result") != bug_verification_binding.get("result")
+            )
+        ):
+            report_errors.append("review BUG verification verdict differs from delivery binding")
+        if verification_record is not None and (
+            verification_record.get("implementation_review_ref") != relative
+            or verification_record.get("full_verification") != report.get("command_outcomes")
+        ):
+            report_errors.append("BUG verification full outcomes differ from the accepted review")
         if (
             not report_errors
             and report.get("verdict") == "APPROVED"
@@ -576,6 +737,8 @@ def _complete_implementation_errors(
         errors.append("Complete delivery event does not reference the accepted review")
     if accepted_snapshot_paths and not accepted_snapshot_paths & delivery_paths:
         errors.append("Complete delivery event does not reference the canonical snapshot")
+    if isinstance(bug_verification_binding, dict) and bug_verification_binding.get("path") not in delivery_refs:
+        errors.append("Complete delivery event does not reference BUG verification")
     return errors
 
 
@@ -622,6 +785,173 @@ def validate_record(record: dict[str, Any]) -> list[str]:
     primary_worktree = record.get("primary_worktree")
     if not isinstance(primary_worktree, str) or not primary_worktree:
         errors.append("primary_worktree is missing")
+
+    work_kind = record.get("work_kind", "standard")
+    bugs = record.get("bugs")
+    if bugs is not None and "work_kind" not in record:
+        errors.append("delivery with BUG overlay must declare work_kind explicitly")
+    bug_assessments: list[dict[str, Any]] = []
+    if work_kind == "standard":
+        if bugs is not None and not isinstance(bugs, dict):
+            errors.append("standard delivery BUG overlay is not an object")
+        elif isinstance(bugs, dict):
+            if bugs.get("primary_bug_id") is not None or bugs.get("assessments"):
+                errors.append("standard delivery cannot contain a primary BUG assessment")
+            if bugs.get("verification") is not None:
+                errors.append("standard delivery cannot contain primary BUG verification")
+    elif work_kind == "bug":
+        if not isinstance(bugs, dict):
+            errors.append("bug delivery lacks bugs record")
+        else:
+            primary_bug_id = bugs.get("primary_bug_id")
+            if not isinstance(primary_bug_id, str) or not BUG_ID_RE.fullmatch(primary_bug_id):
+                errors.append("bug delivery primary_bug_id is invalid")
+            raw_assessments = bugs.get("assessments", [])
+            bug_assessments = raw_assessments if isinstance(raw_assessments, list) else []
+            seen_assessment_paths: set[str] = set()
+            for index, assessment in enumerate(bug_assessments, 1):
+                if not isinstance(assessment, dict):
+                    errors.append(f"bug assessment binding {index} is not an object")
+                    continue
+                bug_id = assessment.get("bug_id")
+                match = re.fullmatch(
+                    rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.json",
+                    str(assessment.get("path", "")),
+                )
+                markdown_match = re.fullmatch(
+                    rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.md",
+                    str(assessment.get("markdown_path", "")),
+                )
+                if match is None or markdown_match is None or match.group(1) != markdown_match.group(1):
+                    errors.append(f"bug assessment binding {index} paths are not canonical")
+                if assessment.get("path") in seen_assessment_paths:
+                    errors.append(f"bug assessment binding {index} reuses a create-only path")
+                seen_assessment_paths.add(str(assessment.get("path")))
+                for field in ("sha256", "markdown_sha256", "requirements_sha256"):
+                    if not SHA256_RE.fullmatch(str(assessment.get(field, ""))):
+                        errors.append(f"bug assessment binding {index} has invalid {field}")
+                refs = assessment.get("approval_evidence_refs")
+                if (
+                    not isinstance(refs, list)
+                    or not refs
+                    or len(refs) != len(set(refs))
+                    or any(not isinstance(ref, str) or not EVIDENCE_REF_RE.fullmatch(ref) for ref in refs)
+                ):
+                    errors.append(f"bug assessment binding {index} approval refs are invalid")
+            if record.get("phase") in {"planning", "implementation", "complete"}:
+                if not bug_assessments or bug_assessments[0].get("bug_id") != primary_bug_id:
+                    errors.append("bug delivery lacks its primary approved assessment")
+    else:
+        errors.append(f"unknown work_kind {work_kind!r}")
+
+    if isinstance(bugs, dict):
+        deferred = bugs.get("deferred", [])
+        if not isinstance(deferred, list):
+            errors.append("BUG deferred history is not an array")
+            deferred = []
+        histories: dict[str, list[dict[str, Any]]] = {}
+        seen_deferred_paths: set[str] = set()
+        for index, item in enumerate(deferred, 1):
+            if not isinstance(item, dict):
+                errors.append(f"deferred BUG event {index} is not an object")
+                continue
+            bug_id = str(item.get("bug_id", ""))
+            histories.setdefault(bug_id, []).append(item)
+            refs = item.get("host_evidence_refs")
+            if (
+                not BUG_ID_RE.fullmatch(bug_id)
+                or not isinstance(refs, list)
+                or not refs
+                or len(refs) != len(set(refs))
+                or any(
+                    not isinstance(ref, str)
+                    or not EVIDENCE_REF_RE.fullmatch(ref)
+                    or _contains_sensitive_material(ref)
+                    for ref in refs
+                )
+            ):
+                errors.append(f"deferred BUG event {index} has invalid redacted evidence")
+            relation = item.get("relation")
+            status_value = item.get("status")
+            sensitive = item.get("sensitive")
+            redacted_summary = item.get("redacted_summary")
+            human_reviewer = item.get("human_reviewer")
+            if sensitive is True:
+                if (
+                    not isinstance(redacted_summary, str)
+                    or not redacted_summary
+                    or not isinstance(human_reviewer, str)
+                    or not human_reviewer
+                    or _contains_sensitive_material(redacted_summary)
+                ):
+                    errors.append(f"deferred BUG event {index} lacks safe sensitive-risk ownership")
+            elif sensitive is False:
+                if redacted_summary is not None or human_reviewer is not None:
+                    errors.append(f"deferred BUG event {index} has unexpected sensitive-risk fields")
+            else:
+                errors.append(f"deferred BUG event {index} sensitive flag is invalid")
+            artifact_values = (
+                item.get("assessment_path"),
+                item.get("assessment_sha256"),
+                item.get("assessment_markdown_path"),
+                item.get("assessment_markdown_sha256"),
+            )
+            if status_value == "pending" and any(value is not None for value in artifact_values):
+                errors.append(f"deferred BUG event {index} pending state cannot bind assessment bytes")
+            if status_value == "materialized":
+                if not all(value is not None for value in artifact_values):
+                    errors.append(f"deferred BUG event {index} materialized state lacks assessment binding")
+                path = str(item.get("assessment_path", ""))
+                markdown_path = str(item.get("assessment_markdown_path", ""))
+                if (
+                    re.fullmatch(rf"docs/bugs/{re.escape(bug_id)}/assessment-[1-9][0-9]*\.json", path) is None
+                    or re.fullmatch(rf"docs/bugs/{re.escape(bug_id)}/assessment-[1-9][0-9]*\.md", markdown_path) is None
+                    or path in seen_deferred_paths
+                ):
+                    errors.append(f"deferred BUG event {index} assessment paths are invalid or reused")
+                seen_deferred_paths.add(path)
+            expected_inbox_ref = f"bug-inbox:{bug_id}" if relation == "unrelated" else None
+            if item.get("inbox_ref") != expected_inbox_ref:
+                errors.append(f"deferred BUG event {index} inbox binding differs from relation")
+        for bug_id, history in histories.items():
+            if [item.get("sequence") for item in history] != list(range(1, len(history) + 1)):
+                errors.append(f"deferred BUG {bug_id} sequence is not contiguous")
+            if history and history[0].get("status") != "pending":
+                errors.append(f"deferred BUG {bug_id} must start pending")
+            if len(history) > 2 or (len(history) == 2 and history[1].get("status") != "materialized"):
+                errors.append(f"deferred BUG {bug_id} history is not pending→materialized")
+            if history and any(
+                item.get("relation") != history[0].get("relation")
+                or item.get("host_evidence_refs") != history[0].get("host_evidence_refs")
+                or item.get("inbox_ref") != history[0].get("inbox_ref")
+                or item.get("sensitive") is not history[0].get("sensitive")
+                or item.get("redacted_summary") != history[0].get("redacted_summary")
+                or item.get("human_reviewer") != history[0].get("human_reviewer")
+                for item in history[1:]
+            ):
+                errors.append(f"deferred BUG {bug_id} routing evidence changed across append-only history")
+        if record.get("phase") == "complete" and any(history[-1].get("status") == "pending" for history in histories.values() if history):
+            errors.append("complete delivery has deferred BUG evidence that was not materialized")
+        verification = bugs.get("verification")
+        if verification is not None:
+            primary_bug_id = bugs.get("primary_bug_id")
+            expected_path = (
+                f"docs/bugs/{primary_bug_id}/verifications/{record.get('work_id')}.json"
+                if isinstance(primary_bug_id, str)
+                else None
+            )
+            if (
+                not isinstance(verification, dict)
+                or verification.get("bug_id") != primary_bug_id
+                or verification.get("path") != expected_path
+                or not SHA256_RE.fullmatch(str(verification.get("sha256", "")))
+                or verification.get("result") not in {"verified", "partial", "failed"}
+            ):
+                errors.append("BUG verification binding is invalid")
+        if record.get("phase") == "complete" and (
+            not isinstance(verification, dict) or verification.get("result") == "failed"
+        ) and work_kind == "bug":
+            errors.append("complete bug delivery requires non-failed BUG verification")
 
     phase = record.get("phase")
     status = record.get("status")
@@ -768,6 +1098,22 @@ def validate_record(record: dict[str, Any]) -> list[str]:
         ):
             errors.append(f"requirements revision {index} approval refs are invalid")
 
+    for index, assessment in enumerate(bug_assessments, 1):
+        requirement = next(
+            (
+                item
+                for item in requirement_revisions
+                if isinstance(item, dict) and item.get("path") == assessment.get("requirements_path")
+            ),
+            None,
+        )
+        if (
+            requirement is None
+            or requirement.get("sha256") != assessment.get("requirements_sha256")
+            or requirement.get("approval_evidence_refs") != assessment.get("approval_evidence_refs")
+        ):
+            errors.append(f"bug assessment binding {index} differs from its Requirements approval")
+
     plan_revisions = plans.get("revisions", []) if isinstance(plans, dict) else []
     previous_plan_revision = 0
     for index, item in enumerate(plan_revisions, 1):
@@ -807,6 +1153,20 @@ def validate_record(record: dict[str, Any]) -> list[str]:
         seen_run_ids.add(run_id)
         if item.get("status") not in {"Active", "Complete", "Awaiting upstream reapproval", "Blocked"}:
             errors.append(f"implementation run {index} has invalid status")
+        verification_fields = (
+            item.get("bug_verification_ref"),
+            item.get("bug_verification_sha256"),
+            item.get("bug_verification_result"),
+        )
+        if any(value is not None for value in verification_fields) and not all(value is not None for value in verification_fields):
+            errors.append(f"implementation run {index} has incomplete BUG verification binding")
+        if all(value is not None for value in verification_fields):
+            if (
+                not isinstance(item.get("bug_verification_ref"), str)
+                or not SHA256_RE.fullmatch(str(item.get("bug_verification_sha256", "")))
+                or item.get("bug_verification_result") not in {"verified", "partial", "failed"}
+            ):
+                errors.append(f"implementation run {index} has invalid BUG verification binding")
         ledger_ref = item.get("ledger_ref")
         if (
             not isinstance(ledger_ref, str)
@@ -823,6 +1183,14 @@ def validate_record(record: dict[str, Any]) -> list[str]:
         )
         if current_run is None or current_run.get("status") != "Complete":
             errors.append("complete delivery lacks a Complete current implementation run")
+        elif work_kind == "bug" and (
+            not isinstance(bugs, dict)
+            or not isinstance(bugs.get("verification"), dict)
+            or current_run.get("bug_verification_ref") != bugs["verification"].get("path")
+            or current_run.get("bug_verification_sha256") != bugs["verification"].get("sha256")
+            or current_run.get("bug_verification_result") != bugs["verification"].get("result")
+        ):
+            errors.append("complete implementation run differs from BUG verification binding")
         elif events:
             errors.extend(
                 _complete_implementation_errors(
@@ -852,7 +1220,18 @@ def _new_record(
     request_sha256: str,
     destination: Path,
     branch: str,
+    *,
+    work_kind: str | None = None,
+    bug_id: str | None = None,
 ) -> dict[str, Any]:
+    if work_kind not in {None, "standard", "bug"}:
+        raise DeliveryError("work_kind must be standard or bug", code="INVALID_WORK_KIND")
+    if work_kind == "bug":
+        if bug_id is None:
+            raise DeliveryError("bug work requires bug_id", code="INVALID_BUG_ID")
+        validate_bug_id(bug_id)
+    elif bug_id is not None:
+        raise DeliveryError("bug_id is only valid for bug work", code="INVALID_BUG_ID")
     now = utc_now()
     record: dict[str, Any] = {
         "schema": SCHEMA,
@@ -882,6 +1261,14 @@ def _new_record(
         "events": [],
         "updated_at": now,
     }
+    if work_kind == "bug":
+        record["work_kind"] = "bug"
+        record["bugs"] = {
+            "primary_bug_id": bug_id,
+            "assessments": [],
+            "deferred": [],
+            "verification": None,
+        }
     _append_event(
         record,
         kind="workspace_reserved",
@@ -989,18 +1376,361 @@ def _ready_payload_sha256(handoff: dict[str, Any]) -> str:
     return sha256_bytes(canonical_json(normalized))
 
 
-def _verify_repo_file(record: dict[str, Any], relative: str, expected_sha256: str) -> None:
+def _verify_repo_file(record: dict[str, Any], relative: str, expected_sha256: str) -> bytes:
     validate_sha256(expected_sha256, "artifact sha256")
     _normalized_repo_path(relative)
     worktree = Path(record["generations"][-1]["canonical_worktree"])
-    path = canonical_path(worktree / Path(*relative.split("/")))
-    if not _is_relative_to(path, canonical_path(worktree)):
-        raise DeliveryError("artifact path escapes the delivery worktree", code="INVALID_PATH")
-    if not path.is_file():
-        raise DeliveryError(f"artifact does not exist: {relative}", code="MISSING_ARTIFACT")
-    actual = sha256_bytes(path.read_bytes())
+    lexical = worktree / Path(*relative.split("/"))
+    if _has_reparse_component(lexical, worktree):
+        raise DeliveryError("artifact path uses a symlink or reparse point", code="INVALID_PATH")
+    value = _stable_read_file(worktree, lexical)
+    actual = sha256_bytes(value)
     if actual != expected_sha256:
         raise DeliveryError(f"artifact hash differs for {relative}", code="ARTIFACT_DRIFT")
+    return value
+
+
+def _validated_bug_assessment_binding(
+    record: dict[str, Any],
+    *,
+    bug_id: str,
+    assessment_path: str,
+    assessment_sha256: str,
+    markdown_path: str,
+    markdown_sha256: str,
+    requirements_path: str,
+    requirements_sha256: str,
+    approval_refs: Sequence[str],
+    known_secret_values: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    try:
+        validate_bug_id(bug_id)
+        assessment_path = _normalized_repo_path(assessment_path)
+        markdown_path = _normalized_repo_path(markdown_path)
+        validate_sha256(assessment_sha256, "BUG assessment sha256")
+        validate_sha256(markdown_sha256, "BUG assessment Markdown sha256")
+        sidecar_bytes = _verify_repo_file(record, assessment_path, assessment_sha256)
+        _verify_repo_file(record, markdown_path, markdown_sha256)
+    except DeliveryError as exc:
+        raise DeliveryError(str(exc), code="INVALID_BUG_ASSESSMENT") from exc
+
+    primary_bug_id = record.get("bugs", {}).get("primary_bug_id")
+    if bug_id != primary_bug_id:
+        raise DeliveryError("BUG assessment ID differs from delivery primary_bug_id", code="INVALID_BUG_ASSESSMENT")
+    if any(item.get("path") == assessment_path for item in record.get("bugs", {}).get("assessments", [])):
+        raise DeliveryError("BUG assessment path is create-only and already bound", code="INVALID_BUG_ASSESSMENT")
+
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    try:
+        data = _strict_bug_json_object(
+            sidecar_bytes,
+            label="BUG assessment sidecar",
+            code="INVALID_BUG_ASSESSMENT",
+            known_secret_values=known_secret_values,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, DeliveryError) as exc:
+        raise DeliveryError("BUG assessment sidecar is not readable JSON", code="INVALID_BUG_ASSESSMENT") from exc
+    if not isinstance(data, dict):
+        raise DeliveryError("BUG assessment sidecar is not an object", code="INVALID_BUG_ASSESSMENT")
+    try:
+        assessment_errors = _bug_contract_validator().validate_assessment(
+            data,
+            repository_root=worktree,
+            sidecar_path=worktree / Path(*assessment_path.split("/")),
+            sidecar_bytes=sidecar_bytes,
+            known_secret_values=known_secret_values,
+        )
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise DeliveryError("BUG assessment validation could not complete", code="INVALID_BUG_ASSESSMENT") from exc
+    if assessment_errors:
+        raise DeliveryError(
+            f"BUG assessment violates bug-assessment/v1 ({len(assessment_errors)} issue(s))",
+            code="INVALID_BUG_ASSESSMENT",
+        )
+    if (
+        data.get("bug_id") != bug_id
+        or data.get("markdown", {}).get("path") != markdown_path
+        or data.get("markdown", {}).get("sha256") != markdown_sha256
+        or data.get("verdict") not in {"confirmed", "likely"}
+        or data.get("disposition") != "delivery"
+    ):
+        raise DeliveryError("BUG assessment cannot enter bug delivery", code="INVALID_BUG_ASSESSMENT")
+    return {
+        "bug_id": bug_id,
+        "path": assessment_path,
+        "sha256": assessment_sha256,
+        "markdown_path": markdown_path,
+        "markdown_sha256": markdown_sha256,
+        "requirements_path": requirements_path,
+        "requirements_sha256": requirements_sha256,
+        "approval_evidence_refs": list(approval_refs),
+    }
+
+
+def _validated_deferred_assessment(
+    record: dict[str, Any],
+    *,
+    bug_id: str,
+    relation: str,
+    assessment_path: str,
+    assessment_sha256: str,
+    markdown_path: str,
+    markdown_sha256: str,
+    evidence_refs: Sequence[str],
+    sensitive: bool,
+    redacted_summary: str | None,
+    human_reviewer: str | None,
+    known_secret_values: tuple[str, ...] = (),
+) -> tuple[str, str, str, str]:
+    try:
+        validate_bug_id(bug_id)
+        assessment_path = _normalized_repo_path(assessment_path)
+        markdown_path = _normalized_repo_path(markdown_path)
+        validate_sha256(assessment_sha256, "deferred BUG assessment sha256")
+        validate_sha256(markdown_sha256, "deferred BUG assessment Markdown sha256")
+        sidecar_bytes = _verify_repo_file(record, assessment_path, assessment_sha256)
+        _verify_repo_file(record, markdown_path, markdown_sha256)
+    except DeliveryError as exc:
+        raise DeliveryError(str(exc), code="INVALID_DEFERRED_BUG") from exc
+
+    prior_paths = {
+        item.get("assessment_path")
+        for item in record.get("bugs", {}).get("deferred", [])
+        if isinstance(item, dict) and item.get("assessment_path") is not None
+    }
+    if assessment_path in prior_paths:
+        raise DeliveryError("deferred BUG assessment path is create-only and already bound", code="INVALID_DEFERRED_BUG")
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    try:
+        data = _strict_bug_json_object(
+            sidecar_bytes,
+            label="deferred BUG assessment",
+            code="INVALID_DEFERRED_BUG",
+            known_secret_values=known_secret_values,
+        )
+        assessment_errors = _bug_contract_validator().validate_assessment(
+            data,
+            repository_root=worktree,
+            sidecar_path=worktree / Path(*assessment_path.split("/")),
+            sidecar_bytes=sidecar_bytes,
+            known_secret_values=known_secret_values,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError, AttributeError, KeyError, TypeError, ValueError, DeliveryError) as exc:
+        raise DeliveryError("deferred BUG assessment validation could not complete", code="INVALID_DEFERRED_BUG") from exc
+    expected_disposition = {
+        "current-scope": "current-run",
+        "affecting-current-work": "upstream-reapproval",
+        "unrelated": "deferred-inbox",
+    }[relation]
+    source = data.get("source", {})
+    risk = data.get("risk", {})
+    if (
+        assessment_errors
+        or data.get("bug_id") != bug_id
+        or data.get("markdown", {}).get("path") != markdown_path
+        or data.get("markdown", {}).get("sha256") != markdown_sha256
+        or source.get("relation") != relation
+        or source.get("work_id") != record.get("work_id")
+        or data.get("disposition") != expected_disposition
+        or risk.get("security_privacy_or_data_risk") is not sensitive
+        or risk.get("redacted_summary") != redacted_summary
+        or risk.get("human_reviewer") != human_reviewer
+        or (sensitive and risk.get("secure_evidence_refs") != list(evidence_refs))
+    ):
+        raise DeliveryError("deferred BUG assessment differs from its routing contract", code="INVALID_DEFERRED_BUG")
+    return assessment_path, assessment_sha256, markdown_path, markdown_sha256
+
+
+def _create_global_bug_inbox(
+    root: Path,
+    record: dict[str, Any],
+    *,
+    bug_id: str,
+    evidence_refs: Sequence[str],
+    sensitive: bool,
+    redacted_summary: str | None,
+    human_reviewer: str | None,
+) -> tuple[str, Path, dict[str, Any], bool]:
+    inbox_ref = f"bug-inbox:{bug_id}"
+    inbox_path = root / "repos" / record["repo_id"] / "bug-inbox" / f"{bug_id}.json"
+    payload = {
+        "schema": "bug-inbox/v1",
+        "bug_id": bug_id,
+        "source_work_id": record["work_id"],
+        "relation": "unrelated",
+        "status": "pending",
+        "redacted_evidence_refs": list(evidence_refs),
+        "risk": {
+            "sensitive": sensitive,
+            "redacted_summary": redacted_summary,
+            "human_reviewer": human_reviewer,
+        },
+        "created_at": utc_now(),
+    }
+
+    def recover_existing(raw: bytes, cause: BaseException | None = None) -> tuple[str, Path, dict[str, Any], bool]:
+        try:
+            existing = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as read_exc:
+            raise DeliveryError(
+                "global BUG inbox entry already exists; allocate a collision suffix",
+                code="BUG_INBOX_EXISTS",
+            ) from read_exc
+        expected_identity = {key: value for key, value in payload.items() if key != "created_at"}
+        existing_identity = (
+            {key: value for key, value in existing.items() if key != "created_at"}
+            if isinstance(existing, dict)
+            else None
+        )
+        if (
+            existing_identity != expected_identity
+            or not isinstance(existing, dict)
+            or not _is_utc_datetime(existing.get("created_at"))
+        ):
+            raise DeliveryError(
+                "global BUG inbox entry already exists; allocate a collision suffix",
+                code="BUG_INBOX_EXISTS",
+            ) from cause
+        return inbox_ref, inbox_path, existing, False
+
+    try:
+        return recover_existing(_stable_read_file(root, inbox_path))
+    except DeliveryError as exc:
+        if exc.code != "MISSING_ARTIFACT":
+            raise
+
+    encoded = (
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    ).encode("utf-8")
+    relative = inbox_path.relative_to(root).as_posix()
+    try:
+        created = _stable_materialize_file(root, relative, encoded, sha256_bytes(encoded))
+    except DeliveryError as exc:
+        if exc.code != "ARTIFACT_COLLISION":
+            raise
+        return recover_existing(_stable_read_file(root, inbox_path), exc)
+    if not created:
+        return recover_existing(_stable_read_file(root, inbox_path))
+    return inbox_ref, inbox_path, payload, True
+
+
+def _rollback_global_bug_inbox(
+    root: Path,
+    inbox_path: Path,
+    payload: dict[str, Any],
+) -> None:
+    """Remove only the exact inbox bytes created by a failed run transition."""
+    try:
+        current = json.loads(_stable_read_file(root, inbox_path).decode("utf-8"))
+    except (DeliveryError, UnicodeError, json.JSONDecodeError):
+        return
+    if current != payload or _has_reparse_component(inbox_path, root):
+        return
+    try:
+        inbox_path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _validated_bug_verification_binding(
+    record: dict[str, Any],
+    *,
+    implementation_run_id: str,
+    path: str,
+    expected_sha256: str,
+    result: str,
+    known_secret_values: tuple[str, ...] = (),
+) -> dict[str, Any]:
+    bugs = record.get("bugs")
+    bug_id = bugs.get("primary_bug_id") if isinstance(bugs, dict) else None
+    if not isinstance(bug_id, str):
+        raise DeliveryError("only a primary BUG delivery can bind BUG verification", code="INVALID_BUG_VERIFICATION")
+    expected_path = f"docs/bugs/{bug_id}/verifications/{record['work_id']}.json"
+    try:
+        normalized = _normalized_repo_path(path)
+        validate_sha256(expected_sha256, "BUG verification sha256")
+        verification_bytes = _verify_repo_file(record, normalized, expected_sha256)
+    except DeliveryError as exc:
+        raise DeliveryError(str(exc), code="INVALID_BUG_VERIFICATION") from exc
+    if normalized != expected_path:
+        raise DeliveryError("BUG verification path is not canonical for this Work ID", code="INVALID_BUG_VERIFICATION")
+    if result not in {"verified", "partial", "failed"}:
+        raise DeliveryError("BUG verification result is invalid", code="INVALID_BUG_VERIFICATION")
+    if bugs.get("verification") is not None:
+        raise DeliveryError("BUG verification path is create-only and already bound", code="INVALID_BUG_VERIFICATION")
+
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    handoff_relative = record.get("plans", {}).get("current_handoff_path")
+    if not isinstance(handoff_relative, str):
+        raise DeliveryError("BUG verification has no current Ready handoff", code="INVALID_BUG_VERIFICATION")
+    try:
+        verification = _strict_bug_json_object(
+            verification_bytes,
+            label="BUG verification",
+            code="INVALID_BUG_VERIFICATION",
+            known_secret_values=known_secret_values,
+        )
+        handoff = json.loads(
+            _stable_read_file(
+                worktree,
+                worktree / Path(*handoff_relative.split("/")),
+            ).decode("utf-8")
+        )
+        evidence_root = canonical_path(_implementation_root() / "runs" / implementation_run_id)
+        ledger_path = _ledger_evidence_path(evidence_root, "run.json")
+        if ledger_path is None:
+            raise TypeError("implementation Ledger is absent")
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        attempt = next(
+            (
+                item
+                for item in ledger.get("attempts", [])
+                if item.get("attempt_id") == ledger.get("current_attempt_id")
+            ),
+            None,
+        )
+        history = attempt.get("state_history", []) if isinstance(attempt, dict) else []
+        terminal_evidence_refs = history[-1].get("evidence_refs", []) if history else []
+        validator = _execution_validator()
+        schema_errors = validator.validate_instance(
+            verification,
+            _execution_records_schema(),
+            "bugVerification",
+        )
+        semantic_errors = validator.validate_bug_verification_against_ready(
+            verification,
+            handoff,
+            expected_work_id=record["work_id"],
+            expected_handoff_path=handoff_relative,
+            known_secret_values=known_secret_values,
+            raw_json_bytes=verification_bytes,
+            evidence_root=evidence_root,
+            terminal_evidence_refs=terminal_evidence_refs,
+        )
+    except (
+        OSError,
+        UnicodeError,
+        json.JSONDecodeError,
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        DeliveryError,
+    ) as exc:
+        raise DeliveryError("BUG verification validation could not complete", code="INVALID_BUG_VERIFICATION") from exc
+    if schema_errors or semantic_errors:
+        raise DeliveryError(
+            f"BUG verification violates bug-verification/v1 ({len(schema_errors) + len(semantic_errors)} issue(s))",
+            code="INVALID_BUG_VERIFICATION",
+        )
+    if verification.get("bug_id") != bug_id or verification.get("result") != result:
+        raise DeliveryError("BUG verification binding differs from persisted record", code="INVALID_BUG_VERIFICATION")
+    return {
+        "bug_id": bug_id,
+        "path": normalized,
+        "sha256": expected_sha256,
+        "result": result,
+    }
 
 
 def _verify_ready_local_sources(
@@ -1041,10 +1771,14 @@ def _verify_ready_local_sources(
                 )
         if not verify_current_sources:
             continue
-        path = canonical_path(worktree / Path(*relative.split("/")))
-        if not _is_relative_to(path, canonical_path(worktree)) or not path.is_file():
-            raise DeliveryError("local Ready source is missing or escapes its worktree", code="SOURCE_DRIFT")
-        if sha256_bytes(path.read_bytes()) != expected:
+        try:
+            source_bytes = _stable_read_file(
+                worktree,
+                worktree / Path(*relative.split("/")),
+            )
+        except DeliveryError as exc:
+            raise DeliveryError("local Ready source is missing or escapes its worktree", code="SOURCE_DRIFT") from exc
+        if sha256_bytes(source_bytes) != expected:
             raise DeliveryError("local Ready source hash differs from its manifest", code="SOURCE_DRIFT")
         if relative not in materialized_paths:
             source_status = _git(
@@ -1077,9 +1811,7 @@ def _approved_upstream_materialization(
     materialization: dict[str, dict[str, Any]] = {}
 
     def include(relative: str, expected_sha256: str) -> None:
-        _verify_repo_file(record, relative, expected_sha256)
-        path = source_worktree / Path(*relative.split("/"))
-        value = path.read_bytes()
+        value = _verify_repo_file(record, relative, expected_sha256)
         existing = materialization.get(relative)
         item = {"path": relative, "sha256": expected_sha256, "bytes": value}
         if existing is not None and (existing["sha256"] != expected_sha256 or existing["bytes"] != value):
@@ -1100,6 +1832,18 @@ def _approved_upstream_materialization(
             raise DeliveryError("current requirements lack a Ready approved revision", code="INVALID_RECORD")
         include(requirements_path, requirements_entry["sha256"])
 
+    if record.get("work_kind", "standard") == "bug":
+        assessments = record.get("bugs", {}).get("assessments", [])
+        if record.get("phase") in {"planning", "implementation", "complete"} and not assessments:
+            raise DeliveryError("bug delivery lacks approved assessment materialization", code="INVALID_RECORD")
+        for assessment in assessments:
+            include(assessment["path"], assessment["sha256"])
+            include(assessment["markdown_path"], assessment["markdown_sha256"])
+    for item in record.get("bugs", {}).get("deferred", []):
+        if isinstance(item, dict) and item.get("status") == "materialized":
+            include(item["assessment_path"], item["assessment_sha256"])
+            include(item["assessment_markdown_path"], item["assessment_markdown_sha256"])
+
     handoff_path = record["plans"]["current_handoff_path"]
     if handoff_path is None:
         return [materialization[key] for key in sorted(materialization)]
@@ -1118,9 +1862,11 @@ def _approved_upstream_materialization(
     ):
         raise DeliveryError("requirements and plan approval evidence are not distinct", code="INVALID_RECORD")
 
-    handoff_file = source_worktree / Path(*handoff_path.split("/"))
     try:
-        handoff_bytes = handoff_file.read_bytes()
+        handoff_bytes = _stable_read_file(
+            source_worktree,
+            source_worktree / Path(*handoff_path.split("/")),
+        )
         handoff = json.loads(handoff_bytes.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise DeliveryError(f"cannot read current Ready handoff: {exc}", code="INVALID_HANDOFF") from exc
@@ -1198,30 +1944,11 @@ def _approved_upstream_materialization(
 
 def _materialize_approved_upstream(destination: Path, items: Sequence[dict[str, Any]]) -> list[dict[str, str]]:
     evidence: list[dict[str, str]] = []
-    canonical_destination = canonical_path(destination)
     for item in items:
         relative = _normalized_repo_path(item["path"])
-        target = canonical_path(canonical_destination / Path(*relative.split("/")))
-        if not _is_relative_to(target, canonical_destination):
-            raise DeliveryError("approved upstream target escapes the new worktree", code="INVALID_PATH")
         expected = item["sha256"]
         value = item["bytes"]
-        if sha256_bytes(value) != expected:
-            raise DeliveryError(f"approved upstream in-memory bytes drifted: {relative}", code="ARTIFACT_DRIFT")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.exists():
-            if not target.is_file() or sha256_bytes(target.read_bytes()) != expected:
-                raise DeliveryError(f"new generation path would be overwritten: {relative}", code="ARTIFACT_COLLISION")
-        else:
-            try:
-                with target.open("xb") as stream:
-                    stream.write(value)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-            except FileExistsError as exc:
-                raise DeliveryError(f"new generation path appeared concurrently: {relative}", code="ARTIFACT_COLLISION") from exc
-        if sha256_bytes(target.read_bytes()) != expected:
-            raise DeliveryError(f"materialized upstream hash differs: {relative}", code="ARTIFACT_DRIFT")
+        _stable_materialize_file(destination, relative, value, expected)
         evidence.append({"path": relative, "sha256": expected})
     return evidence
 
@@ -1255,6 +1982,22 @@ def _transition_record_unlocked(
     requirements_path: str | None = None,
     requirements_sha256: str | None = None,
     requirements_approval_refs: Sequence[str] = (),
+    bug_assessment_id: str | None = None,
+    bug_assessment_path: str | None = None,
+    bug_assessment_sha256: str | None = None,
+    bug_assessment_markdown_path: str | None = None,
+    bug_assessment_markdown_sha256: str | None = None,
+    deferred_bug_id: str | None = None,
+    deferred_bug_relation: str | None = None,
+    deferred_bug_status: str | None = None,
+    deferred_bug_evidence_refs: Sequence[str] = (),
+    deferred_bug_sensitive: bool = False,
+    deferred_bug_redacted_summary: str | None = None,
+    deferred_bug_human_reviewer: str | None = None,
+    deferred_bug_assessment_path: str | None = None,
+    deferred_bug_assessment_sha256: str | None = None,
+    deferred_bug_assessment_markdown_path: str | None = None,
+    deferred_bug_assessment_markdown_sha256: str | None = None,
     handoff_path: str | None = None,
     candidate_revision: str | None = None,
     payload_sha256: str | None = None,
@@ -1262,6 +2005,10 @@ def _transition_record_unlocked(
     implementation_run_id: str | None = None,
     implementation_ledger_ref: str | None = None,
     implementation_status: str | None = None,
+    bug_verification_path: str | None = None,
+    bug_verification_sha256: str | None = None,
+    bug_verification_result: str | None = None,
+    known_secret_values: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
     validate_work_id(work_id)
@@ -1287,12 +2034,199 @@ def _transition_record_unlocked(
     if (phase == "complete") != (status == "complete"):
         raise DeliveryError("complete phase and status must be paired", code="ILLEGAL_TRANSITION")
 
+    known_secrets = tuple(
+        value
+        for value in known_secret_values
+        if isinstance(value, str) and value
+    )
+    metadata_values = (
+        *evidence_refs,
+        *requirements_approval_refs,
+        *plan_approval_refs,
+        *deferred_bug_evidence_refs,
+        deferred_bug_redacted_summary or "",
+        deferred_bug_human_reviewer or "",
+        implementation_ledger_ref or "",
+    )
+    if any(
+        secret in value
+        for value in metadata_values
+        if isinstance(value, str)
+        for secret in known_secrets
+    ):
+        raise DeliveryError(
+            "transition metadata contains a known secret value",
+            code="INVALID_EVIDENCE_REF",
+        )
+    known_secret_values = known_secrets
+
+    pending_inbox: tuple[str, list[str], bool, str | None, str | None] | None = None
+
     if (current_phase, phase) == ("planning", "requirements"):
         record["plans"]["current_handoff_path"] = None
         record["implementations"]["current_run_id"] = None
     elif (current_phase, phase) == ("implementation", "planning"):
         record["plans"]["current_handoff_path"] = None
         record["implementations"]["current_run_id"] = None
+
+    bug_assessment_values = (
+        bug_assessment_id,
+        bug_assessment_path,
+        bug_assessment_sha256,
+        bug_assessment_markdown_path,
+        bug_assessment_markdown_sha256,
+    )
+    bug_assessment_supplied = any(value is not None for value in bug_assessment_values)
+    if bug_assessment_supplied and not all(value is not None for value in bug_assessment_values):
+        raise DeliveryError("BUG assessment binding requires ID, JSON/Markdown paths and hashes", code="INCOMPLETE_ARTIFACT_REF")
+
+    deferred_values = (
+        deferred_bug_id,
+        deferred_bug_relation,
+        deferred_bug_status,
+    )
+    deferred_supplied = (
+        any(value is not None for value in deferred_values)
+        or bool(deferred_bug_evidence_refs)
+        or deferred_bug_sensitive
+        or deferred_bug_redacted_summary is not None
+        or deferred_bug_human_reviewer is not None
+    )
+    if deferred_supplied:
+        if not all(value is not None for value in deferred_values) or not deferred_bug_evidence_refs:
+            raise DeliveryError("deferred BUG requires ID, relation, status, and redacted host evidence", code="INCOMPLETE_ARTIFACT_REF")
+        validate_bug_id(str(deferred_bug_id))
+        if deferred_bug_relation not in {"current-scope", "affecting-current-work", "unrelated"}:
+            raise DeliveryError("deferred BUG relation is invalid", code="INVALID_DEFERRED_BUG")
+        if deferred_bug_status not in {"pending", "materialized"}:
+            raise DeliveryError("deferred BUG status is invalid", code="INVALID_DEFERRED_BUG")
+        deferred_refs = _logical_refs(deferred_bug_evidence_refs, "deferred BUG redacted evidence")
+        if deferred_bug_sensitive:
+            if not deferred_bug_redacted_summary or not deferred_bug_human_reviewer:
+                raise DeliveryError(
+                    "sensitive deferred BUG requires redacted summary and named human reviewer",
+                    code="INVALID_DEFERRED_BUG",
+                )
+            if _contains_sensitive_material(deferred_bug_redacted_summary):
+                raise DeliveryError("deferred BUG summary is not safely redacted", code="INVALID_DEFERRED_BUG")
+        elif deferred_bug_redacted_summary is not None or deferred_bug_human_reviewer is not None:
+            raise DeliveryError(
+                "non-sensitive deferred BUG cannot claim sensitive review fields",
+                code="INVALID_DEFERRED_BUG",
+            )
+        artifact_values = (
+            deferred_bug_assessment_path,
+            deferred_bug_assessment_sha256,
+            deferred_bug_assessment_markdown_path,
+            deferred_bug_assessment_markdown_sha256,
+        )
+        if deferred_bug_status == "pending" and any(value is not None for value in artifact_values):
+            raise DeliveryError("pending deferred BUG cannot bind assessment bytes", code="INVALID_DEFERRED_BUG")
+        if deferred_bug_status == "materialized" and not all(value is not None for value in artifact_values):
+            raise DeliveryError("materialized deferred BUG requires JSON/Markdown paths and hashes", code="INCOMPLETE_ARTIFACT_REF")
+
+        bugs = record.get("bugs")
+        if bugs is None:
+            bugs = {
+                "primary_bug_id": None,
+                "assessments": [],
+                "deferred": [],
+                "verification": None,
+            }
+            record["bugs"] = bugs
+            if "work_kind" not in record:
+                record["work_kind"] = "standard"
+        history = [
+            item
+            for item in bugs.get("deferred", [])
+            if isinstance(item, dict) and item.get("bug_id") == deferred_bug_id
+        ]
+        if deferred_bug_status == "pending":
+            if history:
+                code = "BUG_INBOX_EXISTS" if deferred_bug_relation == "unrelated" else "INVALID_DEFERRED_BUG"
+                raise DeliveryError("deferred BUG ID is already registered", code=code)
+            if current_phase != "implementation":
+                raise DeliveryError("new deferred BUGs may only be registered during implementation", code="INVALID_DEFERRED_BUG")
+            if deferred_bug_relation == "affecting-current-work":
+                if (
+                    phase != "planning"
+                    or status != "active"
+                    or implementation_status != "Awaiting upstream reapproval"
+                ):
+                    raise DeliveryError("affecting BUG requires Planning reapproval", code="BUG_REQUIRES_REAPPROVAL")
+            elif phase != "implementation" or status != "active":
+                raise DeliveryError("current-scope and unrelated BUGs stay in the current implementation run", code="INVALID_DEFERRED_BUG")
+            inbox_ref = None
+            if deferred_bug_relation == "unrelated":
+                inbox_ref = f"bug-inbox:{deferred_bug_id}"
+                pending_inbox = (
+                    str(deferred_bug_id),
+                    deferred_refs,
+                    deferred_bug_sensitive,
+                    deferred_bug_redacted_summary,
+                    deferred_bug_human_reviewer,
+                )
+            entry = {
+                "sequence": 1,
+                "bug_id": deferred_bug_id,
+                "relation": deferred_bug_relation,
+                "status": "pending",
+                "host_evidence_refs": deferred_refs,
+                "sensitive": deferred_bug_sensitive,
+                "redacted_summary": deferred_bug_redacted_summary,
+                "human_reviewer": deferred_bug_human_reviewer,
+                "assessment_path": None,
+                "assessment_sha256": None,
+                "assessment_markdown_path": None,
+                "assessment_markdown_sha256": None,
+                "inbox_ref": inbox_ref,
+            }
+        else:
+            if len(history) != 1 or history[0].get("status") != "pending":
+                raise DeliveryError("deferred BUG materialization requires one pending event", code="INVALID_DEFERRED_BUG")
+            if deferred_bug_relation != history[0].get("relation") or deferred_refs != history[0].get("host_evidence_refs"):
+                raise DeliveryError("deferred BUG routing evidence is append-only", code="INVALID_DEFERRED_BUG")
+            if (
+                deferred_bug_sensitive is not history[0].get("sensitive")
+                or deferred_bug_redacted_summary != history[0].get("redacted_summary")
+                or deferred_bug_human_reviewer != history[0].get("human_reviewer")
+            ):
+                raise DeliveryError("deferred BUG risk routing is append-only", code="INVALID_DEFERRED_BUG")
+            allowed_phases = {"implementation"}
+            if deferred_bug_relation == "affecting-current-work":
+                allowed_phases.add("planning")
+            if current_phase not in allowed_phases or phase != current_phase:
+                raise DeliveryError("deferred BUG must materialize before leaving its current routing phase", code="INVALID_DEFERRED_BUG")
+            normalized = _validated_deferred_assessment(
+                record,
+                bug_id=str(deferred_bug_id),
+                relation=str(deferred_bug_relation),
+                assessment_path=str(deferred_bug_assessment_path),
+                assessment_sha256=str(deferred_bug_assessment_sha256),
+                markdown_path=str(deferred_bug_assessment_markdown_path),
+                markdown_sha256=str(deferred_bug_assessment_markdown_sha256),
+                evidence_refs=deferred_refs,
+                sensitive=deferred_bug_sensitive,
+                redacted_summary=deferred_bug_redacted_summary,
+                human_reviewer=deferred_bug_human_reviewer,
+                known_secret_values=known_secret_values,
+            )
+            entry = {
+                "sequence": 2,
+                "bug_id": deferred_bug_id,
+                "relation": deferred_bug_relation,
+                "status": "materialized",
+                "host_evidence_refs": deferred_refs,
+                "sensitive": deferred_bug_sensitive,
+                "redacted_summary": deferred_bug_redacted_summary,
+                "human_reviewer": deferred_bug_human_reviewer,
+                "assessment_path": normalized[0],
+                "assessment_sha256": normalized[1],
+                "assessment_markdown_path": normalized[2],
+                "assessment_markdown_sha256": normalized[3],
+                "inbox_ref": history[0].get("inbox_ref"),
+            }
+        bugs["deferred"].append(entry)
 
     if any(value is not None for value in (requirements_path, requirements_sha256)) or requirements_approval_refs:
         if requirements_path is None or requirements_sha256 is None or not requirements_approval_refs:
@@ -1305,6 +2239,27 @@ def _transition_record_unlocked(
             raise DeliveryError("requirements path is outside the Work ID artifact root", code="INVALID_PATH")
         _verify_repo_file(record, requirements_path, requirements_sha256)
         approval_refs = _logical_refs(requirements_approval_refs, "requirements approval")
+        bug_entry: dict[str, Any] | None = None
+        if record.get("work_kind", "standard") == "bug":
+            if not bug_assessment_supplied:
+                raise DeliveryError(
+                    "bug delivery Requirements approval must atomically bind its assessment",
+                    code="MISSING_BUG_ASSESSMENT",
+                )
+            bug_entry = _validated_bug_assessment_binding(
+                record,
+                bug_id=str(bug_assessment_id),
+                assessment_path=str(bug_assessment_path),
+                assessment_sha256=str(bug_assessment_sha256),
+                markdown_path=str(bug_assessment_markdown_path),
+                markdown_sha256=str(bug_assessment_markdown_sha256),
+                requirements_path=requirements_path,
+                requirements_sha256=requirements_sha256,
+                approval_refs=approval_refs,
+                known_secret_values=known_secret_values,
+            )
+        elif bug_assessment_supplied:
+            raise DeliveryError("standard delivery cannot bind a BUG assessment", code="INVALID_BUG_ASSESSMENT")
         entry = {
             "path": requirements_path,
             "sha256": requirements_sha256,
@@ -1329,6 +2284,11 @@ def _transition_record_unlocked(
         )
         record["requirements"]["revisions"].append(entry)
         record["requirements"]["current_path"] = requirements_path
+        if bug_entry is not None:
+            record["bugs"]["assessments"].append(bug_entry)
+
+    elif bug_assessment_supplied:
+        raise DeliveryError("BUG assessment must be bound with Requirements approval", code="MISSING_GATE")
 
     if any(value is not None for value in (handoff_path, candidate_revision, payload_sha256)) or plan_approval_refs:
         if handoff_path is None or candidate_revision is None or payload_sha256 is None or not plan_approval_refs:
@@ -1339,9 +2299,10 @@ def _transition_record_unlocked(
         revision = _plan_revision(handoff_path, record["artifact_root"])
         if revision is None:
             raise DeliveryError("handoff path is outside the Work ID plan root", code="INVALID_PATH")
-        handoff_file = Path(record["generations"][-1]["canonical_worktree"]) / Path(*handoff_path.split("/"))
+        worktree = Path(record["generations"][-1]["canonical_worktree"])
+        handoff_file = worktree / Path(*handoff_path.split("/"))
         try:
-            handoff = json.loads(handoff_file.read_text(encoding="utf-8"))
+            handoff = json.loads(_stable_read_file(worktree, handoff_file).decode("utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise DeliveryError(f"cannot read Ready handoff: {exc}", code="INVALID_HANDOFF") from exc
         if not isinstance(handoff, dict):
@@ -1398,6 +2359,31 @@ def _transition_record_unlocked(
                 "handoff must contain exactly one kind: spec source matching current requirements path and hash",
                 code="INVALID_HANDOFF",
             )
+        if record.get("work_kind", "standard") == "bug":
+            assessments = record.get("bugs", {}).get("assessments", [])
+            current_assessment = assessments[-1] if assessments else None
+            bug_context = handoff.get("bug_context")
+            assessment_binding = bug_context.get("assessment", {}) if isinstance(bug_context, dict) else {}
+            if (
+                current_assessment is None
+                or not isinstance(bug_context, dict)
+                or bug_context.get("bug_id") != current_assessment.get("bug_id")
+                or assessment_binding.get("path") != current_assessment.get("path")
+                or assessment_binding.get("sha256") != current_assessment.get("sha256")
+                or assessment_binding.get("markdown_path") != current_assessment.get("markdown_path")
+                or assessment_binding.get("markdown_sha256") != current_assessment.get("markdown_sha256")
+            ):
+                raise DeliveryError(
+                    "bug Ready plan must bind the current approved assessment",
+                    code="INVALID_HANDOFF",
+                )
+        elif handoff.get("bug_context") is not None or any(
+            source.get("kind") == "bug" for source in sources if isinstance(source, dict)
+        ):
+            raise DeliveryError(
+                "standard delivery cannot acquire a primary BUG plan implicitly; use deferred assessment as an approved supporting source",
+                code="INVALID_HANDOFF",
+            )
         entry = {
             "handoff_path": handoff_path,
             "candidate_revision": candidate_revision,
@@ -1425,6 +2411,31 @@ def _transition_record_unlocked(
         record["plans"]["current_handoff_path"] = handoff_path
         _approved_upstream_materialization(record, verify_current_sources=True)
 
+    verification_values = (
+        bug_verification_path,
+        bug_verification_sha256,
+        bug_verification_result,
+    )
+    verification_supplied = any(value is not None for value in verification_values)
+    if verification_supplied and not all(value is not None for value in verification_values):
+        raise DeliveryError("BUG verification requires path, hash, and result", code="INCOMPLETE_ARTIFACT_REF")
+    if verification_supplied:
+        if (
+            record.get("work_kind", "standard") == "bug"
+            and bug_verification_result == "failed"
+            and phase == "complete"
+        ):
+            raise DeliveryError("failed BUG verification cannot Complete delivery", code="FAILED_BUG_VERIFICATION")
+        if (
+            phase != "complete"
+            or status != "complete"
+            or implementation_status != "Complete"
+        ):
+            raise DeliveryError(
+                "successful BUG verification may only bind during terminal Complete",
+                code="INVALID_BUG_VERIFICATION",
+            )
+
     if any(value is not None for value in (implementation_run_id, implementation_ledger_ref, implementation_status)):
         if implementation_run_id is None or implementation_ledger_ref is None or implementation_status is None:
             raise DeliveryError("implementation ref requires run ID, Ledger ref, and status", code="INCOMPLETE_ARTIFACT_REF")
@@ -1440,6 +2451,25 @@ def _transition_record_unlocked(
             "ledger_ref": implementation_ledger_ref,
             "status": implementation_status,
         }
+        verification_entry: dict[str, Any] | None = None
+        if verification_supplied:
+            if record.get("work_kind", "standard") != "bug":
+                raise DeliveryError("standard delivery cannot bind BUG verification", code="INVALID_BUG_VERIFICATION")
+            verification_entry = _validated_bug_verification_binding(
+                record,
+                implementation_run_id=implementation_run_id,
+                path=str(bug_verification_path),
+                expected_sha256=str(bug_verification_sha256),
+                result=str(bug_verification_result),
+                known_secret_values=known_secret_values,
+            )
+            entry.update(
+                {
+                    "bug_verification_ref": verification_entry["path"],
+                    "bug_verification_sha256": verification_entry["sha256"],
+                    "bug_verification_result": verification_entry["result"],
+                }
+            )
         existing = next(
             (item for item in record["implementations"]["runs"] if item["run_id"] == implementation_run_id),
             None,
@@ -1447,9 +2477,21 @@ def _transition_record_unlocked(
         if existing is not None:
             existing["ledger_ref"] = implementation_ledger_ref
             existing["status"] = implementation_status
+            if verification_entry is not None:
+                existing.update(
+                    {
+                        "bug_verification_ref": verification_entry["path"],
+                        "bug_verification_sha256": verification_entry["sha256"],
+                        "bug_verification_result": verification_entry["result"],
+                    }
+                )
         else:
             record["implementations"]["runs"].append(entry)
         record["implementations"]["current_run_id"] = implementation_run_id
+        if verification_entry is not None:
+            record["bugs"]["verification"] = verification_entry
+    elif verification_supplied:
+        raise DeliveryError("BUG verification must bind the implementation run atomically", code="INCOMPLETE_ARTIFACT_REF")
 
     if phase == "planning" and current_phase == "requirements" and requirements_path is None:
         raise DeliveryError("planning requires a newly persisted Ready requirements revision", code="MISSING_GATE")
@@ -1457,6 +2499,15 @@ def _transition_record_unlocked(
         raise DeliveryError("implementation requires the newly Ready plan and may not ask a third approval", code="MISSING_GATE")
     if phase == "complete":
         _approved_upstream_materialization(record)
+        deferred_histories: dict[str, list[dict[str, Any]]] = {}
+        for item in record.get("bugs", {}).get("deferred", []):
+            if isinstance(item, dict):
+                deferred_histories.setdefault(str(item.get("bug_id")), []).append(item)
+        if any(history[-1].get("status") == "pending" for history in deferred_histories.values() if history):
+            raise DeliveryError(
+                "deferred BUG evidence must be materialized before terminal handoff",
+                code="PENDING_BUG_EVIDENCE",
+            )
         current_run_id = record["implementations"]["current_run_id"]
         current_run = next(
             (item for item in record["implementations"]["runs"] if item["run_id"] == current_run_id),
@@ -1464,7 +2515,18 @@ def _transition_record_unlocked(
         )
         if current_run is None or current_run["status"] != "Complete":
             raise DeliveryError("delivery Complete requires a Complete implementation run", code="MISSING_GATE")
-        terminal_errors = _complete_implementation_errors(record, current_run, evidence_refs)
+        if record.get("work_kind", "standard") == "bug":
+            verification = record.get("bugs", {}).get("verification")
+            if not verification_supplied or not isinstance(verification, dict):
+                raise DeliveryError("bug delivery Complete requires bug-verification/v1", code="MISSING_BUG_VERIFICATION")
+            if verification.get("path") not in evidence_refs:
+                raise DeliveryError("Complete event must reference BUG verification", code="MISSING_BUG_VERIFICATION")
+        terminal_errors = _complete_implementation_errors(
+            record,
+            current_run,
+            evidence_refs,
+            known_secret_values,
+        )
         if terminal_errors:
             raise DeliveryError(
                 "delivery Complete requires persisted implementation Ledger and accepted review evidence",
@@ -1475,5 +2537,38 @@ def _transition_record_unlocked(
     errors = validate_record(record)
     if errors:
         raise DeliveryError(f"transition would create an invalid record: {'; '.join(errors)}", code="INVALID_RECORD")
-    _atomic_write_json(path, record)
+    inbox_creation: tuple[str, Path, dict[str, Any], bool] | None = None
+    if pending_inbox is not None:
+        inbox_creation = _create_global_bug_inbox(
+            root,
+            record,
+            bug_id=pending_inbox[0],
+            evidence_refs=pending_inbox[1],
+            sensitive=pending_inbox[2],
+            redacted_summary=pending_inbox[3],
+            human_reviewer=pending_inbox[4],
+        )
+        created_ref = inbox_creation[0]
+        if created_ref != f"bug-inbox:{pending_inbox[0]}":
+            raise DeliveryError("global BUG inbox ref is not canonical", code="INVALID_DEFERRED_BUG")
+    try:
+        _atomic_write_json(path, record)
+    except Exception:
+        if inbox_creation is not None and inbox_creation[3]:
+            try:
+                persisted = load_record(path)
+            except (DeliveryError, OSError):
+                persisted = None
+            persisted_history = (
+                persisted.get("bugs", {}).get("deferred", [])
+                if isinstance(persisted, dict)
+                else []
+            )
+            persisted_bug = any(
+                isinstance(item, dict) and item.get("bug_id") == pending_inbox[0]
+                for item in persisted_history
+            )
+            if not persisted_bug:
+                _rollback_global_bug_inbox(root, inbox_creation[1], inbox_creation[2])
+        raise
     return _result(record, path, outcome="transitioned")

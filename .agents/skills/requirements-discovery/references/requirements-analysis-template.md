@@ -138,6 +138,10 @@
 
 在最能保持閱讀連貫的位置插入下列章節；沒有適用內容時完全省略。
 
+### BUG diagnosis context
+
+只在bug run加入：`bug_id`、assessment Markdown／JSON paths與hashes、verdict、reproduction status、observed／expected、impact、severity與relation。只引用assessment中的root-cause status／信心，不把假設或修法提升為需求；根因、最小修法、regression seam與verification target以`TP-*`交給Planning。
+
 ### 領域詞彙、實體與生命週期
 
 - 詞彙表使用 `TERM-*`，給出唯一、業務可理解的定義與必要別名。

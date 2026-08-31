@@ -37,6 +37,8 @@
     "requirements": {"$ref": "#/$defs/requirementsSet"},
     "plans": {"$ref": "#/$defs/planSet"},
     "implementations": {"$ref": "#/$defs/implementationSet"},
+    "work_kind": {"enum": ["standard", "bug"]},
+    "bugs": {"$ref": "#/$defs/bugSet"},
     "events": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/event"}},
     "updated_at": {"type": "string", "format": "date-time"}
   },
@@ -55,6 +57,7 @@
     "gitSha": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
     "evidenceRef": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#-]{0,255}$"},
     "workId": {"type": "string", "pattern": "^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "bugId": {"type": "string", "pattern": "^(?=.{7,64}$)bug-[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "normalizedPath": {
       "type": "string",
       "pattern": "^(?:(?!\\.{1,2}(?:/|$))[^/:\\\\]+)(?:/(?!(?:\\.{1,2})(?:/|$))[^/:\\\\]+)*$"
@@ -123,7 +126,10 @@
       "properties": {
         "run_id": {"$ref": "#/$defs/sha256"},
         "ledger_ref": {"$ref": "#/$defs/evidenceRef"},
-        "status": {"enum": ["Active", "Complete", "Awaiting upstream reapproval", "Blocked"]}
+        "status": {"enum": ["Active", "Complete", "Awaiting upstream reapproval", "Blocked"]},
+        "bug_verification_ref": {"oneOf": [{"$ref": "#/$defs/evidenceRef"}, {"type": "null"}]},
+        "bug_verification_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "bug_verification_result": {"oneOf": [{"enum": ["verified", "partial", "failed"]}, {"type": "null"}]}
       }
     },
     "implementationSet": {
@@ -148,6 +154,63 @@
         "from_status": {"oneOf": [{"$ref": "#/$defs/status"}, {"type": "null"}]},
         "to_status": {"$ref": "#/$defs/status"},
         "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/evidenceRef"}}
+      }
+    },
+    "bugAssessmentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug_id", "path", "sha256", "markdown_path", "markdown_sha256", "requirements_path", "requirements_sha256", "approval_evidence_refs"],
+      "properties": {
+        "bug_id": {"$ref": "#/$defs/bugId"},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "markdown_path": {"$ref": "#/$defs/normalizedPath"},
+        "markdown_sha256": {"$ref": "#/$defs/sha256"},
+        "requirements_path": {"$ref": "#/$defs/normalizedPath"},
+        "requirements_sha256": {"$ref": "#/$defs/sha256"},
+        "approval_evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/evidenceRef"}}
+      }
+    },
+    "deferredBug": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "bug_id", "relation", "status", "host_evidence_refs", "sensitive", "redacted_summary", "human_reviewer", "assessment_path", "assessment_sha256", "assessment_markdown_path", "assessment_markdown_sha256", "inbox_ref"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "bug_id": {"$ref": "#/$defs/bugId"},
+        "relation": {"enum": ["current-scope", "affecting-current-work", "unrelated"]},
+        "status": {"enum": ["pending", "materialized"]},
+        "host_evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/evidenceRef"}},
+        "sensitive": {"type": "boolean"},
+        "redacted_summary": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "human_reviewer": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "assessment_path": {"oneOf": [{"$ref": "#/$defs/normalizedPath"}, {"type": "null"}]},
+        "assessment_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "assessment_markdown_path": {"oneOf": [{"$ref": "#/$defs/normalizedPath"}, {"type": "null"}]},
+        "assessment_markdown_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "inbox_ref": {"oneOf": [{"$ref": "#/$defs/evidenceRef"}, {"type": "null"}]}
+      }
+    },
+    "bugVerificationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug_id", "path", "sha256", "result"],
+      "properties": {
+        "bug_id": {"$ref": "#/$defs/bugId"},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "result": {"enum": ["verified", "partial", "failed"]}
+      }
+    },
+    "bugSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_bug_id", "assessments", "deferred", "verification"],
+      "properties": {
+        "primary_bug_id": {"oneOf": [{"$ref": "#/$defs/bugId"}, {"type": "null"}]},
+        "assessments": {"type": "array", "items": {"$ref": "#/$defs/bugAssessmentBinding"}},
+        "deferred": {"type": "array", "items": {"$ref": "#/$defs/deferredBug"}},
+        "verification": {"oneOf": [{"$ref": "#/$defs/bugVerificationBinding"}, {"type": "null"}]}
       }
     }
   },

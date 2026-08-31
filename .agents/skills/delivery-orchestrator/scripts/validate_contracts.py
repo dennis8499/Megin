@@ -18,7 +18,7 @@ from urllib.parse import unquote, urlparse
 
 
 DEFAULT_SKILLS_ROOT = Path(__file__).resolve().parents[2]
-DELIVERY_SCHEMA_SHA256 = "cd1dd99aa2a9e4524b046f4860e50cd3b2b2fb6a48d29b27cfe5a2c507a03f12"
+DELIVERY_SCHEMA_SHA256 = "052b283cb14737c44364119c58764cc309eca53064ca1c090ac99030a7dc1146"
 EXPECTED_PHASE_TRANSITIONS = {
     "workspace": {"workspace", "requirements"},
     "requirements": {"requirements", "planning"},
@@ -118,6 +118,31 @@ def _validate_schema(bundle: Path, helper: Any, errors: list[str]) -> None:
         errors.append("delivery schema discriminator drifted")
     if schema.get("additionalProperties") is not False:
         errors.append("delivery schema root must reject additional properties")
+    if set(schema.get("properties", {}).get("work_kind", {}).get("enum", [])) != {"standard", "bug"}:
+        errors.append("delivery schema work_kind overlay drifted")
+    bug_set = schema.get("$defs", {}).get("bugSet", {})
+    if not {"primary_bug_id", "assessments", "deferred", "verification"} <= set(bug_set.get("required", [])):
+        errors.append("delivery schema bugSet is incomplete")
+    deferred_bug = schema.get("$defs", {}).get("deferredBug", {})
+    if not {
+        "sequence",
+        "bug_id",
+        "relation",
+        "status",
+        "host_evidence_refs",
+        "sensitive",
+        "redacted_summary",
+        "human_reviewer",
+        "assessment_path",
+        "assessment_sha256",
+        "assessment_markdown_path",
+        "assessment_markdown_sha256",
+        "inbox_ref",
+    } <= set(deferred_bug.get("required", [])):
+        errors.append("delivery schema deferred BUG append-only contract is incomplete")
+    verification = schema.get("$defs", {}).get("bugVerificationBinding", {})
+    if not {"bug_id", "path", "sha256", "result"} <= set(verification.get("required", [])):
+        errors.append("delivery schema BUG verification binding is incomplete")
     if {
         key: set(value)
         for key, value in schema.get("x-phase-transitions", {}).items()
@@ -239,9 +264,15 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         "SECRET_SENTINEL_RE",
         "KNOWN_TOKEN_RE",
         "_contains_sensitive_material(ref)",
+        "def _known_secret_values_from_env",
     ):
         if fragment not in runtime_source:
             errors.append(f"runtime authority missing secret-ref guard {fragment!r}")
+    for fragment in ("def _atomic_create_json", "os.O_CREAT | os.O_EXCL | os.O_WRONLY"):
+        if fragment not in runtime_source:
+            errors.append(f"runtime authority missing create-only persistence primitive {fragment!r}")
+    if runtime_source.count("os.O_CREAT | os.O_EXCL | os.O_WRONLY") < 2:
+        errors.append("runtime authority no longer protects both inbox creation and record locking with O_EXCL")
 
     record_source = sources["_delivery_record.py"]
     for fragment in (
@@ -253,7 +284,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         "sha256_bytes(base_bytes.stdout) != expected",
         "_complete_implementation_errors",
         'validate_instance(ledger, schema, "ledger")',
-        "validate_review_against_ready(report, ready)",
+        "validator.validate_review_against_ready(",
         "Complete delivery event does not reference the accepted review",
         "_current_implementation_snapshot",
         '"diff",',
@@ -265,9 +296,27 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         'candidate_snapshot == current_snapshot',
         'report.get("snapshot_before") == accepted_snapshot_id',
         "Complete delivery event does not reference the canonical snapshot",
+        "_bug_contract_validator",
+        "MISSING_BUG_ASSESSMENT",
+        "bug Ready plan must bind the current approved assessment",
+        "validate_bug_verification_against_ready",
+        "MISSING_BUG_VERIFICATION",
+        "failed BUG verification cannot Complete delivery",
+        "PENDING_BUG_EVIDENCE",
+        "BUG_REQUIRES_REAPPROVAL",
+        "BUG_INBOX_EXISTS",
+        "successful BUG verification may only bind during terminal Complete",
+        "known_secret_values=known_secret_values",
+        "sidecar_bytes=sidecar_bytes",
+        "raw_json_bytes=verification_bytes",
+        "terminal_evidence_refs=terminal_refs",
     ):
         if fragment not in record_source:
             errors.append(f"record authority missing semantic primitive {fragment!r}")
+    if record_source.count("sidecar_bytes=sidecar_bytes") < 2:
+        errors.append("record authority does not forward raw BUG assessment bytes to both consumers")
+    if record_source.count("raw_json_bytes=verification_bytes") < 2:
+        errors.append("record authority does not forward raw BUG verification bytes to both consumers")
 
     creation = (bundle / "references/workspace-creation.md").read_text(encoding="utf-8")
     if "recorded-base blob並核對manifest SHA" not in creation:
@@ -306,6 +355,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         '"--no-track",',
         '"stdout_sha256": sha256_bytes(completed.stdout)',
         "_git_failure_error(",
+        '"--known-secret-env"',
     ):
         if fragment not in facade_source:
             errors.append(f"public facade missing creation primitive {fragment!r}")
@@ -405,7 +455,7 @@ def validate_all(skills_root: Path | None = None) -> list[str]:
             errors.append(f"delivery openai.yaml missing {fragment}")
 
     behavior = (bundle / "references/behavior-evaluation.md").read_text(encoding="utf-8")
-    for index in range(1, 10):
+    for index in range(1, 11):
         if f"EVAL-DEL-{index:03d}" not in behavior:
             errors.append(f"behavior contract missing EVAL-DEL-{index:03d}")
 

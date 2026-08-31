@@ -22,6 +22,8 @@ description: 將已釐清的開發規格與專案證據轉成可核准的 Ready 
 
 擷取目標、範圍外、規範性需求、驗收、品質屬性、技術限制及相容／移轉條件。先讀適用的 `AGENTS.md` 與治理，再依影響範圍查證 README、詞彙、ADR、manifests、lockfiles、版本與入口、模組／資料／契約、測試、BDD framework、CI、支援環境與相關 Git 歷史；使用 `rg` 或 `rg --files` 定位。沒有應用程式碼是 greenfield 的 `Observed` 證據。
 
+Bug run另讀取current approved `bug-assessment/v1` JSON與Markdown並重算hash；它只提供diagnosis evidence。Requirements仍決定WHAT；Planning在`bug_context`擁有root-cause／低信心假設、單一最小修法、regression seam與`verified | partial` target。
+
 時效敏感或平台相關事實以官方文件、標準、上游原始碼或第一方 API 查證，記錄版本、日期與直接來源。每項主張只使用一種狀態：
 
 - `Observed`：由專案或實際執行確認。
@@ -54,6 +56,8 @@ description: 將已釐清的開發規格與專案證據轉成可核准的 Ready 
 3. [`ready-plan/v1` 契約](references/ready-plan-contract.md)
 
 依三者形成 current／target state、設計決策、Modules／Interfaces／Seams、可執行的 `BDD-FWK-*`／`BDD-*`、必要的 `BOOT-*`、內層 `TEST-*`、`CMD-*`、`WP-*` DAG、revision impact map、來源 manifest 與 `handoff.json`。Current state 只使用 `Observed`；新路徑、介面與架構使用 `Proposed`。
+
+Bug Candidate另包含唯一`kind: bug` source、`purpose: bug-reproduction` command與conditional `bug_context`。可重現分支以original symptom與regression red為`verified` target；無法重現只可在reason、proxy red→green、residual risks與staging／人工follow-up完整時選`partial`。
 
 模板內容完整、所有適用驗收可雙向追溯、`handoff.json` 符合 `ready-plan/v1`，且沒有阻塞未知時，本階段完成。
 

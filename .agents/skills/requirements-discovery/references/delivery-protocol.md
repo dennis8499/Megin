@@ -34,6 +34,12 @@
 
 Ready 完成條件：磁碟 bytes 除狀態／確認者外與核准 Candidate 相同，path 是已確認且先前不存在的路徑，文件可直接交給 Planning。
 
+### BUG overlay
+
+只有caller提供schema-valid、verdict為`confirmed | likely`的assessment Candidate時適用。Candidate分支同時按精確paths完整展示assessment Markdown、`bug-assessment/v1` sidecar與Requirements；仍只問一次既有Requirements確認。下一輪明確核准時，delivery／requirements writer以create-only一次寫入三者，重算Markdown／JSON／Requirements hashes，並在同一transition綁定相同approval evidence。
+
+Assessment是診斷evidence，不取代Requirements。`not-a-bug`若是期望行為改變，改走standard Candidate且不materialize bug delivery binding；否則不建立delivery。Collision、hash drift、秘密或敏感原文使整組不寫並重新配置／遮蔽後展示，不能部分寫入。
+
 ## 提前停止／目前成果分支
 
 Frontier 可繼續時使用 `Draft—Not ready`；必要來源／角色不可得時使用 `Blocked`。依模板完整展示已確認內容、缺口、影響與下一個必要決策，並聲明不可作為無條件 Planning baseline。

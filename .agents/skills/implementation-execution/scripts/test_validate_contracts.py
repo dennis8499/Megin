@@ -50,6 +50,111 @@ def _snapshot_example() -> dict:
     return snapshot
 
 
+def _bug_ready_example(target: str = "verified") -> dict:
+    ready = ready_example()
+    ready["commands"].append(
+        {
+            "command_id": "CMD-BUG-REPRO-001",
+            "purpose": "bug-reproduction",
+            "status": "Observed",
+            "cwd": ".",
+            "command": "tool reproduce-bug",
+            "environment_prerequisites": [],
+            "timeout_seconds": 30,
+            "network_policy": "forbidden",
+            "allowed_writes": [],
+            "external_side_effects": [],
+            "success_criteria": ["distinguishes symptom present from absent"],
+            "completeness_criteria": ["original symptom oracle executed"],
+            "absence_evidence": [],
+        }
+    )
+    ready["bug_context"] = {
+        "bug_id": "bug-sample-failure",
+        "assessment": {
+            "path": "docs/bugs/bug-sample-failure/assessment-1.json",
+            "sha256": "b" * 64,
+            "markdown_path": "docs/bugs/bug-sample-failure/assessment-1.md",
+            "markdown_sha256": "c" * 64,
+        },
+        "reproduction_status": "reproduced" if target == "verified" else "not-reproduced",
+        "root_cause_status": "confirmed" if target == "verified" else "hypothesized",
+        "root_cause_confidence": "high" if target == "verified" else "low",
+        "verification_target": target,
+        "original_reproduction_command_ref": "CMD-BUG-REPRO-001" if target == "verified" else None,
+        "regression_bdd_refs": ["BDD-001"],
+        "regression_test_refs": ["TEST-001"],
+        "partial_safeguards": {
+            "reason": None if target == "verified" else "Original symptom is not reproducible.",
+            "proxy_bdd_refs": [] if target == "verified" else ["BDD-001"],
+            "proxy_test_refs": [] if target == "verified" else ["TEST-001"],
+            "residual_risks": [] if target == "verified" else ["Original symptom may persist outside the proxy seam."],
+            "follow_up": [] if target == "verified" else ["Verify the original journey manually in staging."],
+        },
+    }
+    return ready
+
+
+def _bug_verification_example(result: str = "verified") -> tuple[dict, dict]:
+    ready = _bug_ready_example("partial" if result == "partial" else "verified")
+    partial = result == "partial"
+    record = {
+        "schema": "bug-verification/v1",
+        "bug_id": "bug-sample-failure",
+        "work_id": "work-20260830-bug-sample-failure-12345678",
+        "result": result,
+        "plan": {
+            "handoff_path": "docs/plans/example/handoff.json",
+            "candidate_revision": ready["candidate"]["revision"],
+            "verification_target": ready["bug_context"]["verification_target"],
+        },
+        "assessment": copy.deepcopy(ready["bug_context"]["assessment"]),
+        "original_reproduction": {
+            "pre_fix": {
+                "command_ref": None if partial else "CMD-BUG-REPRO-001",
+                "status": "inconclusive" if partial else "present",
+                "evidence_refs": ["commands/bug-pre.txt"],
+            },
+            "post_fix": {
+                "command_ref": None if partial else "CMD-BUG-REPRO-001",
+                "status": "inconclusive" if partial else "absent",
+                "evidence_refs": ["commands/bug-post.txt"],
+            },
+        },
+        "regression": {
+            "bdd_refs": ["BDD-001"],
+            "test_refs": ["TEST-001"],
+            "red_evidence_refs": ["tests/regression-red.txt"],
+            "green_evidence_refs": ["tests/regression-green.txt"],
+        },
+        "proxy": {
+            "bdd_refs": ["BDD-001"] if partial else [],
+            "test_refs": ["TEST-001"] if partial else [],
+            "red_evidence_refs": ["tests/proxy-red.txt"] if partial else [],
+            "green_evidence_refs": ["tests/proxy-green.txt"] if partial else [],
+        },
+        "full_verification": [
+            {
+                "command_id": command["command_id"],
+                "outcome": "passed",
+                "exit_code": 0,
+                "failure_count": 0,
+                "skipped_count": 0,
+                "output_ref": f"commands/{command['command_id']}.txt",
+                "not_run_reason": None,
+            }
+            for command in ready["commands"]
+            if command["purpose"] in {"build-full", "test-full", "bdd-full", "governance", "ci"}
+        ],
+        "residual_risks": copy.deepcopy(ready["bug_context"]["partial_safeguards"]["residual_risks"]),
+        "follow_up": copy.deepcopy(ready["bug_context"]["partial_safeguards"]["follow_up"]),
+        "implementation_review_ref": "reviews/round-1/report.json",
+        "summary": "Proxy evidence passed; original symptom remains inconclusive." if partial else "Original symptom is absent after the root-cause fix.",
+        "created_at": "2026-08-30T12:00:00+08:00",
+    }
+    return ready, record
+
+
 def _persist_terminal_evidence(
     root: Path,
     ledger: dict,
@@ -1091,6 +1196,273 @@ class ImplementationContractTests(unittest.TestCase):
             self.assertTrue(any("A→B→C無證據輪換" in error for error in errors), errors)
             self.assertTrue(any("phantom ref" in error for error in errors), errors)
             self.assertTrue(any("terminal/<sequence>-<step>.json" in error for error in errors), errors)
+
+
+class BugVerificationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.execution_schema = json.loads(
+            (
+                SKILLS_ROOT
+                / "implementation-execution/references/execution-records.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+
+    def test_verified_requires_original_red_green_and_full_pass(self) -> None:
+        ready, record = _bug_verification_example("verified")
+        self.assertEqual(
+            [],
+            validator.validate_instance(record, self.execution_schema, "bugVerification"),
+        )
+        self.assertEqual([], validator.validate_bug_verification_against_ready(record, ready))
+
+        missing_pre = copy.deepcopy(record)
+        missing_pre["original_reproduction"]["pre_fix"]["evidence_refs"] = []
+        errors = validator.validate_bug_verification_against_ready(missing_pre, ready)
+        self.assertTrue(any("pre-fix original reproduction" in error for error in errors), errors)
+
+        missing_post = copy.deepcopy(record)
+        missing_post["original_reproduction"]["post_fix"]["status"] = "inconclusive"
+        errors = validator.validate_bug_verification_against_ready(missing_post, ready)
+        self.assertTrue(any("post-fix original reproduction" in error for error in errors), errors)
+
+        no_regression_red = copy.deepcopy(record)
+        no_regression_red["regression"]["red_evidence_refs"] = []
+        errors = validator.validate_bug_verification_against_ready(no_regression_red, ready)
+        self.assertTrue(any("regression red" in error for error in errors), errors)
+
+    def test_terminal_bug_evidence_must_be_indexed_and_physically_persisted(self) -> None:
+        ready, record = _bug_verification_example("verified")
+        evidence_refs = [
+            *record["original_reproduction"]["pre_fix"]["evidence_refs"],
+            *record["original_reproduction"]["post_fix"]["evidence_refs"],
+            *record["regression"]["red_evidence_refs"],
+            *record["regression"]["green_evidence_refs"],
+            *[
+                outcome["output_ref"]
+                for outcome in record["full_verification"]
+                if outcome["output_ref"] is not None
+            ],
+            record["implementation_review_ref"],
+        ]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            errors = validator.validate_bug_verification_against_ready(
+                record,
+                ready,
+                evidence_root=root,
+                terminal_evidence_refs=evidence_refs,
+            )
+            self.assertTrue(any("evidence is not persisted" in error for error in errors), errors)
+
+            for relative in evidence_refs:
+                path = root.joinpath(*relative.split("/"))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f"persisted {relative}\n", encoding="utf-8", newline="\n")
+            self.assertEqual(
+                [],
+                validator.validate_bug_verification_against_ready(
+                    record,
+                    ready,
+                    evidence_root=root,
+                    terminal_evidence_refs=evidence_refs,
+                ),
+            )
+
+            errors = validator.validate_bug_verification_against_ready(
+                record,
+                ready,
+                evidence_root=root,
+                terminal_evidence_refs=evidence_refs[1:],
+            )
+            self.assertTrue(any("absent from terminal index" in error for error in errors), errors)
+
+    def test_partial_requires_approved_proxy_red_green_and_residual_risk(self) -> None:
+        ready, record = _bug_verification_example("partial")
+        self.assertEqual(
+            [],
+            validator.validate_instance(record, self.execution_schema, "bugVerification"),
+        )
+        self.assertEqual([], validator.validate_bug_verification_against_ready(record, ready))
+
+        for field in ("red_evidence_refs", "green_evidence_refs"):
+            broken = copy.deepcopy(record)
+            broken["proxy"][field] = []
+            errors = validator.validate_bug_verification_against_ready(broken, ready)
+            self.assertTrue(any("proxy red→green" in error for error in errors), errors)
+
+        no_risk = copy.deepcopy(record)
+        no_risk["residual_risks"] = []
+        errors = validator.validate_bug_verification_against_ready(no_risk, ready)
+        self.assertTrue(any("residual risks" in error for error in errors), errors)
+
+        for wording in (
+            "BUG verified and fixed.",
+            "The BUG has been verified as fixed.",
+            "The original symptom was not verified; proxy evidence passed.",
+        ):
+            overclaim = copy.deepcopy(record)
+            overclaim["summary"] = wording
+            errors = validator.validate_bug_verification_against_ready(overclaim, ready)
+            self.assertTrue(any("canonical inconclusive wording" in error for error in errors), errors)
+
+        honest = copy.deepcopy(record)
+        honest["summary"] = "代理證據已通過；原始症狀仍無法確認。"
+        self.assertEqual([], validator.validate_bug_verification_against_ready(honest, ready))
+
+        for claim in (
+            "The BUG has been verified as fixed.",
+            "The defect has been conclusively remediated and the repair conclusively validated.",
+            "缺陷已徹底排除，修復結果已確認。",
+        ):
+            overclaim_ready, overclaim = _bug_verification_example("partial")
+            overclaim_ready["bug_context"]["partial_safeguards"]["residual_risks"] = [claim]
+            overclaim_ready["bug_context"]["partial_safeguards"]["follow_up"] = [claim]
+            overclaim["residual_risks"] = [claim]
+            overclaim["follow_up"] = [claim]
+            errors = validator.validate_bug_verification_against_ready(overclaim, overclaim_ready)
+            self.assertTrue(any("overclaim" in error for error in errors), (claim, errors))
+
+        hidden_secret = "ultraviolet-harbor-9472"
+        raw_ready, raw_record = _bug_verification_example("partial")
+        canonical = json.dumps(
+            raw_record,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        duplicate = canonical.replace(
+            '"summary":',
+            f'"summary":"{hidden_secret}","summary":',
+            1,
+        ).encode("utf-8")
+        errors = validator.validate_bug_verification_against_ready(
+            raw_record,
+            raw_ready,
+            raw_json_bytes=duplicate,
+            known_secret_values=(hidden_secret,),
+        )
+        self.assertTrue(any("duplicate object key" in error for error in errors), errors)
+        self.assertTrue(any("known secret" in error for error in errors), errors)
+        self.assertNotIn(hidden_secret, "\n".join(errors))
+
+    def test_ready_assessment_revision_must_be_a_canonical_positive_integer(self) -> None:
+        for invalid_revision in ("0", "01"):
+            ready, record = _bug_verification_example("verified")
+            ready["bug_context"]["assessment"]["path"] = (
+                f"docs/bugs/bug-sample-failure/assessment-{invalid_revision}.json"
+            )
+            ready["bug_context"]["assessment"]["markdown_path"] = (
+                f"docs/bugs/bug-sample-failure/assessment-{invalid_revision}.md"
+            )
+            record["assessment"] = copy.deepcopy(ready["bug_context"]["assessment"])
+            errors = validator.validate_bug_verification_against_ready(record, ready)
+            self.assertTrue(
+                any("positive" in error for error in errors),
+                (invalid_revision, errors),
+            )
+
+    def test_failed_is_recordable_but_never_an_approved_bug_result(self) -> None:
+        ready, record = _bug_verification_example("failed")
+        record["original_reproduction"]["post_fix"]["status"] = "present"
+        record["full_verification"][0]["outcome"] = "failed"
+        record["full_verification"][0]["exit_code"] = 1
+        record["full_verification"][0]["failure_count"] = 1
+        self.assertEqual(
+            [],
+            validator.validate_instance(record, self.execution_schema, "bugVerification"),
+        )
+        self.assertEqual([], validator.validate_bug_verification_against_ready(record, ready))
+
+    def test_bug_review_has_a_separate_verification_result(self) -> None:
+        ready = _bug_ready_example("partial")
+        report = {
+            "verdict": "APPROVED",
+            "command_outcomes": [
+                {"command_id": command["command_id"]}
+                for command in ready["commands"]
+                if command["purpose"] in {"build-full", "test-full", "bdd-full", "governance", "ci"}
+            ],
+            "requirement_coverage": [
+                {
+                    "source_ref": source["source_id"],
+                    "obligation_ref": obligation,
+                    "bdd_refs": ["BDD-001"],
+                    "test_refs": ["TEST-001"],
+                    "wp_refs": ["WP-001"],
+                }
+                for source in ready["sources"]
+                for obligation in source["plan_refs"]
+            ],
+            "findings": [],
+        }
+        errors = validator.validate_review_against_ready(report, ready)
+        self.assertTrue(any("separate BUG verification" in error for error in errors), errors)
+
+        report["bug_verification_ref"] = "bug-verification.json"
+        report["bug_verification_result"] = "partial"
+        report["summary"] = "Implementation approved; BUG verification is partial and the original symptom remains inconclusive."
+        self.assertEqual([], validator.validate_review_against_ready(report, ready))
+
+        for wording in ("BUG is verified fixed.", "The BUG has been verified as fixed."):
+            report["summary"] = wording
+            errors = validator.validate_review_against_ready(report, ready)
+            self.assertTrue(any("partial review summary" in error for error in errors), errors)
+        report["summary"] = "實作已核准；BUG 驗證結果為 partial，原始症狀仍無法確認。"
+
+        for field in ("message", "required_outcome"):
+            for wording in (
+                "The defect has been conclusively remediated and the repair conclusively validated.",
+                "缺陷已徹底排除，修復結果已確認。",
+            ):
+                report["findings"] = [
+                    {
+                        "message": "Continue to monitor the remaining uncertainty.",
+                        "key_inputs": {
+                            "source_refs": ["SRC-001"],
+                            "required_outcome": "Verify the original symptom in staging.",
+                        },
+                        "bdd_refs": [],
+                        "test_refs": [],
+                        "wp_refs": [],
+                    }
+                ]
+                if field == "message":
+                    report["findings"][0]["message"] = wording
+                else:
+                    report["findings"][0]["key_inputs"]["required_outcome"] = wording
+                errors = validator.validate_review_against_ready(report, ready)
+                self.assertTrue(
+                    any("partial public claim" in error for error in errors),
+                    (field, wording, errors),
+                )
+        report["findings"] = []
+
+        report["bug_verification_result"] = "failed"
+        errors = validator.validate_review_against_ready(report, ready)
+        self.assertTrue(any("APPROVED review cannot carry failed" in error for error in errors), errors)
+
+    def test_preflight_rejects_unauthorized_bug_dirty_paths(self) -> None:
+        ready = _bug_ready_example("verified")
+        approved = ready["bug_context"]["assessment"]
+        self.assertEqual(
+            [],
+            validator.validate_bug_dirty_paths(
+                ready,
+                [approved["path"], approved["markdown_path"]],
+            ),
+        )
+        errors = validator.validate_bug_dirty_paths(
+            ready,
+            ["docs/bugs/bug-hidden/assessment-1.json"],
+        )
+        self.assertTrue(any("unauthorized BUG dirty path" in error for error in errors), errors)
+
+        standard_errors = validator.validate_bug_dirty_paths(
+            ready_example(),
+            ["docs/bugs/bug-unapproved/assessment-1.md"],
+        )
+        self.assertTrue(any("unauthorized BUG dirty path" in error for error in standard_errors), standard_errors)
 
 
 if __name__ == "__main__":

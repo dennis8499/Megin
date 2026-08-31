@@ -61,6 +61,8 @@
 
 ## 4. 測試策略
 
+Bug plan在本節前加入「BUG diagnosis與verification target」：列出assessment JSON／Markdown binding、reproduction／root-cause status與confidence、單一最小causal fix、original `CMD-BUG-REPRO-*`、regression BDD／TEST refs，以及`verified | partial` target。Partial另完整列出reason、proxy red→green、residual risks與staging／人工follow-up；standard plan省略整節。
+
 詳細矩陣可移至 `test-strategy.md`；本節保留目標、seams、順序、IDs 與連結。
 
 | BDD-FWK ID | Observed／Proposed framework、版本與一手來源 | Test-only／安裝邊界 | Feature／binding／fixture | Discovery／report／zero-skip／CI |

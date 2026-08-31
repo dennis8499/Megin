@@ -118,8 +118,40 @@ class DeliveryContractMutationTests(unittest.TestCase):
     def test_terminal_review_validation_mutation_is_rejected(self) -> None:
         self.mutate(
             "scripts/_delivery_record.py",
-            "validator.validate_review_against_ready(report, ready)",
-            "[]",
+            "validator.validate_review_against_ready(",
+            "validator.validate_review_without_ready(",
+        )
+        self.assert_failure("record authority missing semantic primitive")
+
+    def test_terminal_bug_evidence_forwarding_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "terminal_evidence_refs=terminal_refs,",
+            "terminal_evidence_refs=(),",
+        )
+        self.assert_failure("record authority missing semantic primitive")
+
+    def test_bug_raw_json_forwarding_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "raw_json_bytes=verification_bytes,",
+            "raw_json_bytes=None,",
+        )
+        self.assert_failure("raw BUG verification bytes")
+
+    def test_bug_raw_assessment_forwarding_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "sidecar_bytes=sidecar_bytes,",
+            "sidecar_bytes=None,",
+        )
+        self.assert_failure("raw BUG assessment bytes")
+
+    def test_early_bug_verification_binding_guard_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "successful BUG verification may only bind during terminal Complete",
+            "BUG verification accepted before terminal",
         )
         self.assert_failure("record authority missing semantic primitive")
 
@@ -146,6 +178,38 @@ class DeliveryContractMutationTests(unittest.TestCase):
             "or False",
         )
         self.assert_failure("runtime authority missing secret-ref guard")
+
+    def test_bug_inbox_create_only_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_runtime.py",
+            "os.O_CREAT | os.O_EXCL | os.O_WRONLY",
+            "os.O_CREAT | os.O_WRONLY",
+        )
+        self.assert_failure("both inbox creation and record locking")
+
+    def test_failed_bug_verification_guard_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "failed BUG verification cannot Complete delivery",
+            "failed BUG verification accepted for Complete delivery",
+        )
+        self.assert_failure("record authority missing semantic primitive")
+
+    def test_pending_bug_materialization_guard_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            'code="PENDING_BUG_EVIDENCE"',
+            'code="MISSING_GATE"',
+        )
+        self.assert_failure("record authority missing semantic primitive")
+
+    def test_affecting_bug_reapproval_guard_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            'code="BUG_REQUIRES_REAPPROVAL"',
+            'code="INVALID_DEFERRED_BUG"',
+        )
+        self.assert_failure("record authority missing semantic primitive")
 
 
 if __name__ == "__main__":

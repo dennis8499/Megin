@@ -118,7 +118,8 @@
           }
         }
       }
-    }
+    },
+    "bug_context": {"$ref": "#/$defs/bugContext"}
   },
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
@@ -137,6 +138,7 @@
     "srcId": {"type": "string", "pattern": "^SRC-[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "wpId": {"type": "string", "pattern": "^WP-[A-Za-z0-9][A-Za-z0-9._-]*$"},
     "commandId": {"type": "string", "pattern": "^CMD-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "bugId": {"type": "string", "pattern": "^(?=.{7,64}$)bug-[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "contractId": {
       "type": "string",
       "pattern": "^(BDD-FWK|BOOT|BDD|TEST|CMD|WP)-[A-Za-z0-9][A-Za-z0-9._-]*$"
@@ -178,13 +180,30 @@
       "required": ["source_id", "kind", "location", "revision", "sha256", "plan_refs", "wp_refs"],
       "properties": {
         "source_id": {"$ref": "#/$defs/srcId"},
-        "kind": {"enum": ["spec", "governance", "adr", "project", "platform", "contract", "supporting"]},
+        "kind": {"enum": ["spec", "bug", "governance", "adr", "project", "platform", "contract", "supporting"]},
         "location": {"$ref": "#/$defs/sourceLocation"},
         "revision": {"type": "string", "minLength": 1},
         "sha256": {"$ref": "#/$defs/sha256"},
         "plan_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "wp_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/wpId"}}
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": {"kind": {"const": "bug"}}
+          },
+          "then": {
+            "properties": {
+              "location": {
+                "type": "string",
+                "pattern": "^docs/bugs/bug-[a-z0-9]+(?:-[a-z0-9]+)*/assessment-[1-9][0-9]*\\.json$"
+              },
+              "revision": {"type": "string", "pattern": "^[1-9][0-9]*$"}
+            }
+          }
+        }
+      ]
     },
     "contract": {
       "type": "object",
@@ -248,7 +267,7 @@
       ],
       "properties": {
         "command_id": {"$ref": "#/$defs/commandId"},
-        "purpose": {"enum": ["bdd-install", "bdd-discovery", "bdd-focused", "bdd-full", "bootstrap", "tdd-focused", "related", "build-full", "test-full", "governance", "ci"]},
+        "purpose": {"enum": ["bug-reproduction", "bdd-install", "bdd-discovery", "bdd-focused", "bdd-full", "bootstrap", "tdd-focused", "related", "build-full", "test-full", "governance", "ci"]},
         "status": {"enum": ["Observed", "Proposed"]},
         "cwd": {"$ref": "#/$defs/normalizedPath"},
         "command": {"type": "string", "minLength": 1},
@@ -279,6 +298,57 @@
         "contract_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contractId"}},
         "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/srcId"}},
         "command_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/commandId"}}
+      }
+    },
+    "bugAssessmentBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "markdown_path", "markdown_sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "markdown_path": {"$ref": "#/$defs/normalizedPath"},
+        "markdown_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "partialSafeguards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "proxy_bdd_refs", "proxy_test_refs", "residual_risks", "follow_up"],
+      "properties": {
+        "reason": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "proxy_bdd_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^BDD-[A-Za-z0-9][A-Za-z0-9._-]*$"}},
+        "proxy_test_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^TEST-[A-Za-z0-9][A-Za-z0-9._-]*$"}},
+        "residual_risks": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "follow_up": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "bugContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bug_id",
+        "assessment",
+        "reproduction_status",
+        "root_cause_status",
+        "root_cause_confidence",
+        "verification_target",
+        "original_reproduction_command_ref",
+        "regression_bdd_refs",
+        "regression_test_refs",
+        "partial_safeguards"
+      ],
+      "properties": {
+        "bug_id": {"$ref": "#/$defs/bugId"},
+        "assessment": {"$ref": "#/$defs/bugAssessmentBinding"},
+        "reproduction_status": {"enum": ["reproduced", "intermittent", "not-reproduced", "not-attempted"]},
+        "root_cause_status": {"enum": ["confirmed", "hypothesized", "unknown"]},
+        "root_cause_confidence": {"enum": ["high", "medium", "low"]},
+        "verification_target": {"enum": ["verified", "partial"]},
+        "original_reproduction_command_ref": {"oneOf": [{"$ref": "#/$defs/commandId"}, {"type": "null"}]},
+        "regression_bdd_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^BDD-[A-Za-z0-9][A-Za-z0-9._-]*$"}},
+        "regression_test_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^TEST-[A-Za-z0-9][A-Za-z0-9._-]*$"}},
+        "partial_safeguards": {"$ref": "#/$defs/partialSafeguards"}
       }
     }
   },

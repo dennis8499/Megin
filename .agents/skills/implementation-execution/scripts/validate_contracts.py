@@ -10,7 +10,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 from urllib.parse import unquote
 
 
@@ -32,8 +32,10 @@ _pointer = _shared._pointer
 _walk = _shared._walk
 _required = _shared._required
 _validate_schema_refs = _shared._validate_schema_refs
+partial_overclaim = _shared.partial_overclaim
+partial_safeguard_prose_errors = _shared.partial_safeguard_prose_errors
 
-EXECUTION_SCHEMA_SHA256 = "c9e5a408129ee7dc8a79ede2b926c63fefac393d24d5e9d0d1e30621bfccf7ab"
+EXECUTION_SCHEMA_SHA256 = "001646122fe6b80cf099840a92c0d20746cee133f1aab7827cee464b8ab864d1"
 AUTHORITY_FILES = {
     "implementation-entrypoint": "implementation-execution/SKILL.md",
     "execution-ledger": "implementation-execution/references/preflight-and-ledger.md",
@@ -80,6 +82,27 @@ EXECUTION_DEF_REQUIRED = {
         "requirement_coverage",
         "findings",
         "summary",
+    },
+    "bugAssessmentBinding": {"path", "sha256", "markdown_path", "markdown_sha256"},
+    "bugVerificationPlan": {"handoff_path", "candidate_revision", "verification_target"},
+    "symptomEvidence": {"command_ref", "status", "evidence_refs"},
+    "contractEvidence": {"bdd_refs", "test_refs", "red_evidence_refs", "green_evidence_refs"},
+    "bugVerification": {
+        "schema",
+        "bug_id",
+        "work_id",
+        "result",
+        "plan",
+        "assessment",
+        "original_reproduction",
+        "regression",
+        "proxy",
+        "full_verification",
+        "residual_risks",
+        "follow_up",
+        "implementation_review_ref",
+        "summary",
+        "created_at",
     },
     "binding": {"repo_id", "canonical_worktree", "worktree_key", "branch", "initial_base_sha", "run_id"},
     "attempt": {"attempt_id", "candidate_revision", "state", "wp_states", "state_history"},
@@ -151,6 +174,18 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 KNOWN_TOKEN_RE = re.compile(
     r"(?:\bAKIA[0-9A-Z]{16}\b|\b(?:gh[pousr]|github_pat)_[A-Za-z0-9_]{20,}\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)"
 )
+PARTIAL_VERIFICATION_SUMMARIES = frozenset(
+    {
+        "Proxy evidence passed; original symptom remains inconclusive.",
+        "代理證據已通過；原始症狀仍無法確認。",
+    }
+)
+PARTIAL_REVIEW_SUMMARIES = frozenset(
+    {
+        "Implementation approved; BUG verification is partial and the original symptom remains inconclusive.",
+        "實作已核准；BUG 驗證結果為 partial，原始症狀仍無法確認。",
+    }
+)
 COMPLETE_EXACT_REFS = {"source-manifest.json", "wp-ledger.json", "breaker.json"}
 
 LINK_RE = re.compile(r"!?(?<!\\)\[[^\]]*\]\(([^)]+)\)")
@@ -181,6 +216,46 @@ def validate_secret_free(
         if SECRET_ASSIGNMENT_RE.search(text) or SECRET_SENTINEL_RE.search(text) or KNOWN_TOKEN_RE.search(text):
             return [f"{label}: contains credential-shaped material"]
     return []
+
+
+class _DuplicateRawJSONKey(ValueError):
+    pass
+
+
+def _reject_duplicate_raw_json_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise _DuplicateRawJSONKey("duplicate JSON object key")
+        value[key] = item
+    return value
+
+
+def _raw_json_errors(
+    raw: bytes,
+    expected: dict[str, Any],
+    known_secret_values: tuple[str, ...],
+    *,
+    label: str,
+) -> list[str]:
+    """Scan persisted bytes before parsing and reject ambiguous JSON objects."""
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError:
+        return [f"{label}: raw JSON is not valid UTF-8"]
+    errors = validate_secret_free(text, known_secret_values, label=f"{label} raw JSON")
+    try:
+        parsed = json.loads(text, object_pairs_hook=_reject_duplicate_raw_json_keys)
+    except _DuplicateRawJSONKey:
+        errors.append(f"{label}: raw JSON contains a duplicate object key")
+    except json.JSONDecodeError:
+        errors.append(f"{label}: raw JSON is invalid")
+    else:
+        if not isinstance(parsed, dict):
+            errors.append(f"{label}: raw JSON is not an object")
+        elif parsed != expected:
+            errors.append(f"{label}: parsed record differs from raw JSON")
+    return errors
 
 
 def _canonical_evidence_ref(value: Any) -> str | None:
@@ -691,6 +766,269 @@ def finding_key(key_inputs: dict[str, Any]) -> str:
     return canonical_sha256(normalized)
 
 
+def validate_bug_verification_against_ready(
+    record: dict[str, Any],
+    ready: dict[str, Any],
+    *,
+    expected_work_id: str | None = None,
+    expected_handoff_path: str | None = None,
+    known_secret_values: tuple[str, ...] = (),
+    raw_json_bytes: bytes | None = None,
+    evidence_root: Path | None = None,
+    terminal_evidence_refs: Sequence[str] | None = None,
+) -> list[str]:
+    """Validate a BUG result independently from implementation approval."""
+    errors = validate_secret_free(
+        [ready, record],
+        known_secret_values,
+        label="Ready/BUG verification records",
+    )
+    if raw_json_bytes is not None:
+        errors.extend(
+            _raw_json_errors(
+                raw_json_bytes,
+                record,
+                known_secret_values,
+                label="BUG verification",
+            )
+        )
+    context = ready.get("bug_context")
+    if not isinstance(context, dict):
+        return [*errors, "BUG verification: Ready plan has no bug_context"]
+
+    if record.get("schema") != "bug-verification/v1":
+        errors.append("BUG verification: schema must be bug-verification/v1")
+    if record.get("bug_id") != context.get("bug_id"):
+        errors.append("BUG verification: bug_id differs from Ready bug_context")
+    if expected_work_id is not None and record.get("work_id") != expected_work_id:
+        errors.append("BUG verification: work_id differs from delivery run")
+    plan = record.get("plan", {})
+    if expected_handoff_path is not None and plan.get("handoff_path") != expected_handoff_path:
+        errors.append("BUG verification: handoff_path differs from the approved Ready handoff")
+    if plan.get("candidate_revision") != ready.get("candidate", {}).get("revision"):
+        errors.append("BUG verification: candidate revision differs from Ready")
+    target = context.get("verification_target")
+    if plan.get("verification_target") != target:
+        errors.append("BUG verification: verification target differs from Ready")
+    if record.get("assessment") != context.get("assessment"):
+        errors.append("BUG verification: assessment binding differs from Ready")
+    assessment = context.get("assessment", {})
+    bug_id = context.get("bug_id")
+    assessment_match = re.fullmatch(
+        rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.json",
+        str(assessment.get("path")),
+    )
+    markdown_match = re.fullmatch(
+        rf"docs/bugs/{re.escape(str(bug_id))}/assessment-([1-9][0-9]*)\.md",
+        str(assessment.get("markdown_path")),
+    )
+    if (
+        assessment_match is None
+        or markdown_match is None
+        or assessment_match.group(1) != markdown_match.group(1)
+    ):
+        errors.append("BUG verification: Ready assessment revision must be a canonical positive integer")
+
+    result = record.get("result")
+    if result in {"verified", "partial"} and result != target:
+        errors.append("BUG verification: successful result exceeds or differs from the approved target")
+
+    regression = record.get("regression", {})
+    if set(regression.get("bdd_refs", [])) != set(context.get("regression_bdd_refs", [])):
+        errors.append("BUG verification: regression BDD refs differ from Ready")
+    if set(regression.get("test_refs", [])) != set(context.get("regression_test_refs", [])):
+        errors.append("BUG verification: regression TEST refs differ from Ready")
+
+    full_outcomes = record.get("full_verification", [])
+    full_ids = [outcome.get("command_id") for outcome in full_outcomes]
+    if len(full_ids) != len(set(full_ids)):
+        errors.append("BUG verification: duplicate full verification command")
+    known_commands = {command.get("command_id") for command in ready.get("commands", [])}
+    unknown = set(full_ids) - known_commands
+    if unknown:
+        errors.append(f"BUG verification: unknown full verification commands {sorted(unknown)}")
+    required_purposes = {"build-full", "test-full", "bdd-full", "governance", "ci"}
+    required_full = {
+        command.get("command_id")
+        for command in ready.get("commands", [])
+        if command.get("purpose") in required_purposes
+    }
+    missing_full = required_full - set(full_ids)
+    if missing_full:
+        errors.append(f"BUG verification: missing full verification commands {sorted(missing_full)}")
+
+    original = record.get("original_reproduction", {})
+    pre_fix = original.get("pre_fix", {})
+    post_fix = original.get("post_fix", {})
+    proxy = record.get("proxy", {})
+    safeguards = context.get("partial_safeguards", {})
+
+    if result in {"verified", "partial"}:
+        if not regression.get("red_evidence_refs"):
+            errors.append("BUG verification: successful result requires regression red evidence")
+        if not regression.get("green_evidence_refs"):
+            errors.append("BUG verification: successful result requires regression green evidence")
+        if any(outcome.get("outcome") != "passed" for outcome in full_outcomes):
+            errors.append("BUG verification: successful result requires every full verification command to pass")
+
+    if result == "verified":
+        original_command = context.get("original_reproduction_command_ref")
+        if (
+            pre_fix.get("command_ref") != original_command
+            or pre_fix.get("status") != "present"
+            or not pre_fix.get("evidence_refs")
+        ):
+            errors.append("BUG verification: verified requires pre-fix original reproduction evidence with symptom present")
+        if (
+            post_fix.get("command_ref") != original_command
+            or post_fix.get("status") != "absent"
+            or not post_fix.get("evidence_refs")
+        ):
+            errors.append("BUG verification: verified requires post-fix original reproduction evidence with symptom absent")
+        if any(proxy.get(field) for field in ("bdd_refs", "test_refs", "red_evidence_refs", "green_evidence_refs")):
+            errors.append("BUG verification: verified must not substitute proxy evidence for the original symptom")
+    elif result == "partial":
+        if post_fix.get("status") not in {"inconclusive", "not-run"}:
+            errors.append("BUG verification: partial must keep the original post-fix symptom result inconclusive")
+        if not pre_fix.get("evidence_refs") or not post_fix.get("evidence_refs"):
+            errors.append("BUG verification: partial requires original reproduction attempt evidence")
+        if (
+            set(proxy.get("bdd_refs", [])) != set(safeguards.get("proxy_bdd_refs", []))
+            or set(proxy.get("test_refs", [])) != set(safeguards.get("proxy_test_refs", []))
+            or not proxy.get("red_evidence_refs")
+            or not proxy.get("green_evidence_refs")
+        ):
+            errors.append("BUG verification: partial requires the approved proxy red→green evidence")
+        if not record.get("residual_risks") or not set(safeguards.get("residual_risks", [])).issubset(record.get("residual_risks", [])):
+            errors.append("BUG verification: partial requires all approved residual risks")
+        if not record.get("follow_up") or not set(safeguards.get("follow_up", [])).issubset(record.get("follow_up", [])):
+            errors.append("BUG verification: partial requires all approved follow-up verification")
+        partial_prose = {
+            "Ready reason": safeguards.get("reason"),
+            "Ready residual risks": safeguards.get("residual_risks"),
+            "Ready follow-up": safeguards.get("follow_up"),
+            "verification residual risks": record.get("residual_risks"),
+            "verification follow-up": record.get("follow_up"),
+        }
+        for label, value in partial_prose.items():
+            if partial_overclaim(value):
+                errors.append(f"BUG verification: partial {label} contains a verified-fix overclaim")
+        errors.extend(
+            f"BUG verification: Ready {error}"
+            for error in partial_safeguard_prose_errors(safeguards)
+        )
+        errors.extend(
+            f"BUG verification: record {error}"
+            for error in partial_safeguard_prose_errors(
+                {
+                    "reason": safeguards.get("reason"),
+                    "residual_risks": record.get("residual_risks"),
+                    "follow_up": record.get("follow_up"),
+                }
+            )
+        )
+        summary = record.get("summary")
+        if summary not in PARTIAL_VERIFICATION_SUMMARIES:
+            errors.append("BUG verification: partial summary must use canonical inconclusive wording")
+    elif result == "failed":
+        has_failure_signal = (
+            post_fix.get("status") != "absent"
+            or any(outcome.get("outcome") != "passed" for outcome in full_outcomes)
+            or not regression.get("green_evidence_refs")
+        )
+        if not has_failure_signal:
+            errors.append("BUG verification: failed requires a persisted failure signal")
+
+    evidence_groups = [
+        ("pre-fix original symptom", pre_fix.get("evidence_refs", [])),
+        ("post-fix original symptom", post_fix.get("evidence_refs", [])),
+        ("regression red", regression.get("red_evidence_refs", [])),
+        ("regression green", regression.get("green_evidence_refs", [])),
+        ("proxy red", proxy.get("red_evidence_refs", [])),
+        ("proxy green", proxy.get("green_evidence_refs", [])),
+        (
+            "full command output",
+            [
+                outcome.get("output_ref")
+                for outcome in full_outcomes
+                if outcome.get("output_ref") is not None
+            ],
+        ),
+        ("implementation review", [record.get("implementation_review_ref")]),
+    ]
+    canonical_refs: list[str] = []
+    roles: dict[str, str] = {}
+    for role, refs in evidence_groups:
+        if not isinstance(refs, list):
+            errors.append(f"BUG verification: {role} evidence refs are not an array")
+            continue
+        for raw_ref in refs:
+            relative = _canonical_evidence_ref(raw_ref)
+            if relative is None or relative != raw_ref:
+                errors.append(f"BUG verification: {role} evidence ref is not a canonical Ledger path")
+                continue
+            if relative in roles:
+                errors.append(
+                    f"BUG verification: evidence ref {relative} is reused for {roles[relative]} and {role}"
+                )
+                continue
+            roles[relative] = role
+            canonical_refs.append(relative)
+
+    if (evidence_root is None) != (terminal_evidence_refs is None):
+        errors.append("BUG verification: terminal evidence root and index must be supplied together")
+    if evidence_root is not None and terminal_evidence_refs is not None:
+        terminal_set = {
+            relative
+            for raw_ref in terminal_evidence_refs
+            for relative in [_canonical_evidence_ref(raw_ref)]
+            if relative is not None and relative == raw_ref
+        }
+        for relative in canonical_refs:
+            if relative not in terminal_set:
+                errors.append(f"BUG verification: evidence is absent from terminal index: {relative}")
+                continue
+            path = _persisted_evidence_path(evidence_root, relative)
+            if path is None:
+                errors.append(f"BUG verification: evidence is not persisted: {relative}")
+                continue
+            try:
+                materialized = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                errors.append(f"BUG verification: evidence is unreadable: {relative}")
+                continue
+            errors.extend(
+                validate_secret_free(
+                    materialized,
+                    known_secret_values,
+                    label=f"BUG verification evidence {relative}",
+                )
+            )
+    return errors
+
+
+def validate_bug_dirty_paths(
+    ready: dict[str, Any],
+    dirty_paths: Sequence[str],
+) -> list[str]:
+    """Reject unapproved repository BUG evidence at implementation preflight."""
+    context = ready.get("bug_context")
+    allowed: set[str] = set()
+    if isinstance(context, dict):
+        assessment = context.get("assessment", {})
+        allowed = {
+            value
+            for value in (assessment.get("path"), assessment.get("markdown_path"))
+            if isinstance(value, str)
+        }
+    errors: list[str] = []
+    for raw in dirty_paths:
+        normalized = raw.replace("\\", "/")
+        if normalized.startswith("docs/bugs/") and normalized not in allowed:
+            errors.append(f"preflight: unauthorized BUG dirty path {normalized}")
+    return errors
+
+
 def validate_execution_record_semantics(
     data: dict[str, Any],
     *,
@@ -796,6 +1134,14 @@ def validate_execution_record_semantics(
         if actual != canonical_sha256(payload):
             errors.append("snapshot: snapshot_id does not match canonical content")
     elif schema_name == "implementation-review/v1":
+        bug_fields = (
+            data.get("bug_verification_ref"),
+            data.get("bug_verification_result"),
+        )
+        if any(value is not None for value in bug_fields) and not all(
+            value is not None for value in bug_fields
+        ):
+            errors.append("review: BUG verification ref and result must be recorded together")
         raw_ref_list = data.get("raw_output_refs", [])
         raw_refs = set(raw_ref_list)
         if len(raw_ref_list) != len(raw_refs):
@@ -850,6 +1196,15 @@ def validate_execution_record_semantics(
             item.get("blocking") is True for item in data.get("findings", [])
         ):
             errors.append("review: CHANGES_REQUIRED requires a blocking finding")
+    elif schema_name == "bug-verification/v1":
+        if ready is not None:
+            errors.extend(
+                validate_bug_verification_against_ready(
+                    data,
+                    ready,
+                    known_secret_values=known_secret_values,
+                )
+            )
     elif schema_name == "implementation-breaker/v1":
         if breaker_reports is None:
             errors.append("breaker: persisted review report chain is required for semantic validation")
@@ -1002,6 +1357,35 @@ def validate_review_against_ready(
     missing_commands = required_commands - set(outcome_ids)
     if missing_commands:
         errors.append(f"review: missing full command outcomes {sorted(missing_commands)}")
+
+    bug_context = ready.get("bug_context")
+    bug_ref = report.get("bug_verification_ref")
+    bug_result = report.get("bug_verification_result")
+    if isinstance(bug_context, dict):
+        if not isinstance(bug_ref, str) or not bug_ref or bug_result is None:
+            errors.append("review: BUG Ready plan requires a separate BUG verification ref and result")
+        elif report.get("verdict") == "APPROVED" and bug_result == "failed":
+            errors.append("review: APPROVED review cannot carry failed BUG verification")
+        elif report.get("verdict") == "APPROVED" and bug_result != bug_context.get("verification_target"):
+            errors.append("review: APPROVED BUG verification result differs from the approved target")
+        if bug_result == "partial":
+            if report.get("summary") not in PARTIAL_REVIEW_SUMMARIES:
+                errors.append("review: partial review summary must use canonical inconclusive wording")
+            public_claims = {
+                "summary": report.get("summary"),
+                "findings": [
+                    {
+                        "message": finding.get("message"),
+                        "required_outcome": finding.get("key_inputs", {}).get("required_outcome"),
+                    }
+                    for finding in report.get("findings", [])
+                    if isinstance(finding, dict)
+                ],
+            }
+            if partial_overclaim(public_claims):
+                errors.append("review: partial public claim contains a verified-fix overclaim")
+    elif bug_ref is not None or bug_result is not None:
+        errors.append("review: non-BUG Ready plan cannot carry BUG verification fields")
 
     sources = {item["source_id"]: item for item in ready.get("sources", [])}
     contracts = {item["contract_id"]: item for item in ready.get("contract_index", [])}
@@ -1201,6 +1585,7 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "capability／baseline refs",
         "implementation-capability/v1",
         "implementation-integrity/v1",
+        "Standard Ready不允許任何BUG dirty path",
     ):
         if fragment not in preflight:
             errors.append(f"preflight missing executor security/integrity semantic {fragment}")
@@ -1210,6 +1595,9 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
     loop = (bundle / "references/bdd-tdd-loop.md").read_text(encoding="utf-8")
     if "deterministic Unimplemented" in loop:
         errors.append("BDD/TDD loop duplicates greenfield bootstrap details")
+    for fragment in ("BUG plan 分支", "不得再疊第二個猜測式patch", "current-scope", "全域BUG inbox"):
+        if fragment not in loop:
+            errors.append(f"BDD/TDD loop missing BUG execution semantic {fragment}")
     reviewer = (bundle / "references/reviewer-contract.md").read_text(encoding="utf-8")
     for fragment in (
         "implementation-snapshot/v1",
@@ -1223,6 +1611,8 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "duplicate normalized refs",
         "raw_output_refs`自身也不得重複",
         "A→B→C無證據輪換",
+        "bug_verification_ref",
+        "Reviewer分別判定",
     ):
         if fragment not in reviewer:
             errors.append(f"reviewer authority missing shared semantic {fragment}")
@@ -1232,14 +1622,30 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "Ledger terminal index",
         "phantom ref",
         "terminal/<sequence>-<step>.json",
+        "結果為`failed`",
+        "未materialize",
     ):
         if fragment not in delivery:
             errors.append(f"delivery authority missing terminal persistence semantic {fragment}")
 
     behavior = (bundle / "references/behavior-evaluation.md").read_text(encoding="utf-8")
-    for index in range(1, 10):
+    for index in range(1, 11):
         if f"EVAL-{index:03d}" not in behavior:
             errors.append(f"behavior contract missing EVAL-{index:03d}")
+    validator_source = (bundle / "scripts/validate_contracts.py").read_text(encoding="utf-8")
+    for fragment in (
+        "def validate_bug_verification_against_ready",
+        "def validate_bug_dirty_paths",
+        "partial summary must use canonical inconclusive wording",
+        "evidence is absent from terminal index",
+        "evidence is not persisted",
+        "partial review summary must use canonical inconclusive wording",
+        "partial public claim contains a verified-fix overclaim",
+        "raw JSON contains a duplicate object key",
+        "APPROVED review cannot carry failed BUG verification",
+    ):
+        if fragment not in validator_source:
+            errors.append(f"implementation validator missing BUG semantic {fragment}")
 
 
 def validate_all(skills_root: Path) -> list[str]:

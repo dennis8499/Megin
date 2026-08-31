@@ -52,12 +52,15 @@ Reviewer 必須自行重跑全量 build、test、BDD 與治理命令，並獨立
 - 每個 production behavior change 是否都有正確 red，既有已滿足情境是否沒有無依據擴張；若第一個 greenfield red 前存在 production shape，逐 bytes 核對它只符合已核准 `BOOT-*`、sentinel 與所有驗收結果互斥、bootstrap command 未執行 behavior，且後續 behavior diff 才由 red 驅動；
 - plan 決策、Module／Interface／Seam、依賴版本、CI 與 scope 是否一致；
 - 無關檔案、Ready artifacts、秘密、Git 與外部狀態是否保持邊界。
+- BUG plan 是否先有正確regression red、只做單一最小根因修復，且`bug-verification/v1`的原始症狀／proxy／full-command evidence與Ready target一致；途中BUG分流及materialization是否完整。
 
 正確性、規格忠實度、安全、資料完整性、測試缺口、破壞性相容問題及會造成驗證不可信的缺陷都是實質 finding。純命名／格式偏好或無需求依據的替代寫法是非 blocking advisory。
 
 ## 4. `implementation-review/v1`
 
 原始 report 必須符合 [execution records schema](execution-records.schema.json) 的 `reviewReport`：verdict、snapshot-before／after、Reviewer attestation、獨立 command outcomes、raw-output logical refs、逐一對應 `SRC-*`／`plan_refs` 的 requirement coverage、findings 與 summary 均完整。
+
+BUG Ready plan 的report另必須同時保存`bug_verification_ref`與`bug_verification_result`。Reviewer分別判定：(1) implementation verdict；(2) BUG result。`verified`須有原始pre-fix present與post-fix absent、regression red→green及full pass；`partial`須是Plan事先核准的低信心分支，具proxy red→green、full pass、殘餘風險與follow-up；Ready與verification的reason／risk／follow-up需分別保留明確不確定性、風險語意與驗證動作，任何conclusive remediated／validated或中英文等價確定宣稱都拒絕。Verification與review兩份summary另採fail-closed canonical wording，只允許明示proxy已通過、結果為partial且原始症狀仍無法確認的中英文固定句，任何自由改寫（包含「The BUG has been verified as fixed.」）都拒絕。Partial review的完整公開claim-bearing欄位至少包含`summary`、`findings[].message`與`findings[].key_inputs.required_outcome`；後兩者也必須套用相同的中英文／改寫式overclaim guard。`failed`不得與`APPROVED`交付共存。原始症狀、regression／proxy red-green、full-command output及implementation review的每個ref必須是不同的canonical Ledger-relative path，實際存在且列在Complete terminal index；只填字串不構成evidence。
 
 Command outcome 語義：
 

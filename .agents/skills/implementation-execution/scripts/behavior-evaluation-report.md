@@ -50,3 +50,34 @@ A subsequent findings-first review returned **Fail** after proving that the cano
 Post-fix Implementation validator and 7/7 owner tests pass. Corrected owner corpus: **14 files, 169,508 bytes, SHA-256 `2f3697fa520cce914aaf6b4ad3c56062686710735df1f626ff46dba29f150f69`**, excluding this report and cache files under the existing manifest algorithm. The earlier Pass and later Fail remain visible because the final verdict must be based on the re-reviewed corrected candidate, not on either historical snapshot.
 
 Final post-fix Reviewer verdict: **PASS, no blocking findings**. A live textconv control invoked its sentinel-writing driver, while the actual canonical snapshot did not; the raw no-textconv digest and snapshot digest were identical. The re-review was independent, read-only and did not use behavior reports as an oracle.
+
+## 2026-08-30 — BUG execution overlay pre-review capture
+
+- Base HEAD: `11316066df74e8b4828bd77ca80c743886d7f283`; Work ID: `work-20260830-bug-diagnosis-flow-590d6e65`.
+- Execution schema SHA-256: `001646122fe6b80cf099840a92c0d20746cee133f1aab7827cee464b8ab864d1`.
+- `bug-verification/v1` keeps implementation approval separate from `verified | partial | failed`; verified requires original symptom pre／post plus regression red→green and full pass, while partial requires its pre-approved proxy safeguards and blocks verified-fix wording.
+- Owner validator and quick validation: Pass; execution／review／dirty-path mutation tests: **12/12 Pass**.
+- Owner corpus excluding this report and caches: **14 files, 204,740 bytes, SHA-256 `6e1e3a30462d027253b4eaf90194097c7b314c6146f2a11ca4a18e478ff0a5ee`**.
+- Fresh read-only Reviewer: pending; pending is not a Pass.
+
+### Findings-first correction before re-review
+
+The first fresh Reviewer returned implementation `CHANGES_REQUIRED` and BUG contract `FAIL`: phantom red／green refs could pass Complete, and a partial implementation review could overclaim a verified fix. The corrected validator requires every original-symptom, regression／proxy, full-command and review ref to be a distinct canonical Ledger path, physically persisted and present in the terminal index. Both verification and review summaries now reject partial overclaim wording.
+
+- Exact Ready focused command now resolves the planned `BugVerificationTests` class and passes **6/6**.
+- Corrected owner suite: **13/13 Pass**; owner validator and quick contract anchors pass locally.
+- Corrected owner corpus excluding this report and caches: **14 files, 211,005 bytes, SHA-256 `c68b57126ce57ee3edc2e2eea7f6e5d40ba02a8a8d0f16c3a02162d4c51e4407`**.
+- Fresh re-review: pending; the earlier Fail remains preserved and pending is not a Pass.
+
+### Final findings-first closure
+
+The next fresh round found one additional wording bypass: `The BUG has been verified as fixed.` evaded the original partial-summary regex. That round correctly remained `CHANGES_REQUIRED`／`FAIL`. The contract now uses fail-closed canonical allowlists for both partial verification and partial implementation-review summaries; only fixed English／Traditional-Chinese wording that explicitly says the result is partial and the original symptom remains inconclusive is accepted. The exact Reviewer counterexample is a negative fixture in both consumers.
+
+Final fresh re-review: **implementation `APPROVED`; BUG verification contract `PASS`; findings none**. It independently ran `BugVerificationTests` at **6/6**, the implementation owner validator, and the legacy-standard compatibility test. Final local owner suite is **13/13 Pass**, quick validation and owner validation pass, and the report-excluding owner corpus is **14 files, 211,854 bytes, SHA-256 `bea06605888e1d203a9c0ec68089373c6b7a6f71f1682ce93b15ebe44a486f22`**.
+
+## 2026-08-31 — Plan revision 3 superseding evidence capture
+
+- Owner validator, skill quick validation and **14/14** execution tests pass; the focused BUG-verification class is **7/7 Pass**. Report-excluding corpus: **14 files, 220,502 bytes, SHA-256 `5c71880f53c025b92fcb2acdc8421a89a1e119d79c9202b64f2bba53cfeba1c1`**.
+- Persisted verification raw bytes are scanned before parse, duplicate keys fail closed without reproducing the known-value marker, terminal refs must be physical and indexed, and implementation approval remains separate from `verified | partial | failed`.
+- Partial terminal wording uses canonical inconclusive summaries and scans `findings[].message` plus `key_inputs.required_outcome`; the exact English／Traditional-Chinese overclaim fixtures fail. The integrated author run passed **91/91** tests.
+- The final fresh Reviewer passed Implementation **14/14**, Delivery mutations **20/20**, BUG overlay **14/14** and terminal **8/8**, and found no execution-code issue. Its only blocker was the stale diagnosis report header, corrected in this report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger.

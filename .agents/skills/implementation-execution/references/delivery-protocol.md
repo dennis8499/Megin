@@ -41,8 +41,11 @@ Preflight → Executing → Verifying → Reviewing → Complete
 - Reviewer attestation、round、snapshot-before／after、獨立 command outcomes 與 `APPROVED`；
 - 非 blocking advisories；
 - Ledger 的精確 path。
+- BUG run 的assessment path／hash、`bug-verification/v1` path／hash、implementation verdict與獨立`verified | partial`結果；`partial`明示原始症狀未驗證、殘餘風險及staging／人工follow-up。
 
 交付後被審內容與 Ledger 只讀；不自動 stage、commit、push、merge、部署、建立 ticket、清理 artifacts 或刪除 worktree。
+
+BUG run若缺verification、結果為`failed`、review與verification雙結論不一致、verification evidence未實際保存並列入terminal index，或仍有未materialize的途中BUG evidence，均不得Complete。Verification只在同一次`complete/complete` transition綁定；implementation期間的提早綁定不得占用create-only path。Critical／high只改變優先與風險回報，不繞過gate；安全／隱私／資料風險只引用遮蔽摘要、安全evidence ref與具名人工reviewer。
 
 ## Awaiting upstream reapproval
 

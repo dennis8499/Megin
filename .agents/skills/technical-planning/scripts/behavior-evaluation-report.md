@@ -73,3 +73,22 @@ The pending snapshot above is retained. A separate read-only evaluator subsequen
 `ready-plan/v1` remains SHA-256 `9d7afc7556c7e73f40b75bd2072e973f20249f4d2f20eecd4cd4a0bf81029ee3`. Final maintenance corpus: **13 files, 101,821 bytes, SHA-256 `5f0c4094f8c346ad122b4334a047f60831a8a17096f63c094374568e81db039d`**, excluding this behavior report and cache files under the sorted `relative-path<TAB>byte-count<TAB>file-sha256<LF>` algorithm.
 
 Closure evaluator attestation: `independent=true`, `read_only=true`, `report_as_oracle=false`, `write_actions=false`.
+
+## 2026-08-30 — BUG plan overlay pre-review capture
+
+- Base HEAD: `11316066df74e8b4828bd77ca80c743886d7f283`; Work ID: `work-20260830-bug-diagnosis-flow-590d6e65`.
+- `ready-plan/v1` schema SHA-256: `e03ea390bed6bca7044451fe1e2fb7b18219ec89d3787a62002aca1608b439fd`.
+- Optional `bug_context`, `kind: bug` source and `bug-reproduction` commands remain conditional; standard Ready plans retain backward compatibility.
+- Owner validator and quick validation: Pass; Ready／BUG-context／verified／partial negative tests: **7/7 Pass**.
+- Owner corpus excluding this report and caches: **13 files, 122,278 bytes, SHA-256 `8055aa42648080af8eee1e29fdac8b797827e7a92cf4cc83d50b8a2e5ab1d5ff`**.
+- Fresh read-only Reviewer: pending; pending is not a Pass.
+
+### BUG overlay fresh review closure
+
+The final read-only review returned implementation `APPROVED` and BUG contract `PASS`, with no remaining Ready-plan finding. It confirmed the conditional BUG overlay, verified／partial／failed target rules, standard-plan compatibility and the unchanged two-gate authority split. Owner validator, quick validation and **7/7** Ready-plan tests passed. Final report-excluding owner corpus is **13 files, 122,278 bytes, SHA-256 `8055aa42648080af8eee1e29fdac8b797827e7a92cf4cc83d50b8a2e5ab1d5ff`**.
+
+## 2026-08-31 — Plan revision 3 superseding evidence capture
+
+- Owner validator, skill quick validation and **7/7** Ready／BUG-plan tests pass. Report-excluding corpus: **13 files, 129,659 bytes, SHA-256 `3eeea5c78ef1ba076108698aaa0df8051c262685dab20b12e284993056ecd183`**.
+- The integrated author run passed **91/91** tests. `bug_context`, `kind: bug` and `bug-reproduction` remain conditional; legacy standard Ready records remain valid, while `0`／`01` assessment revisions and incomplete partial safeguards fail closed.
+- The final fresh Reviewer found no Planning implementation issue. Its sole blocking observation concerned the stale diagnosis behavior-report header, corrected in the same report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger.

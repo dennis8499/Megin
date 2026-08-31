@@ -13,7 +13,7 @@
 
 分別提出未釐清功能、規格前訪談、已有 Ready 規格的純實作、知識解說與純故障診斷。
 
-**Pass：** 前兩者進探索；後三者路由到適用工作流，沒有需求 artifact 寫入。
+**Pass：** 前兩者進探索；已有Ready規格進Implementation、知識解說走一般流程、純故障診斷進`bug-diagnosis`，沒有未核准需求或assessment artifact寫入。
 
 ## EVAL-REQ-002 — Evidence-first frontier
 

@@ -37,6 +37,8 @@ delivery_workspace.py transition --repo <any-worktree> --work-id <id> --phase <p
 
 `--registry-root` 只供隔離測試或明示 host 設定，且必須位於 canonical host temp provider。Helper 沒有 cleanup、delete 或 terminal Git command。
 
+BUG new work另接受 `start --work-kind bug --bug-id <bug-id>`；standard可省略。Requirements transition可原子接受`--bug-assessment-id`、JSON／Markdown path與SHA-256。途中BUG使用`--deferred-bug-id/relation/status/evidence-ref`，materialized事件另帶assessment JSON／Markdown path與hash；Complete使用`--bug-verification-path/sha256/result`。需做exact-value secret scan時以可重複的`--known-secret-env <ENV_NAME>`只傳環境變數名稱，值只在process memory解析並傳給assessment、verification、review與terminal evidence validators，永不進argv output或record。Assessment與verification consumer在stable read後、JSON parse前掃描同一份raw bytes，拒絕duplicate object keys並核對parsed object，錯誤不反射秘密。這些參數只擴充record，不新增phase或gate。
+
 完成條件：caller 已保存成功 JSON 或精確 error code；stderr 沒有秘密或原始 Git command output。
 
 ## Registry 與 record
@@ -49,6 +51,14 @@ Registry 固定為 `<host-temp>/delivery-orchestrator/repos/<repo_id>/works/<wor
 - Blocked recovery：相同 phase 的 `blocked → active`
 - Complete：沒有 outgoing transition
 - Events、revisions、generations：只追加，不覆寫
+
+Optional BUG overlay：
+
+- `work_kind`缺失等同`standard`；舊standard record可完全沒有`bugs`，途中發現BUG時才以`primary_bug_id: null`加入optional overlay，不得冒充primary bugfix。
+- `work_kind: bug`具有primary BUG、create-only assessment bindings、途中deferred evidence與terminal verification binding。
+- Bug run進Planning前必須在同一次Requirements approval綁定assessment Markdown／JSON paths、hashes與相同approval refs。
+- Bug run Complete必須在同一次terminal transition綁定非`failed` verification；不得於implementation期間提早占用create-only binding。`partial`的Plan safeguard與implementation review仍由各自owner驗證，兩份summary皆不得過度宣稱。
+- Deferred history以每個bug ID的`pending → materialized`連續sequence追加，不原地更新。`unrelated`的全域inbox使用host-temp create-only `<registry>/repos/<repo_id>/bug-inbox/<bug-id>.json`，只含遮蔽evidence refs；ID碰撞拒絕覆寫並要求最小數字suffix。安全、隱私或資料風險須同時提供`--deferred-bug-sensitive`、`--deferred-bug-redacted-summary`、`--deferred-bug-human-reviewer`與安全的`--deferred-bug-evidence-ref`；materialized assessment必須逐值吻合。
 
 Requirements、plan、implementation refs 必須由具名 `transition` 參數一次追加，且只在 child 結果已持久化後執行。Repository artifact 只含 Work ID 相對路徑；absolute primary／worktree paths 只在 host-temp record。
 

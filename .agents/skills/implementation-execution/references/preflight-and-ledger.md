@@ -14,6 +14,7 @@
 4. Contract index涵蓋 BDD-FWK、適用BOOT、全部BDD／TEST／CMD／WP；cross-references完整、DAG無環。
 5. 每個command具cwd、exact command、非秘密env前提、timeout、network、allowed writes、external side effects、success與completeness；Proposed有absence evidence，Observed的absence evidence為空。
 6. 獨立bdd-discovery command可證明scenario inventory與contract mapping。
+7. 若有`bug_context`：恰有一個`kind: bug` source，其assessment JSON／Markdown path與hash、bug ID、reproduction／root-cause狀態、regression refs、verification target及partial safeguards全部通過producer contract；沒有`bug_context`的舊Ready plan維持相容。
 
 任一缺失、歧義、hash drift或矛盾為producer gap，結果是 Awaiting upstream reapproval且產品diff為零。
 
@@ -30,6 +31,8 @@
 
 Workspace、能力、工具或未記錄dirty state失敗為Blocked。嚴禁stash、reset、clean、覆寫、建立／切換／刪除worktree。
 
+BUG Ready只額外允許`bug_context.assessment`精確列出的JSON／Markdown dirty paths；其他`docs/bugs/`內容（包含過早建立的verification或未綁定assessment）一律是未授權dirty path並Blocked。Standard Ready不允許任何BUG dirty path。
+
 ## Binding 與 run identity
 
 Ledger root固定在host canonical temp provider的 implementation-execution，不接受repository scratch root。worktree_key是canonical_worktree UTF-8 bytes的SHA-256。
@@ -38,7 +41,7 @@ Ledger root固定在host canonical temp provider的 implementation-execution，�
 
 run_id是 repo_id、worktree_key、initial_base_sha、canonical handoff path與Candidate revision的canonical JSON SHA-256。Run directory固定為 host-temp/runs/run_id。任何binding／run初始化失敗停止，不宣稱取得workspace。
 
-秘密不得進入manifest、命令列或Ledger。Executor在記憶體維持本次已知秘密值集合，每次保存Ready、delivery、Ledger或output record前，以consumer validator的`known_secret_values`做exact-value scan；集合與原值不持久化。Raw output若含秘密，保存前只遮蔽該秘密值、保留其餘完整輸出並另記redaction event。每個WP開始／完成、global transition與snapshot前重算Ready／source hashes；任何drift立即進入[Resume與Revision](resume-and-revision.md)分支。
+秘密不得進入manifest、命令列或Ledger。Executor在記憶體維持本次已知秘密值集合，每次保存Ready、delivery、Ledger或output record前，以consumer validator的`known_secret_values`做exact-value scan；集合與原值不持久化。Repository中的assessment與`bug-verification/v1`另須對stable-read raw JSON bytes在parse前掃描，拒絕duplicate object keys並核對parsed object，避免last-key-wins隱藏秘密。Raw output若含秘密，保存前只遮蔽該秘密值、保留其餘完整輸出並另記redaction event。每個WP開始／完成、global transition與snapshot前重算Ready／source hashes；任何drift立即進入[Resume與Revision](resume-and-revision.md)分支。
 
 完成條件：binding與run identity可由raw probes重算，race只有directory winner有record。
 
@@ -56,6 +59,7 @@ run_id是 repo_id、worktree_key、initial_base_sha、canonical handoff path與C
 | diffs/ | bootstrap、red前、WP完成、full verification與review snapshots |
 | reviews/round/ | reviewer input、snapshot、raw response／outputs、report或invalid report |
 | breaker.json | stable finding identity與counters |
+| repository `docs/bugs/<bug-id>/verifications/<work-id>.json` | create-only `bug-verification/v1`；綁定Ready、assessment、原始症狀、regression／proxy red→green、full commands、殘餘風險與review ref |
 
 WP states只用 Pending／Executing／Verified／Invalidated／Blocked；scenario outcome可用 Red／Green／Satisfied by existing implementation。Ledger append-only且不進review snapshot或repository artifact。
 

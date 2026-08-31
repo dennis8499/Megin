@@ -183,6 +183,8 @@ class DeliveryFixture(unittest.TestCase):
         delivery: Path,
         work_id: str,
         run_id: str,
+        *,
+        bug_verification_result: str | None = None,
     ) -> tuple[str, str, str]:
         record = self.record(delivery, work_id)
         handoff_relative = record["plans"]["current_handoff_path"]
@@ -234,6 +236,83 @@ class DeliveryFixture(unittest.TestCase):
             for source in handoff["sources"]
             for obligation in source["plan_refs"]
         ]
+        bug_verification_relative: str | None = None
+        bug_evidence_refs: list[str] = []
+        bug_context = handoff.get("bug_context")
+        if isinstance(bug_context, dict):
+            result = bug_verification_result or bug_context["verification_target"]
+            partial = result == "partial"
+            failed = result == "failed"
+            bug_verification_relative = (
+                f"docs/bugs/{bug_context['bug_id']}/verifications/{work_id}.json"
+            )
+            bug_verification = {
+                "schema": "bug-verification/v1",
+                "bug_id": bug_context["bug_id"],
+                "work_id": work_id,
+                "result": result,
+                "plan": {
+                    "handoff_path": handoff_relative,
+                    "candidate_revision": handoff["candidate"]["revision"],
+                    "verification_target": bug_context["verification_target"],
+                },
+                "assessment": copy.deepcopy(bug_context["assessment"]),
+                "original_reproduction": {
+                    "pre_fix": {
+                        "command_ref": None if partial else "CMD-BUG-REPRO-001",
+                        "status": "inconclusive" if partial else "present",
+                        "evidence_refs": ["commands/bug-pre.txt"],
+                    },
+                    "post_fix": {
+                        "command_ref": None if partial else "CMD-BUG-REPRO-001",
+                        "status": "inconclusive" if partial else ("present" if failed else "absent"),
+                        "evidence_refs": ["commands/bug-post.txt"],
+                    },
+                },
+                "regression": {
+                    "bdd_refs": bug_context["regression_bdd_refs"],
+                    "test_refs": bug_context["regression_test_refs"],
+                    "red_evidence_refs": ["tests/regression-red.txt"],
+                    "green_evidence_refs": ["tests/regression-green.txt"],
+                },
+                "proxy": {
+                    "bdd_refs": bug_context["partial_safeguards"]["proxy_bdd_refs"] if partial else [],
+                    "test_refs": bug_context["partial_safeguards"]["proxy_test_refs"] if partial else [],
+                    "red_evidence_refs": ["tests/proxy-red.txt"] if partial else [],
+                    "green_evidence_refs": ["tests/proxy-green.txt"] if partial else [],
+                },
+                "full_verification": copy.deepcopy(outcomes),
+                "residual_risks": bug_context["partial_safeguards"]["residual_risks"] if partial else [],
+                "follow_up": bug_context["partial_safeguards"]["follow_up"] if partial else [],
+                "implementation_review_ref": review_relative,
+                "summary": (
+                    "Original symptom remains present after the attempted fix."
+                    if failed
+                    else "Proxy evidence passed; original symptom remains inconclusive."
+                    if partial
+                    else "Original symptom is absent after the root-cause fix."
+                ),
+                "created_at": "2026-08-30T00:00:00Z",
+            }
+            if failed:
+                bug_verification["full_verification"][0].update(
+                    {"outcome": "failed", "exit_code": 1, "failure_count": 1}
+                )
+            bug_evidence_refs = [
+                *bug_verification["original_reproduction"]["pre_fix"]["evidence_refs"],
+                *bug_verification["original_reproduction"]["post_fix"]["evidence_refs"],
+                *bug_verification["regression"]["red_evidence_refs"],
+                *bug_verification["regression"]["green_evidence_refs"],
+                *bug_verification["proxy"]["red_evidence_refs"],
+                *bug_verification["proxy"]["green_evidence_refs"],
+            ]
+            verification_path = delivery / Path(*bug_verification_relative.split("/"))
+            verification_path.parent.mkdir(parents=True, exist_ok=True)
+            verification_path.write_text(
+                json.dumps(bug_verification, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
         snapshot_relative = "diffs/reviewed-snapshot.json"
         snapshot = workspace._current_implementation_snapshot(record, handoff)
         snapshot_path = run_dir / Path(*snapshot_relative.split("/"))
@@ -261,8 +340,16 @@ class DeliveryFixture(unittest.TestCase):
             "raw_output_refs": raw_refs,
             "requirement_coverage": coverage,
             "findings": [],
-            "summary": "Independent verification approved the reviewed snapshot.",
+            "summary": (
+                "Implementation approved; BUG verification is partial and the original symptom remains inconclusive."
+                if bug_verification_relative is not None
+                and (bug_verification_result or bug_context["verification_target"]) == "partial"
+                else "Independent verification approved the reviewed snapshot."
+            ),
         }
+        if bug_verification_relative is not None:
+            report["bug_verification_ref"] = bug_verification_relative
+            report["bug_verification_result"] = bug_verification_result or bug_context["verification_target"]
         review_path.write_text(
             json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
@@ -306,6 +393,7 @@ class DeliveryFixture(unittest.TestCase):
             "breaker.json",
             "commands/full-verification.json",
             *main_output_refs,
+            *bug_evidence_refs,
             snapshot_relative,
             raw_response_relative,
             *raw_refs,
@@ -346,6 +434,12 @@ class DeliveryFixture(unittest.TestCase):
             {
                 relative: {"stream": relative.rsplit(".", 2)[-2]}
                 for relative in main_output_refs
+            }
+        )
+        placeholder_payloads.update(
+            {
+                relative: {"evidence": relative}
+                for relative in bug_evidence_refs
             }
         )
         witness_evidence = {
@@ -494,6 +588,7 @@ class DeliveryFixture(unittest.TestCase):
         requirements_path: str,
         requirements_sha256: str,
         revision: int = 1,
+        bug_verification_target: str = "verified",
     ) -> tuple[str, str, str]:
         directory = "plan" if revision == 1 else f"plan-{revision}"
         root = delivery / "docs" / "work" / work_id / directory
@@ -540,6 +635,73 @@ class DeliveryFixture(unittest.TestCase):
                 "sha256": requirements_sha256,
             }
         )
+        if record.get("work_kind") == "bug":
+            assessment = record["bugs"]["assessments"][-1]
+            handoff["sources"].append(
+                {
+                    "source_id": "SRC-BUG-001",
+                    "kind": "bug",
+                    "location": assessment["path"],
+                    "revision": "1",
+                    "sha256": assessment["sha256"],
+                    "plan_refs": ["REQ-001"],
+                    "wp_refs": ["WP-001"],
+                }
+            )
+            handoff["work_packages"][0]["source_refs"].append("SRC-BUG-001")
+            for contract in handoff["contract_index"]:
+                if contract["contract_id"] in {"REQ-001", "BDD-001", "TEST-001", "WP-001"}:
+                    contract["source_refs"].append("SRC-BUG-001")
+            handoff["commands"].append(
+                {
+                    "command_id": "CMD-BUG-REPRO-001",
+                    "purpose": "bug-reproduction",
+                    "status": "Observed",
+                    "cwd": ".",
+                    "command": "tool reproduce-bug",
+                    "environment_prerequisites": [],
+                    "timeout_seconds": 30,
+                    "network_policy": "forbidden",
+                    "allowed_writes": [],
+                    "external_side_effects": [],
+                    "success_criteria": ["distinguishes symptom present from absent"],
+                    "completeness_criteria": ["original symptom oracle executed"],
+                    "absence_evidence": [],
+                }
+            )
+            handoff["contract_index"].append(
+                {
+                    "contract_id": "CMD-BUG-REPRO-001",
+                    "kind": "command",
+                    "source_refs": ["SRC-001", "SRC-BUG-001"],
+                    "wp_refs": ["WP-001"],
+                }
+            )
+            handoff["work_packages"][0]["contract_refs"].append("CMD-BUG-REPRO-001")
+            handoff["work_packages"][0]["command_refs"].append("CMD-BUG-REPRO-001")
+            handoff["bug_context"] = {
+                "bug_id": assessment["bug_id"],
+                "assessment": {
+                    "path": assessment["path"],
+                    "sha256": assessment["sha256"],
+                    "markdown_path": assessment["markdown_path"],
+                    "markdown_sha256": assessment["markdown_sha256"],
+                },
+                "reproduction_status": "reproduced" if bug_verification_target == "verified" else "not-reproduced",
+                "root_cause_status": "confirmed" if bug_verification_target == "verified" else "hypothesized",
+                "root_cause_confidence": "high" if bug_verification_target == "verified" else "low",
+                "verification_target": bug_verification_target,
+                "original_reproduction_command_ref": "CMD-BUG-REPRO-001" if bug_verification_target == "verified" else None,
+                "regression_bdd_refs": ["BDD-001"],
+                "regression_test_refs": ["TEST-001"],
+                "partial_safeguards": {
+                    "reason": None if bug_verification_target == "verified" else "Original symptom is not reproducible.",
+                    "proxy_bdd_refs": [] if bug_verification_target == "verified" else ["BDD-001"],
+                    "proxy_test_refs": [] if bug_verification_target == "verified" else ["TEST-001"],
+                    "residual_risks": [] if bug_verification_target == "verified" else ["Original symptom may persist outside the proxy seam."],
+                    "follow_up": [] if bug_verification_target == "verified" else ["Verify the original journey manually in staging."],
+                },
+            }
         handoff["revision_impact"]["revision"] = f"candidate-{revision}"
         payload = workspace._ready_payload_sha256(handoff)
         handoff["candidate"]["payload_sha256"] = payload
@@ -557,6 +719,7 @@ class DeliveryFixture(unittest.TestCase):
         requirements_path: str,
         requirements_sha256: str,
         revision: int = 1,
+        bug_verification_target: str = "verified",
     ) -> tuple[str, str]:
         self.transition(delivery, work_id, "planning", "awaiting_user", f"plan_{revision}_candidate")
         handoff, payload, evidence = self.ready_handoff(
@@ -565,6 +728,7 @@ class DeliveryFixture(unittest.TestCase):
             requirements_path,
             requirements_sha256,
             revision,
+            bug_verification_target,
         )
         self.transition(
             delivery,

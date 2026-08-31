@@ -76,6 +76,12 @@ Fixture 放入假秘密、外部 sentinel、惡意 `post-checkout` hook、fsmoni
 
 **Pass：** sandboxed probe 精確回報 `GIT_TRUST_REQUIRED`，不誤報 `NOT_A_REPOSITORY`，message／record 不反射 raw stderr 或 path；orchestrator 取得授權後以相同參數重跑成功。Helper 沒有新增或繞過 `safe.directory`；一般 non-repository failure 仍維持既有 code。
 
+## EVAL-DEL-010 — BUG overlay 與舊版相容
+
+分別建立confirmed／likely bug run、not-a-bug、assessment hash drift、critical severity、partial plan、failed verification、途中current-scope／affecting-current-work／unrelated與pending deferred BUG、generation 2、inbox ID碰撞及缺少全部optional BUG欄位的舊standard record。
+
+**Pass：** diagnosis在worktree前且唯讀；not-a-bug不建立bug run；assessment與Requirements同第一道gate，bug_context與Plan同第二道；severity不繞過；三種途中BUG分別留在Fixing、回Planning reapproval、或只入create-only全域inbox；pending→materialized append-only且generation複製assessment，碰撞不覆寫；failed或pending deferred不得Complete；partial只依核准safeguards並由Reviewer分開判定；舊standard record與phase machine完全相容。
+
 ## 驗證紀錄
 
 每次維護在 `scripts/behavior-evaluation-report.md` 記錄 revision、fixture、隔離方式、每案 Pass／Fail、命令結果、前後 hashes、failure evidence與 fresh Reviewer report；它是開發期產物，不是 runtime reference。

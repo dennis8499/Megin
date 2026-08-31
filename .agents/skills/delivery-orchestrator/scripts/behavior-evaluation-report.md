@@ -183,3 +183,42 @@ Corrected local closure:
 **PASS — no blocking findings.** The independent findings-first Reviewer used a live sentinel-writing textconv control, then proved `_current_implementation_snapshot` did not execute the driver, its raw diff hash matched exactly, and the snapshot ID remained valid. The flag-removal mutation was rejected. Fresh LF-normalized recomputation matched all **18/18** aggregate and branch rows, including total 76,833→77,421 (+588).
 
 The Reviewer also recorded quick validation 4/4, owner validators 4/4, focused terminal regressions 3/3 and schema compatibility 3/3. HEAD, file set, `safe.directory` count and zero-cache state were unchanged; no edit, stage, commit, clean, push, merge, deploy or worktree deletion occurred. Attestation: `independent=true`, `read_only=true`, `report_as_oracle=false`, `write_actions=false`.
+
+## 2026-08-30 — BUG delivery overlay pre-review capture
+
+- Base HEAD: `11316066df74e8b4828bd77ca80c743886d7f283`; isolated Work ID: `work-20260830-bug-diagnosis-flow-590d6e65`.
+- `delivery-run/v1` schema SHA-256: `052b283cb14737c44364119c58764cc309eca53064ca1c090ac99030a7dc1146`.
+- Optional `work_kind`／BUG bindings preserve legacy standard records. Primary assessment joins the first gate; terminal completion separately binds accepted implementation review and nonfailed BUG verification.
+- Deferred current-scope／affecting／unrelated fixtures prove in-run acceptance, Planning reapproval and create-only global inbox routing. Sensitive fixtures bind redacted summary, safe evidence refs and named human ownership through pending→materialized history.
+- Owner validator and quick validation: Pass; mutation suite **16/16 Pass**; public compatibility safety／worktree／transition suite **37/37 Pass** in 170.536 seconds.
+- Owner corpus excluding this report and caches: **20 files, 351,407 bytes, SHA-256 `0d1776da1ac7cbb10e10d14ceca8ee7d1df1b428db609ee6e1d8c3326284e152`**.
+- Fresh read-only Reviewer: pending; pending is not a Pass.
+
+### Findings-first correction before re-review
+
+The first fresh Reviewer returned implementation `CHANGES_REQUIRED` and BUG contract `FAIL`. Corrections now enforce physical terminal-indexed BUG evidence, block partial overclaim in both records, forward in-memory known-secret scans, and reject verification binding before the atomic terminal Complete transition. The Ready command class-name drift was also corrected.
+
+- Corrected owner mutation suite: **18/18 Pass**.
+- Corrected BUG overlay: **9/9 Pass**.
+- Final public safety／worktree／transition compatibility run: **38/38 Pass** in 232.704 seconds.
+- Exact `CMD-RELATED-001`, `CMD-BUILD-FULL-001` and `CMD-TEST-FULL-001` all exited 0; the last command includes the complete 38-case delivery run.
+- Corrected owner corpus excluding this report and caches: **20 files, 363,802 bytes, SHA-256 `bcbdd8da28c8a091e8b1aec1c92bc6b9f46bdc6fb1b46d9e3ee91805c8050375`**.
+- Fresh re-review: pending; the earlier Fail remains preserved and pending is not a Pass.
+
+### Final BUG-flow closure
+
+A second fresh round first found the partial-summary paraphrase bypass and returned `CHANGES_REQUIRED`／`FAIL`. After the owner changed both summary consumers to fail-closed canonical wording and added the exact counterexample, the same independent, read-only Reviewer returned **implementation `APPROVED`; BUG verification contract `PASS`; findings none**. It did not treat this report as an oracle and made no edit, delegation or commit.
+
+- Delivery owner validator and quick validation: Pass; mutation suite **18/18 Pass**.
+- Exact related owner suites: BUG diagnosis **14/14**, Requirements **8/8**, Technical Planning **7/7**, Implementation **13/13**, Delivery mutations **18/18**.
+- Full safety／worktree／transition compatibility suite: **38/38 Pass** in **233.697 seconds**, including BUG overlay, legacy standard records, two approval gates, Complete freeze, generation／resume and terminal evidence validation.
+- Final report-excluding owner corpus: **20 files, 364,228 bytes, SHA-256 `a69661f9cbec2f9b6fe65aefbc75c488c0ed9a3fdacb9bd651ecca7f06bc8447`**.
+
+The historical Fail rounds remain visible; the final Pass applies only to the corrected snapshot.
+
+## 2026-08-31 — Plan revision 3 superseding evidence capture
+
+- Owner validator and skill quick validation pass; mutation guards are **20/20 Pass** and the complete safety／worktree／transition suite is **43/43 Pass**. Report-excluding corpus: **20 files, 400,296 bytes, SHA-256 `ca90e3813b562f8f7321ccd5c30f993e72d5d8802a1d277aacf36ffc33d203a8`**.
+- Raw assessment and verification JSON are strictly checked before parsing and duplicate keys fail closed without reproducing known-value markers. Generation materialization, redirected-path rejection, inbox rollback／matching-orphan adoption, deferred three-way routing, two approvals, terminal evidence and Complete freeze remain covered.
+- The integrated author run passed **91/91** tests, five owner validators, five skill quick validations and `git diff --check`. The final fresh Reviewer independently passed Delivery mutations **20/20**, BUG overlay **14/14** and terminal **8/8**.
+- That Reviewer found no Delivery implementation issue; its sole blocking observation was the diagnosis report's stale header, corrected in this report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger and will be authoritative for the final verdict.

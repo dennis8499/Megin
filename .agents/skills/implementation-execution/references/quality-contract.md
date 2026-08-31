@@ -35,6 +35,8 @@
 | Terminal order | Reviewer 與主代理的 before／after snapshots 相同，report 保存後才 append `Complete` |
 | Ledger continuity | state／WP histories、commands、diffs、reviews、breaker、resume 與 revision attempts 都可重現且 append-only |
 | Revision／breaker | WP-local／global 分流正確；stable counters 在指定門檻停止，未提前或延後 |
+| BUG verification | BUG plan有正確regression red→green與create-only `bug-verification/v1`；implementation verdict與BUG result分開。verified具原始症狀pre／post，partial具核准proxy、殘餘風險與follow-up，failed不可Complete |
+| Discovered BUG | current-scope／affecting-current-work／unrelated分流正確；不順手修unrelated，pending evidence在review／terminal前materialize且全域inbox不覆寫 |
 
 ## 判定
 

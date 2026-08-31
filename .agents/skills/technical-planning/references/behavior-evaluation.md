@@ -105,6 +105,12 @@ python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contra
 
 **Pass：** 前兩類都在零產品變更下停止，要求 producer 重新規劃、完整展示與重新核准；不得由 executor 或交接回覆補值。第三類結束規劃，提供 Primary 與 `handoff.json` paths 並指出 `$implementation-execution` consumer；`technical-planning` 本身不修改產品程式碼或啟動實作。
 
+## EVAL-008 — BUG plan 與 partial safeguards
+
+以同一Requirements分別提供可重現confirmed assessment、無法重現的likely assessment、錯誤assessment hash與舊版standard ready-plan fixture。
+
+**Pass：** 可重現分支形成含唯一bug source、bug-reproduction command、regression refs與verified target的Candidate；無法重現只有在低信心reason、proxy red→green、residual risks與staging／人工follow-up完整時形成partial Candidate，且不宣稱verified。Hash mismatch停止；舊standard plan省略optional overlay仍通過。
+
 ## 驗證紀錄
 
 每次維護至少記錄 Skill revision、evaluator 隔離方式、每個 `EVAL-*` 的 `Pass`／`Fail`、失敗證據及前後狀態差異。這份紀錄是執行產物，不寫入 runtime Skill references。

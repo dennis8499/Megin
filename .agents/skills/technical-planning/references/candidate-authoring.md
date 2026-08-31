@@ -43,6 +43,19 @@ Ready 計畫提供可執行的 outside-in contract。先沿用 manifests、lockf
 
 同一 WP 的 scenarios 依序執行；目前 `BDD-*` 取得正確 red、完成映射的 inner TDD 並 green 後，才開始下一個。非行為品質驗收若無法自動化，記錄理由、可判定程序與證據。
 
+## BUG 修復 overlay
+
+### Primary BUG plan
+
+只有source assessment verdict為`confirmed | likely`且Requirements已核准時建立`bug_context`。它綁定assessment JSON／Markdown hashes、reproduction／root-cause狀態、verification target、original reproduction command與regression BDD／TEST refs。
+
+- `verified`：original symptom已`reproduced | intermittent`且有`purpose: bug-reproduction` command；regression oracle必須能在修正前取得正確red並在修正後重跑原始症狀。
+- `partial`：只用於原始症狀不能可靠pre/post；root cause維持低信心，並明列reason、proxy BDD／TEST red→green、residual risks及staging／具名人工follow-up。Reason明示不確定性，每項risk保留風險／可能性，每項follow-up使用驗證動作；不得用任何同義改寫把partial描述成已確定修復或validated／verified。
+
+修法保持一個最小causal change。若實際red推翻assessment、修法失敗或scope擴大，計畫的執行分支是upstream reapproval，不是追加第二個猜測patch。
+
+Standard delivery途中`affecting-current-work`回流的assessment，在重新核准WHAT後以`kind: supporting` evidence追溯，不建立`bug_context`。Primary `kind: bug`只用於已通過delivery assessment gate的bug work；若需要獨立primary bugfix則另開Work，不在Planning暗中轉換work kind。
+
 ## 測試策略
 
 Interface 是預設測試面。每個 `TEST-*` 固定目的、層級／`SEAM-*`、fixture、前置狀態、獨立 oracle、替身、正確 red 與 focused／related command。使用能穩定證明行為的最高 seam；純邏輯才下沉 unit，契約／Adapter 使用 integration 或 contract，關鍵旅程只保留必要 E2E。
