@@ -404,6 +404,19 @@ def validate_ready_cross_references(data: dict[str, Any]) -> list[str]:
                 errors.append(f"ready: source {source['source_id']} references unknown {wp_ref}")
             elif source["source_id"] not in packages[wp_ref].get("source_refs", []):
                 errors.append(f"ready: source {source['source_id']} and {wp_ref} mapping is not symmetric")
+        source_wp_refs = set(source.get("wp_refs", []))
+        for required_kind in ("bdd-scenario", "inner-test"):
+            has_direct_shared_coverage = any(
+                contract.get("kind") == required_kind
+                and source["source_id"] in contract.get("source_refs", [])
+                and bool(source_wp_refs.intersection(contract.get("wp_refs", [])))
+                for contract in contracts.values()
+            )
+            if not has_direct_shared_coverage:
+                errors.append(
+                    f"ready: source {source['source_id']} has no direct "
+                    f"{required_kind} contract sharing a WP"
+                )
     for contract in contracts.values():
         for source_ref in contract.get("source_refs", []):
             if source_ref not in sources:

@@ -1,0 +1,65 @@
+{
+  "schema": "bug-assessment/v1",
+  "bug_id": "bug-knowledge-outcome-create-only-toctou",
+  "revision": 1,
+  "markdown": {
+    "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-1.md",
+    "sha256": "e8cefc07010a8ea3482c3cb837cdf412bff620e57aee474b2dd66eb3fcda5e5a"
+  },
+  "source": {
+    "relation": "current-scope",
+    "work_id": "work-20260831-project-knowledge-system-19202d78",
+    "reported_by": "fresh preliminary product review round 2",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-diagnosis.json",
+      "host-temp:commands/preliminary-r2-fresh-retry-fixing/windows-WP-003-red.txt",
+      "host-temp:reviews/preliminary-r2-fresh-retry/report.json#FINDING-002"
+    ]
+  },
+  "observed_behavior": "A pair target created after the existence check is overwritten, and rollback unconditionally removes an earlier target even when it was independently changed.",
+  "expected_behavior": "Preliminary review and Outcome pairs publish atomically create-only, preserve every competitor, return the correct collision code, and roll back only writer-owned bytes.",
+  "impact": "Review evidence or implementation Outcome history can be silently replaced, invalidating create-only revisions and the audit chain.",
+  "verdict": "confirmed",
+  "severity": "high",
+  "reproduction": {
+    "status": "reproduced",
+    "symptom_oracle": "Both the second-target competitor and the independently changed first target remain byte-identical while the writer returns its requested collision code.",
+    "steps": [
+      "Stage a two-file create-only pair with both destinations initially absent.",
+      "Independently change the first destination after its publication and create the second destination immediately before its publication.",
+      "Run once with OUTCOME_EXISTS and once with PRELIMINARY_REVIEW_EXISTS."
+    ],
+    "sample": "Before the fix, the two new subtests were the only failures in the 22-test workflow suite because KnowledgeError was not raised; the reviewer probe reported competitor_bytes_preserved=false.",
+    "command_refs": [
+      "host-temp:commands/preliminary-r2-fresh-retry-fixing/windows-WP-003-red.txt"
+    ],
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-diagnosis.json",
+      "host-temp:reviews/preliminary-r2-fresh-retry/outputs/08-outcome-create-only-toctou-windows.json"
+    ]
+  },
+  "root_cause": {
+    "status": "confirmed",
+    "confidence": "high",
+    "summary": "_write_pair_create_only implements create-only as a non-atomic exists-check followed by os.replace and unconditionally unlinks committed targets during rollback.",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-diagnosis.json"
+    ]
+  },
+  "hypotheses": [],
+  "active_hypothesis_id": null,
+  "risk": {
+    "security_privacy_or_data_risk": false,
+    "redacted_summary": null,
+    "secure_evidence_refs": [],
+    "human_reviewer": null
+  },
+  "disposition": "current-run",
+  "evidence_refs": [
+    "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-diagnosis.json",
+    "host-temp:commands/preliminary-r2-fresh-retry-fixing/windows-WP-003-red.txt",
+    "host-temp:reviews/preliminary-r2-fresh-retry/report.json#FINDING-002"
+  ],
+  "next_action": "Implementation executor uses atomic no-replace file publication and atomic ownership retirement for rollback, then reruns workflow, Windows/Linux full verification and fresh review.",
+  "created_at": "2026-09-01T16:33:00Z"
+}

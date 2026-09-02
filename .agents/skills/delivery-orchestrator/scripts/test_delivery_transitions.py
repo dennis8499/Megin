@@ -86,7 +86,718 @@ def persist_bug_assessment(
     return assessment_relative, digest(sidecar), markdown_relative, digest(markdown)
 
 
+def persist_knowledge_receipt(
+    delivery: Path,
+    work_id: str,
+    *,
+    stage: str,
+    approval_evidence: str,
+    formal_paths: list[str],
+) -> dict[str, str]:
+    promotion_id = f"promotion-{stage}-{hashlib.sha256(work_id.encode('utf-8')).hexdigest()[:12]}"
+    candidate_ref = f"knowledge:candidates/{promotion_id}/candidate.json"
+    payload_sha256 = hashlib.sha256(f"{work_id}:{stage}".encode("utf-8")).hexdigest()
+    relative = f"docs/knowledge/meta/promotions/{promotion_id}.json"
+    path = delivery / Path(*relative.split("/"))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "knowledge-promotion/v1",
+                "promotion_id": promotion_id,
+                "stage": stage,
+                "work_id": work_id,
+                "candidate_ref": candidate_ref,
+                "payload_sha256": payload_sha256,
+                "decision": "no-change",
+                "formal_paths": formal_paths,
+                "approval": {
+                    "actor": "delivery-test-owner",
+                    "evidence": approval_evidence,
+                },
+                "lint": {"required_outcome": "passed"},
+                "status": "Ready",
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    receipts = [
+        json.loads(candidate.read_text(encoding="utf-8"))
+        for candidate in sorted(path.parent.glob("*.json"))
+    ]
+    rows = sorted(
+        (
+            item["promotion_id"],
+            item["candidate_ref"],
+            item["payload_sha256"],
+        )
+        for item in receipts
+    )
+    log = delivery / "docs/knowledge/log.md"
+    log.write_text(
+        "# Knowledge Promotion Log\n\n"
+        + "".join(
+            f"- `{promotion}` — `Ready` — `{candidate}` — `{payload}`\n"
+            for promotion, candidate, payload in rows
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    return {
+        "knowledge_candidate_ref": candidate_ref,
+        "knowledge_candidate_payload_sha256": payload_sha256,
+        "knowledge_promotion_id": promotion_id,
+        "knowledge_receipt_path": relative,
+        "knowledge_receipt_sha256": digest(path),
+        "knowledge_approval_evidence": approval_evidence,
+    }
+
+
+def persist_preliminary_outcome(
+    delivery: Path,
+    work_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    """Persist a real preliminary fresh review, then derive the implementation outcome."""
+
+    delivery_record._knowledge_delivery_module()
+    import knowledge_outcome
+
+    run_dir = (
+        Path(tempfile.gettempdir()).resolve()
+        / "implementation-execution"
+        / "runs"
+        / run_id
+    )
+    run_dir.mkdir(parents=True)
+    handoff_relative = f"docs/work/{work_id}/plan/handoff.json"
+    handoff = json.loads(
+        (delivery / Path(*handoff_relative.split("/"))).read_text(encoding="utf-8")
+    )
+    (run_dir / "run.json").write_text(
+        json.dumps(
+            {
+                "schema": "implementation-ledger/v1",
+                "run_id": run_id,
+                "binding": {
+                    "canonical_worktree": str(delivery),
+                    "run_id": run_id,
+                },
+                "handoff_path": handoff_relative,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    logical_ref = "review:fresh-review:delivery-preliminary-r1"
+    report_ref = "reviews/preliminary-r1/report.json"
+    review_commands = [
+        command
+        for command in handoff["commands"]
+        if command["purpose"] in {"bdd-full", "build-full", "test-full"}
+    ]
+    output_refs = {
+        command["command_id"]: (
+            f"reviews/preliminary-r1/outputs/{command['command_id']}.txt"
+        )
+        for command in review_commands
+    }
+    report = {
+        "schema": "implementation-review/v1",
+        "logical_ref": logical_ref,
+        "round": 1,
+        "verdict": "APPROVED",
+        "snapshot_before": "a" * 64,
+        "snapshot_after": "a" * 64,
+        "attestation": {
+            "agent_id": "preliminary-fresh-reviewer",
+            "fresh_session": True,
+            "read_only": True,
+            "implementation_conversation_received": False,
+            "delegation_used": False,
+            "write_actions": False,
+        },
+        "command_outcomes": [
+            {
+                "command_id": command["command_id"],
+                "outcome": "passed",
+                "exit_code": 0,
+                "failure_count": 0,
+                "skipped_count": 0,
+                "output_ref": output_refs[command["command_id"]],
+                "not_run_reason": None,
+            }
+            for command in review_commands
+        ],
+        "raw_output_refs": list(output_refs.values()),
+        "requirement_coverage": [
+            {
+                "source_ref": "SRC-001",
+                "obligation_ref": "REQ-001",
+                "bdd_refs": ["BDD-001"],
+                "test_refs": ["TEST-001"],
+                "wp_refs": ["WP-001"],
+                "code_evidence": ["app.txt:1"],
+                "result": "covered",
+            }
+        ],
+        "findings": [],
+        "summary": "Preliminary fresh review approved the verified product snapshot.",
+    }
+    persisted = knowledge_outcome.persist_preliminary_review_report(
+        implementation_run_id=run_id,
+        report_ref=report_ref,
+        report=report,
+        raw_outputs={
+            relative: f"{command_id} passed\n"
+            for command_id, relative in output_refs.items()
+        },
+    )
+    return knowledge_outcome.write_implementation_outcome(
+        str(delivery),
+        work_id=work_id,
+        implementation_run_id=run_id,
+        work_kind="standard",
+        result="complete",
+        summary="The implementation passed preliminary fresh review.",
+        changes=[{"path": "app.txt", "summary": "Preserved the approved product behavior."}],
+        verification=[
+            {
+                "command_id": "CMD-TEST-FULL-001",
+                "outcome": "passed",
+                "evidence_refs": [output_refs["CMD-TEST-FULL-001"]],
+            }
+        ],
+        review={
+            "verdict": persisted["verdict"],
+            "evidence_refs": [persisted["logical_ref"]],
+            "report_ref": persisted["report_ref"],
+            "report_sha256": persisted["report_sha256"],
+        },
+        known_deviations=[],
+        knowledge_decision="no-change",
+        bug_verification_ref=None,
+        created_at="2026-08-31T12:00:00+08:00",
+    )
+
+
 class DeliveryTransitionTests(DeliveryFixture):
+    def test_new_records_require_knowledge_while_legacy_records_remain_valid(self) -> None:
+        required_primary = self.make_repo("required-project")
+        required_delivery = Path(
+            self.start_required(required_primary, "required-knowledge-work")["worktree"]
+        )
+        required = self.record(required_delivery, "required-knowledge-work")
+        self.assertEqual("required", required["knowledge_gate"]["policy"])
+        self.assertIsNone(required["knowledge_gate"]["candidate_ref"])
+        self.assertEqual([], workspace.validate_record(required))
+
+        legacy_primary = self.make_repo("legacy-project")
+        legacy_delivery = Path(self.start(legacy_primary, "legacy-knowledge-work")["worktree"])
+        legacy = self.record(legacy_delivery, "legacy-knowledge-work")
+        self.assertNotIn("knowledge_gate", legacy)
+        self.assertEqual([], workspace.validate_record(legacy))
+
+    def test_required_overlay_blocks_direct_complete_until_reviewed_promotion(self) -> None:
+        primary = self.make_repo()
+        delivery = Path(self.start(primary, "knowledge-gate-work")["worktree"])
+        self.enter_requirements(delivery, "knowledge-gate-work")
+        requirements_path, requirements_sha = self.approve_requirements(
+            delivery,
+            "knowledge-gate-work",
+        )
+        self.approve_plan(
+            delivery,
+            "knowledge-gate-work",
+            requirements_path,
+            requirements_sha,
+        )
+        self.transition(
+            delivery,
+            "knowledge-gate-work",
+            "implementation",
+            "active",
+            "enable_knowledge",
+            enable_knowledge=True,
+            evidence_refs=[
+                "conversation:knowledge-bootstrap-approved",
+                requirements_path,
+                "docs/work/knowledge-gate-work/plan/handoff.json",
+            ],
+        )
+
+        fabricated_relative = "docs/work/knowledge-gate-work/implementation/outcome.json"
+        fabricated_path = delivery / Path(*fabricated_relative.split("/"))
+        fabricated_path.parent.mkdir(parents=True, exist_ok=True)
+        fabricated_path.write_text(
+            json.dumps(
+                {
+                    "schema": "implementation-outcome/v1",
+                    "work_id": "knowledge-gate-work",
+                    "review": {"verdict": "APPROVED"},
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        self.assert_error(
+            "INVALID_KNOWLEDGE_OUTCOME",
+            lambda: delivery_record._validated_knowledge_outcome(
+                self.record(delivery, "knowledge-gate-work"),
+                path=fabricated_relative,
+                expected_sha256=digest(fabricated_path),
+                known_secret_values=(),
+            ),
+        )
+        fabricated_path.unlink()
+        run_id = hashlib.sha256(f"{self.root}:knowledge-gate-work".encode("utf-8")).hexdigest()
+        outcome = persist_preliminary_outcome(
+            delivery,
+            "knowledge-gate-work",
+            run_id,
+        )
+        outcome_relative = outcome["path"]
+        outcome_path = delivery / Path(*outcome_relative.split("/"))
+        ledger_ref, review_ref, snapshot_ref = self.persist_complete_implementation(
+            delivery,
+            "knowledge-gate-work",
+            run_id,
+            allow_preexisting_review_evidence=True,
+        )
+        implementation_root = (
+            Path(tempfile.gettempdir()).resolve()
+            / "implementation-execution"
+            / "runs"
+            / run_id
+        )
+        preliminary_path = implementation_root / "reviews/preliminary-r1/report.json"
+        original_preliminary_raw = preliminary_path.read_bytes()
+        original_outcome_raw = outcome_path.read_bytes()
+        misbound_preliminary = json.loads(original_preliminary_raw.decode("utf-8"))
+        misbound_preliminary["requirement_coverage"][0]["obligation_ref"] = "REQ-404"
+        preliminary_path.write_text(
+            json.dumps(
+                misbound_preliminary,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        misbound_outcome = json.loads(original_outcome_raw.decode("utf-8"))
+        misbound_outcome["review"]["report_sha256"] = digest(preliminary_path)
+        outcome_path.write_text(
+            json.dumps(misbound_outcome, ensure_ascii=False, sort_keys=True, indent=2)
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        delivery_binding = copy.deepcopy(self.record(delivery, "knowledge-gate-work"))
+        delivery_binding["implementations"]["current_run_id"] = run_id
+        self.assert_error(
+            "INVALID_KNOWLEDGE_OUTCOME",
+            lambda: delivery_record._validated_knowledge_outcome(
+                delivery_binding,
+                path=outcome_relative,
+                expected_sha256=digest(outcome_path),
+                known_secret_values=(),
+            ),
+        )
+        preliminary_path.write_bytes(original_preliminary_raw)
+        outcome_path.write_bytes(original_outcome_raw)
+        snapshot = json.loads((implementation_root / "diffs/reviewed-snapshot.json").read_text(encoding="utf-8"))
+        knowledge_module = delivery_record._knowledge_delivery_module()
+        from knowledge_promotion import apply_candidate, seal_candidate_draft
+
+        sealed = seal_candidate_draft(
+            str(delivery),
+            draft={
+                "schema": "knowledge-candidate-draft/v1",
+                "stage": "implementation",
+                "work_id": "knowledge-gate-work",
+                "decision": "no-change",
+                "source_snapshot": [],
+                "operations": [],
+            },
+            approval_actor="knowledge-owner",
+            approval_evidence="conversation:knowledge-promotion-approved",
+        )
+        snapshot_binding = knowledge_module.build_knowledge_snapshot(
+            str(delivery),
+            sealed=sealed,
+        )
+        knowledge_snapshot = snapshot_binding["snapshot_id"]
+        candidate_ref = sealed["candidate_ref"]
+        candidate_payload = sealed["payload_sha256"]
+        review_path = implementation_root / review_ref.removeprefix("implementation:")
+        review = json.loads(review_path.read_text(encoding="utf-8"))
+        review.update(
+            {
+                "knowledge_snapshot_before": knowledge_snapshot,
+                "knowledge_snapshot_after": knowledge_snapshot,
+                "knowledge_candidate_ref": candidate_ref,
+                "knowledge_candidate_payload_sha256": candidate_payload,
+            }
+        )
+        review_path.write_text(
+            json.dumps(review, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        terminal_refs = [ledger_ref, review_ref, snapshot_ref, outcome_relative]
+        self.assert_error(
+            "KNOWLEDGE_GATE_REQUIRED",
+            lambda: self.transition(
+                delivery,
+                "knowledge-gate-work",
+                "complete",
+                "complete",
+                "direct_complete_forbidden",
+                implementation_run_id=run_id,
+                implementation_ledger_ref=ledger_ref,
+                implementation_status="Complete",
+                evidence_refs=terminal_refs,
+            ),
+        )
+        review["attestation"]["agent_id"] = "preliminary-fresh-reviewer"
+        review_path.write_text(
+            json.dumps(review, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        self.assert_error(
+            "INVALID_KNOWLEDGE_REVIEW",
+            lambda: self.transition(
+                delivery,
+                "knowledge-gate-work",
+                "knowledge",
+                "active",
+                "same_reviewer_identity_rejected",
+                implementation_run_id=run_id,
+                implementation_ledger_ref=ledger_ref,
+                implementation_status="Complete",
+                knowledge_candidate_ref=candidate_ref,
+                knowledge_candidate_payload_sha256=candidate_payload,
+                knowledge_snapshot_before=knowledge_snapshot,
+                knowledge_snapshot_after=knowledge_snapshot,
+                knowledge_product_snapshot_id=snapshot["snapshot_id"],
+                knowledge_outcome_path=outcome_relative,
+                knowledge_outcome_sha256=digest(outcome_path),
+                evidence_refs=terminal_refs,
+            ),
+        )
+        review["attestation"]["agent_id"] = "fresh-reviewer"
+        review_path.write_text(
+            json.dumps(review, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        reviewed = self.transition(
+            delivery,
+            "knowledge-gate-work",
+            "knowledge",
+            "active",
+            "implementation_review_approved",
+            implementation_run_id=run_id,
+            implementation_ledger_ref=ledger_ref,
+            implementation_status="Complete",
+            knowledge_candidate_ref=candidate_ref,
+            knowledge_candidate_payload_sha256=candidate_payload,
+            knowledge_snapshot_before=knowledge_snapshot,
+            knowledge_snapshot_after=knowledge_snapshot,
+            knowledge_product_snapshot_id=snapshot["snapshot_id"],
+            knowledge_outcome_path=outcome_relative,
+            knowledge_outcome_sha256=digest(outcome_path),
+            evidence_refs=terminal_refs,
+        )
+        self.assertEqual(("knowledge", "active"), (reviewed["phase"], reviewed["status"]))
+        awaiting = self.transition(
+            delivery,
+            "knowledge-gate-work",
+            "knowledge",
+            "awaiting_user",
+            "knowledge_candidate_presented",
+        )
+        self.assertEqual("awaiting_user", awaiting["status"])
+
+        applied = apply_candidate(
+            str(delivery),
+            candidate_ref=candidate_ref,
+            approval_actor="knowledge-owner",
+            approval_evidence="conversation:knowledge-promotion-approved",
+        )
+        promotion_id = applied["promotion"]["promotion_id"]
+        receipt_relative = applied["receipt_path"]
+        receipt_path = delivery / Path(*receipt_relative.split("/"))
+        unreviewed = delivery / "docs/knowledge/glossary.md"
+        unreviewed.write_text(
+            "# Unreviewed but lint-valid knowledge\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        self.assert_error(
+            "KNOWLEDGE_SNAPSHOT_DRIFT",
+            lambda: self.transition(
+                delivery,
+                "knowledge-gate-work",
+                "complete",
+                "complete",
+                "knowledge_promotion_snapshot_bypass",
+                knowledge_promotion_id=promotion_id,
+                knowledge_receipt_path=receipt_relative,
+                knowledge_receipt_sha256=digest(receipt_path),
+                knowledge_approval_evidence="conversation:knowledge-promotion-approved",
+                evidence_refs=[*terminal_refs, receipt_relative, outcome_relative],
+            ),
+        )
+        unreviewed.unlink()
+        completed = self.transition(
+            delivery,
+            "knowledge-gate-work",
+            "complete",
+            "complete",
+            "knowledge_promotion_applied",
+            knowledge_promotion_id=promotion_id,
+            knowledge_receipt_path=receipt_relative,
+            knowledge_receipt_sha256=digest(receipt_path),
+            knowledge_approval_evidence="conversation:knowledge-promotion-approved",
+            evidence_refs=[*terminal_refs, receipt_relative, outcome_relative],
+        )
+        self.assertEqual(("complete", "complete"), (completed["phase"], completed["status"]))
+        record = self.record(delivery, "knowledge-gate-work")
+        self.assertEqual(promotion_id, record["knowledge_gate"]["current_promotion_id"])
+        self.assertEqual([], workspace.validate_record(record))
+
+    def test_required_new_run_co_gates_requirements_and_plan_promotions(self) -> None:
+        primary = self.make_repo()
+        delivery = Path(self.start_required(primary, "required-stage-gates")["worktree"])
+        self.enter_requirements(delivery, "required-stage-gates")
+        requirements_relative = "docs/work/required-stage-gates/requirements.md"
+        requirements_path = delivery / Path(*requirements_relative.split("/"))
+        requirements_path.parent.mkdir(parents=True, exist_ok=True)
+        requirements_path.write_text("# Requirements\n\nStatus: Ready\n", encoding="utf-8", newline="\n")
+        requirement_fields = {
+            "requirements_path": requirements_relative,
+            "requirements_sha256": digest(requirements_path),
+            "requirements_approval_refs": ["conversation:req-stage-gate"],
+        }
+        self.assert_error(
+            "MISSING_KNOWLEDGE_GATE",
+            lambda: self.transition(
+                delivery,
+                "required-stage-gates",
+                "planning",
+                "active",
+                "requirements_without_knowledge",
+                **requirement_fields,
+            ),
+        )
+        requirements_promotion = persist_knowledge_receipt(
+            delivery,
+            "required-stage-gates",
+            stage="requirements",
+            approval_evidence="conversation:req-stage-gate",
+            formal_paths=[requirements_relative],
+        )
+        requirements_receipt_path = delivery / Path(
+            *requirements_promotion["knowledge_receipt_path"].split("/")
+        )
+        requirements_receipt = json.loads(
+            requirements_receipt_path.read_text(encoding="utf-8")
+        )
+        requirements_receipt_without_manifest = copy.deepcopy(requirements_receipt)
+        requirements_receipt_without_manifest.pop("formal_paths")
+        requirements_receipt_path.write_text(
+            json.dumps(
+                requirements_receipt_without_manifest,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        requirements_promotion["knowledge_receipt_sha256"] = digest(
+            requirements_receipt_path
+        )
+        self.assert_error(
+            "INVALID_KNOWLEDGE_PROMOTION",
+            lambda: self.transition(
+                delivery,
+                "required-stage-gates",
+                "planning",
+                "active",
+                "requirements_without_formal_paths",
+                evidence_refs=[
+                    "conversation:req-stage-gate",
+                    requirements_promotion["knowledge_receipt_path"],
+                ],
+                **requirement_fields,
+                **requirements_promotion,
+            ),
+        )
+        requirements_receipt_path.write_text(
+            json.dumps(
+                requirements_receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        requirements_promotion["knowledge_receipt_sha256"] = digest(
+            requirements_receipt_path
+        )
+        self.transition(
+            delivery,
+            "required-stage-gates",
+            "planning",
+            "active",
+            "requirements_with_knowledge",
+            evidence_refs=[
+                "conversation:req-stage-gate",
+                requirements_promotion["knowledge_receipt_path"],
+            ],
+            **requirement_fields,
+            **requirements_promotion,
+        )
+        self.transition(
+            delivery,
+            "required-stage-gates",
+            "planning",
+            "awaiting_user",
+            "plan_candidate",
+        )
+        handoff_path, payload, evidence = self.ready_handoff(
+            delivery,
+            "required-stage-gates",
+            requirements_relative,
+            digest(requirements_path),
+        )
+        plan_fields = {
+            "handoff_path": handoff_path,
+            "candidate_revision": "candidate-1",
+            "payload_sha256": payload,
+            "plan_approval_refs": [evidence],
+        }
+        self.assert_error(
+            "MISSING_KNOWLEDGE_GATE",
+            lambda: self.transition(
+                delivery,
+                "required-stage-gates",
+                "implementation",
+                "active",
+                "plan_without_knowledge",
+                **plan_fields,
+            ),
+        )
+        plan_promotion = persist_knowledge_receipt(
+            delivery,
+            "required-stage-gates",
+            stage="planning",
+            approval_evidence=evidence,
+            formal_paths=sorted(
+                {
+                    handoff_path,
+                    *(
+                        artifact["path"]
+                        for artifact in json.loads(
+                            (
+                                delivery / Path(*handoff_path.split("/"))
+                            ).read_text(encoding="utf-8")
+                        )["artifacts"]
+                    ),
+                },
+                key=lambda value: value.encode("utf-8"),
+            ),
+        )
+        plan_receipt_path = delivery / Path(
+            *plan_promotion["knowledge_receipt_path"].split("/")
+        )
+        plan_receipt = json.loads(plan_receipt_path.read_text(encoding="utf-8"))
+        incomplete_plan_receipt = copy.deepcopy(plan_receipt)
+        incomplete_plan_receipt["formal_paths"] = [handoff_path]
+        plan_receipt_path.write_text(
+            json.dumps(
+                incomplete_plan_receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        plan_promotion["knowledge_receipt_sha256"] = digest(plan_receipt_path)
+        self.assert_error(
+            "INVALID_KNOWLEDGE_PROMOTION",
+            lambda: self.transition(
+                delivery,
+                "required-stage-gates",
+                "implementation",
+                "active",
+                "plan_with_incomplete_formal_paths",
+                evidence_refs=[evidence, plan_promotion["knowledge_receipt_path"]],
+                **plan_fields,
+                **plan_promotion,
+            ),
+        )
+        plan_receipt_path.write_text(
+            json.dumps(
+                plan_receipt,
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        plan_promotion["knowledge_receipt_sha256"] = digest(plan_receipt_path)
+        result = self.transition(
+            delivery,
+            "required-stage-gates",
+            "implementation",
+            "active",
+            "plan_with_knowledge",
+            evidence_refs=[evidence, plan_promotion["knowledge_receipt_path"]],
+            **plan_fields,
+            **plan_promotion,
+        )
+        self.assertEqual("implementation", result["phase"])
+        record = self.record(delivery, "required-stage-gates")
+        self.assertEqual(
+            ["requirements", "planning"],
+            [item["stage"] for item in record["knowledge_gate"]["promotions"]],
+        )
+        self.assertEqual(
+            [
+                requirements_receipt["formal_paths"],
+                plan_receipt["formal_paths"],
+            ],
+            [
+                item["formal_paths"]
+                for item in record["knowledge_gate"]["promotions"]
+            ],
+        )
+        self.assertEqual([], workspace.validate_record(record))
+
     def test_blocked_recovery_must_resume_the_same_phase(self) -> None:
         primary = self.make_repo()
         delivery = Path(self.start(primary, "blocked-work")["worktree"])
@@ -243,6 +954,7 @@ class DeliveryBugOverlayTests(DeliveryFixture):
             root=self.registry,
             work_kind="bug",
             bug_id="bug-sample-failure",
+            knowledge_policy="legacy",
         )
         return Path(started["worktree"])
 
@@ -1452,6 +2164,9 @@ class DeliveryTerminalContractTests(DeliveryFixture):
             }
         )
         extra_spec["work_packages"][0]["source_refs"].append("SRC-002")
+        for contract in extra_spec["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["source_refs"].append("SRC-002")
         extra_spec["candidate"]["payload_sha256"] = workspace._ready_payload_sha256(extra_spec)
         self.assertEqual([], validator.validate_instance(extra_spec, workspace._ready_plan_schema()))
         self.assertEqual([], validator.validate_ready_cross_references(extra_spec))
@@ -1495,7 +2210,7 @@ class DeliveryTerminalContractTests(DeliveryFixture):
         branch = git(primary, "show-ref", "--verify", "refs/heads/delivery/drift-work-r2", check=False)
         self.assertNotEqual(0, branch.returncode)
 
-    def test_generation_rejects_base_byte_mismatch_before_git_mutation(self) -> None:
+    def test_plan_admission_rejects_base_byte_mismatch_before_git_mutation(self) -> None:
         primary = self.make_repo()
         (primary / ".gitattributes").write_text("app.txt eol=crlf\n", encoding="utf-8", newline="\n")
         git(primary, "add", ".gitattributes")
@@ -1525,36 +2240,41 @@ class DeliveryTerminalContractTests(DeliveryFixture):
             }
         )
         handoff["work_packages"][0]["source_refs"].append("SRC-002")
+        for contract in handoff["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["source_refs"].append("SRC-002")
         handoff["candidate"]["payload_sha256"] = workspace._ready_payload_sha256(handoff)
         handoff_file.write_text(
             json.dumps(handoff, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
             newline="\n",
         )
-        self.transition(
-            delivery,
-            "base-bytes-work",
-            "implementation",
-            "active",
-            "plan_approved",
-            handoff_path=handoff_path,
-            candidate_revision="candidate-1",
-            payload_sha256=handoff["candidate"]["payload_sha256"],
-            plan_approval_refs=[evidence],
-        )
         base_bytes = git(primary, "show", "HEAD:app.txt").stdout
         self.assertNotEqual(hashlib.sha256(base_bytes).hexdigest(), digest(delivery / "app.txt"))
         before_worktrees = git(primary, "worktree", "list", "--porcelain").stdout
         self.assert_error(
             "SOURCE_NOT_MATERIALIZABLE",
-            lambda: self.start(primary, "base-bytes-work", generation=2),
+            lambda: self.transition(
+                delivery,
+                "base-bytes-work",
+                "implementation",
+                "active",
+                "plan_approved",
+                handoff_path=handoff_path,
+                candidate_revision="candidate-1",
+                payload_sha256=handoff["candidate"]["payload_sha256"],
+                plan_approval_refs=[evidence],
+            ),
         )
         self.assertEqual(before_worktrees, git(primary, "worktree", "list", "--porcelain").stdout)
         destination = primary.parent / f"{primary.name}.worktrees" / "base-bytes-work-r2"
         self.assertFalse(destination.exists())
         branch = git(primary, "show-ref", "--verify", "refs/heads/delivery/base-bytes-work-r2", check=False)
         self.assertNotEqual(0, branch.returncode)
-        self.assertEqual(1, self.record(primary, "base-bytes-work")["current_generation"])
+        record = self.record(primary, "base-bytes-work")
+        self.assertEqual(1, record["current_generation"])
+        self.assertEqual("planning", record["phase"])
+        self.assertIsNone(record["plans"]["current_handoff_path"])
 
 
     def test_unmaterialized_local_ready_source_is_rejected_before_implementation(self) -> None:
@@ -1585,6 +2305,9 @@ class DeliveryTerminalContractTests(DeliveryFixture):
             }
         )
         handoff["work_packages"][0]["source_refs"].append("SRC-002")
+        for contract in handoff["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["source_refs"].append("SRC-002")
         handoff["candidate"]["payload_sha256"] = workspace._ready_payload_sha256(handoff)
         handoff_file.write_text(
             json.dumps(handoff, ensure_ascii=False, sort_keys=True, indent=2) + "\n",

@@ -1,0 +1,68 @@
+{
+  "schema": "bug-assessment/v1",
+  "bug_id": "bug-knowledge-promotion-retirement-read-failure",
+  "revision": 1,
+  "markdown": {
+    "path": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.md",
+    "sha256": "f3d1bf38269b69ca06c4f7bc93add93a470ea1b56baf40594f508e5992eef604"
+  },
+  "source": {
+    "relation": "current-scope",
+    "work_id": "work-20260831-project-knowledge-system-19202d78",
+    "reported_by": "fresh preliminary product review round 3",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-promotion-retirement-read-failure-diagnosis.json",
+      "host-temp:commands/preliminary-r3-fixing/windows-WP-002-red-retry-2.json",
+      "host-temp:reviews/preliminary-r3-fresh/report.json#PRELIM-R3-001"
+    ]
+  },
+  "observed_behavior": "An update retirement read fault leaves the canonical target missing, strands the approved preimage below commit-boundary, and lets caller rollback record a rolled_back journal.",
+  "expected_behavior": "Every failure after update retirement restores the approved preimage, or leaves the transaction explicitly recovery-required when a competing target prevents restoration.",
+  "impact": "Approved repository data can disappear from its canonical path while transaction state falsely claims rollback completed.",
+  "verdict": "confirmed",
+  "severity": "high",
+  "reproduction": {
+    "status": "reproduced",
+    "symptom_oracle": "After an injected first read fault on the retirement path, the approved target bytes remain canonical, no receipt exists, the journal is honestly rolled back, and no retirement preimage is stranded.",
+    "steps": [
+      "Seal an update Candidate over an approved target preimage.",
+      "Allow atomic target retirement, then inject OSError on the first retired-path read.",
+      "Wait for apply_candidate rollback and inspect the target, receipt, journal and commit-boundary directory."
+    ],
+    "sample": "Windows and Linux each produced one expected regression failure reporting that rollback left the approved target missing; both fresh-review probes also reported one stranded retirement entry.",
+    "command_refs": [
+      "host-temp:commands/preliminary-r3-fixing/windows-WP-002-red-retry-2.json",
+      "host-temp:commands/preliminary-r3-fixing/linux-WP-002-red.json"
+    ],
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-promotion-retirement-read-failure-diagnosis.json",
+      "host-temp:reviews/preliminary-r3-fresh/outputs/08-promotion-retirement-windows.observation.json",
+      "host-temp:reviews/preliminary-r3-fresh/outputs/09-promotion-retirement-linux.observation.json"
+    ]
+  },
+  "root_cause": {
+    "status": "confirmed",
+    "confidence": "high",
+    "summary": "_publish_operation_at_commit_boundary has no exception-safe restoration after retirement, while caller rollback tracks the operation only after that helper returns.",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-promotion-retirement-read-failure-diagnosis.json"
+    ]
+  },
+  "hypotheses": [],
+  "active_hypothesis_id": null,
+  "risk": {
+    "security_privacy_or_data_risk": false,
+    "redacted_summary": null,
+    "secure_evidence_refs": [],
+    "human_reviewer": null
+  },
+  "disposition": "current-run",
+  "evidence_refs": [
+    "host-temp:evidence/bug-knowledge-promotion-retirement-read-failure-diagnosis.json",
+    "host-temp:commands/preliminary-r3-fixing/windows-WP-002-red-retry-2.json",
+    "host-temp:commands/preliminary-r3-fixing/linux-WP-002-red.json",
+    "host-temp:reviews/preliminary-r3-fresh/report.json#PRELIM-R3-001"
+  ],
+  "next_action": "Implementation executor restores retirement on every pre-publication failure and preserves an in-progress recovery transaction if restoration collides, then reruns Windows/Linux focused, full and fresh review.",
+  "created_at": "2026-09-01T18:28:00Z"
+}

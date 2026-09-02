@@ -1,0 +1,460 @@
+{
+  "schema": "ready-plan/v1",
+  "candidate": {
+    "revision": "candidate-20260831-01",
+    "payload_sha256": "f1a8cb56ee9b7ab7ea8eba8fdba4768f9a1575d0b269bc351c99cf96550cc526"
+  },
+  "approval": {
+    "status": "Ready",
+    "actor": "使用者",
+    "confirmed_at": "2026-08-31T01:56:12.746Z",
+    "evidence": "conversation:plan-approved-20260831"
+  },
+  "planning_baseline": {
+    "repo_id": "0c5534020993ce0e527ffefdd0bbbdf8e3e26138d3933defe22de1ed5ea2530c",
+    "head_sha": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "primary_plan": {
+    "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/plan.md",
+    "sha256": "bca78675863fc675b3e50de49656af5930f43383027f152dd620547754e96eed"
+  },
+  "artifacts": [
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/plan.md",
+      "role": "primary",
+      "approval_status": "Ready",
+      "sha256": "bca78675863fc675b3e50de49656af5930f43383027f152dd620547754e96eed"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/source-evidence.md",
+      "role": "supporting",
+      "approval_status": "Ready",
+      "sha256": "12559af63c890d0c188fb1fb91fa9e683f52da8beb56a7eadc7c7a5832429c04"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/handoff.json",
+      "role": "handoff",
+      "approval_status": "Ready",
+      "sha256": null
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "SRC-REQ",
+      "kind": "spec",
+      "location": "docs/work/work-20260831-project-knowledge-system-19202d78/requirements.md",
+      "revision": "Ready@2026-08-31",
+      "sha256": "66c641cc25c6833c4ce12ca10ecff491d36b190ed4edfe15f61a5c24601c7381",
+      "plan_refs": ["CON-001", "CON-012", "TD-001", "TD-009", "BDD-001", "BDD-017"],
+      "wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]
+    },
+    {
+      "source_id": "SRC-EVIDENCE",
+      "kind": "supporting",
+      "location": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/source-evidence.md",
+      "revision": "candidate-20260831-01",
+      "sha256": "12559af63c890d0c188fb1fb91fa9e683f52da8beb56a7eadc7c7a5832429c04",
+      "plan_refs": ["CON-003", "CON-011", "CON-012", "BDD-FWK-001", "BOOT-001"],
+      "wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]
+    },
+    {
+      "source_id": "SRC-GITIGNORE",
+      "kind": "project",
+      "location": ".gitignore",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "971c52a12de3c6ced85c32155a00eced180bb04e2627f9bf00a3ae273b325b38",
+      "plan_refs": ["CON-010", "TD-008", "IMP-009"],
+      "wp_refs": ["WP-004"]
+    },
+    {
+      "source_id": "SRC-DELIVERY-CONTRACT",
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/references/delivery-run.schema.json",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "052b283cb14737c44364119c58764cc309eca53064ca1c090ac99030a7dc1146",
+      "plan_refs": ["CON-009", "TD-006", "MOD-006"],
+      "wp_refs": ["WP-003", "WP-004"]
+    },
+    {
+      "source_id": "SRC-DELIVERY-RECORD",
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "32da97fdd725c6990288ff04f050321a8d0a1bd361ef10c46c7d204801e0bc0e",
+      "plan_refs": ["TD-005", "TD-006", "TD-007", "MOD-006", "MOD-007"],
+      "wp_refs": ["WP-003"]
+    },
+    {
+      "source_id": "SRC-DELIVERY-RUNTIME",
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/_delivery_runtime.py",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "7aecf128718abd629700581178c8d5f5cc85890ebe62ed60fea4c0e9ee27290d",
+      "plan_refs": ["CON-007", "TD-005", "TD-009", "MOD-002", "MOD-004"],
+      "wp_refs": ["WP-001", "WP-002", "WP-003"]
+    },
+    {
+      "source_id": "SRC-REQUIREMENTS-WORKFLOW",
+      "kind": "governance",
+      "location": ".agents/skills/requirements-discovery/SKILL.md",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "95e46211e40e3c68a5abe1cfd549b8d6412794104cee61d9d400524cf0c670b3",
+      "plan_refs": ["TD-002", "TD-005", "MOD-005"],
+      "wp_refs": ["WP-001", "WP-003"]
+    },
+    {
+      "source_id": "SRC-READY-PLAN",
+      "kind": "contract",
+      "location": ".agents/skills/technical-planning/references/ready-plan.schema.json",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "c3e90430e69acb6a06795f1855ab6fd045281ce555627061bd877c00d3f5c13b",
+      "plan_refs": ["CON-009", "TD-003", "TD-005", "TD-006", "MOD-005"],
+      "wp_refs": ["WP-003"]
+    },
+    {
+      "source_id": "SRC-IMPLEMENTATION-CONTRACT",
+      "kind": "contract",
+      "location": ".agents/skills/implementation-execution/references/execution-records.schema.json",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "001646122fe6b80cf099840a92c0d20746cee133f1aab7827cee464b8ab864d1",
+      "plan_refs": ["CON-009", "TD-003", "TD-007", "MOD-007"],
+      "wp_refs": ["WP-003"]
+    },
+    {
+      "source_id": "SRC-IMPLEMENTATION-WORKFLOW",
+      "kind": "governance",
+      "location": ".agents/skills/implementation-execution/references/delivery-protocol.md",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "5d91f08ba8f45eb6876767f86632acb18c0cb850359dafd077a7639b9ec9a655",
+      "plan_refs": ["CON-008", "TD-006", "TD-007", "MOD-006", "MOD-007"],
+      "wp_refs": ["WP-003"]
+    },
+    {
+      "source_id": "SRC-BUG-CONTRACT",
+      "kind": "contract",
+      "location": ".agents/skills/bug-diagnosis/references/assessment-contract.md",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "3540fd11bb16332bbe690df6d92b98365a0fb61e63406639a8acaed98a8c6272",
+      "plan_refs": ["TD-002", "TD-003", "TD-007", "BDD-010", "BDD-011"],
+      "wp_refs": ["WP-003"]
+    },
+    {
+      "source_id": "SRC-SKILL-GUIDE",
+      "kind": "governance",
+      "location": ".agents/skills/writing-great-skills/SKILL.md",
+      "revision": "5ddfe8a73560dd6754b00aa6ce45a333449c4f32",
+      "sha256": "8c38389dbcfdb3605690c5ce2fe0fa433e7a2f2371a7f1e697d080d81d15fdea",
+      "plan_refs": ["TD-002", "MOD-001"],
+      "wp_refs": ["WP-001"]
+    }
+  ],
+  "contract_index": [
+    {"contract_id": "BDD-FWK-001", "kind": "bdd-framework", "source_refs": ["SRC-EVIDENCE"], "wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]},
+    {"contract_id": "BOOT-001", "kind": "bootstrap", "source_refs": ["SRC-EVIDENCE", "SRC-SKILL-GUIDE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "BDD-001", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-002", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "BDD-003", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-REQUIREMENTS-WORKFLOW"], "wp_refs": ["WP-001"]},
+    {"contract_id": "BDD-004", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "BDD-005", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "BDD-006", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-REQUIREMENTS-WORKFLOW", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-003"]},
+    {"contract_id": "BDD-007", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-READY-PLAN"], "wp_refs": ["WP-003"]},
+    {"contract_id": "BDD-008", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-CONTRACT", "SRC-IMPLEMENTATION-WORKFLOW"], "wp_refs": ["WP-003"]},
+    {"contract_id": "BDD-009", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-010", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-BUG-CONTRACT"], "wp_refs": ["WP-003"]},
+    {"contract_id": "BDD-011", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-BUG-CONTRACT"], "wp_refs": ["WP-003"]},
+    {"contract_id": "BDD-012", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-013", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-014", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-015", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "BDD-016", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-004"]},
+    {"contract_id": "BDD-017", "kind": "bdd-scenario", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-001", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-002", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "TEST-003", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-REQUIREMENTS-WORKFLOW"], "wp_refs": ["WP-001"]},
+    {"contract_id": "TEST-004", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "TEST-005", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "TEST-006", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-REQUIREMENTS-WORKFLOW", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-003"]},
+    {"contract_id": "TEST-007", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-READY-PLAN"], "wp_refs": ["WP-003"]},
+    {"contract_id": "TEST-008", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-CONTRACT", "SRC-IMPLEMENTATION-WORKFLOW"], "wp_refs": ["WP-003"]},
+    {"contract_id": "TEST-009", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-010", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-BUG-CONTRACT"], "wp_refs": ["WP-003"]},
+    {"contract_id": "TEST-011", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-BUG-CONTRACT"], "wp_refs": ["WP-003"]},
+    {"contract_id": "TEST-012", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-013", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-014", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-015", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "TEST-016", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-004"]},
+    {"contract_id": "TEST-017", "kind": "inner-test", "source_refs": ["SRC-REQ", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "CMD-BOOT-001", "kind": "command", "source_refs": ["SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "CMD-BDD-DISCOVERY-001", "kind": "command", "source_refs": ["SRC-EVIDENCE"], "wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]},
+    {"contract_id": "CMD-BDD-FOCUSED-001", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "CMD-BDD-FOCUSED-002", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "CMD-BDD-FOCUSED-003", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-003"]},
+    {"contract_id": "CMD-BDD-FOCUSED-004", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-003", "WP-004"]},
+    {"contract_id": "CMD-BDD-FULL-001", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]},
+    {"contract_id": "CMD-TDD-FOCUSED-001", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "CMD-TDD-FOCUSED-002", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-002"]},
+    {"contract_id": "CMD-TDD-FOCUSED-003", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-003"]},
+    {"contract_id": "CMD-RELATED-001", "kind": "command", "source_refs": ["SRC-EVIDENCE"], "wp_refs": ["WP-001", "WP-002", "WP-003"]},
+    {"contract_id": "CMD-BUILD-FULL-001", "kind": "command", "source_refs": ["SRC-EVIDENCE"], "wp_refs": ["WP-004"]},
+    {"contract_id": "CMD-TEST-FULL-001", "kind": "command", "source_refs": ["SRC-REQ", "SRC-EVIDENCE"], "wp_refs": ["WP-004"]},
+    {"contract_id": "CMD-GOVERNANCE-001", "kind": "command", "source_refs": ["SRC-EVIDENCE", "SRC-SKILL-GUIDE"], "wp_refs": ["WP-004"]},
+    {"contract_id": "WP-001", "kind": "work-package", "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-RUNTIME", "SRC-REQUIREMENTS-WORKFLOW", "SRC-SKILL-GUIDE"], "wp_refs": ["WP-001"]},
+    {"contract_id": "WP-002", "kind": "work-package", "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-RUNTIME"], "wp_refs": ["WP-002"]},
+    {"contract_id": "WP-003", "kind": "work-package", "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-CONTRACT", "SRC-DELIVERY-RECORD", "SRC-DELIVERY-RUNTIME", "SRC-REQUIREMENTS-WORKFLOW", "SRC-READY-PLAN", "SRC-IMPLEMENTATION-CONTRACT", "SRC-IMPLEMENTATION-WORKFLOW", "SRC-BUG-CONTRACT"], "wp_refs": ["WP-003"]},
+    {"contract_id": "WP-004", "kind": "work-package", "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-GITIGNORE", "SRC-DELIVERY-CONTRACT"], "wp_refs": ["WP-004"]}
+  ],
+  "commands": [
+    {
+      "command_id": "CMD-BOOT-001",
+      "purpose": "bootstrap",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py query --repo . --stage ad-hoc --query bootstrap-sentinel",
+      "environment_prerequisites": ["Python 3.12+ on PATH"],
+      "timeout_seconds": 30,
+      "network_policy": "forbidden",
+      "allowed_writes": [],
+      "external_side_effects": [],
+      "success_criteria": ["Before retrieval implementation, exits 78 and emits BOOTSTRAP_SENTINEL without an uncaught exception."],
+      "completeness_criteria": ["Repository porcelain bytes before and after are identical; no context contract is emitted."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "No project-knowledge files exist at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "purpose": "bdd-discovery",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --list-scenarios",
+      "environment_prerequisites": ["Python 3.12+ on PATH"],
+      "timeout_seconds": 30,
+      "network_policy": "forbidden",
+      "allowed_writes": [],
+      "external_side_effects": [],
+      "success_criteria": ["Exits 0 and lists BDD-001 through BDD-017 exactly once."],
+      "completeness_criteria": ["Reports discovered=17, run=0, failed=0, skipped=0 and does not execute fixture setup."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Discovery runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --group retrieval --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 180,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["BDD-002 through BDD-005 pass with exit 0."],
+      "completeness_criteria": ["Report shows discovered=4, run=4, failed=0, skipped=0; golden score is at least 18/20 with 100% valid citations."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Focused retrieval runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-FOCUSED-002",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --group governance --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 240,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["BDD-001, BDD-009, BDD-012 through BDD-015 and BDD-017 pass."],
+      "completeness_criteria": ["Report shows discovered=7, run=7, failed=0, skipped=0; every injected transaction fault is rolled back or recovery-blocked."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Focused governance runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-FOCUSED-003",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --group promotion --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 300,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["BDD-006, BDD-007 and BDD-013 pass with exit 0."],
+      "completeness_criteria": ["Report shows discovered=3, run=3, failed=0, skipped=0; co-gates share approval evidence and drift yields zero committed paths."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Focused promotion runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-FOCUSED-004",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --group delivery --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH", "Release runner OS capability metadata"],
+      "timeout_seconds": 600,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["BDD-008, BDD-010, BDD-011 and BDD-016 pass with exit 0."],
+      "completeness_criteria": ["Report shows discovered=4, run=4, failed=0, skipped=0; every timed operation is at most 2.000 seconds and OS-normalized outputs match."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Focused delivery runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "purpose": "bdd-full",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 900,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["All BDD-001 through BDD-017 pass with exit 0."],
+      "completeness_criteria": ["Report shows discovered=17, run=17, failed=0, skipped=0 and includes golden, citation, stale/contested and performance counters."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Full BDD runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_query.py --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 180,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Test removes fixture root in tearDownClass and asserts absence."}],
+      "external_side_effects": [],
+      "success_criteria": ["All query, ranking, context and CLI contract unit tests pass."],
+      "completeness_criteria": ["unittest report has zero failures, errors and skips and covers TEST-002 through TEST-005."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Query unit runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_governance.py --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH", "OS symlink or reparse capability probe"],
+      "timeout_seconds": 300,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Test removes fixture root in tearDownClass and asserts absence."}],
+      "external_side_effects": [],
+      "success_criteria": ["All bootstrap, lint, transaction, recovery and security unit tests pass."],
+      "completeness_criteria": ["unittest report has zero failures, errors and skips and covers TEST-001, TEST-009 and TEST-012 through TEST-015 plus TEST-017."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Governance unit runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-TDD-FOCUSED-003",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_workflow.py --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 360,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Test removes fixture root in tearDownClass and asserts absence."}],
+      "external_side_effects": [],
+      "success_criteria": ["All co-gate, delivery overlay, outcome, review snapshot, legacy and BUG mapping tests pass."],
+      "completeness_criteria": ["unittest report has zero failures, errors and skips and covers TEST-003, TEST-006 through TEST-008, TEST-010 and TEST-011."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Workflow unit runner is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-RELATED-001",
+      "purpose": "related",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope related --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH"],
+      "timeout_seconds": 600,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["Project-knowledge tests and all directly modified owner contract suites pass."],
+      "completeness_criteria": ["Report enumerates every selected test file and records zero failures, errors and skips."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Related-suite orchestrator is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "purpose": "build-full",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --syntax-all",
+      "environment_prerequisites": ["Python 3.12+ on PATH"],
+      "timeout_seconds": 120,
+      "network_policy": "forbidden",
+      "allowed_writes": [],
+      "external_side_effects": [],
+      "success_criteria": ["Every repository Python file parses and every JSON schema parses with exit 0."],
+      "completeness_criteria": ["Report gives discovered file counts and zero syntax or JSON errors without creating pyc files."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Full syntax validator is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "purpose": "test-full",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp",
+      "environment_prerequisites": ["Python 3.12+", "Git on PATH", "ripgrep 15+ on PATH", "Windows, macOS or Linux release runner metadata"],
+      "timeout_seconds": 1200,
+      "network_policy": "forbidden",
+      "allowed_writes": [{"path": ".knowledge-test-tmp/", "kind": "temporary", "cleanup": "Runner removes the fixture root in finally and asserts it is absent."}],
+      "external_side_effects": [],
+      "success_criteria": ["All existing owner tests, project-knowledge tests, 17 BDDs, golden, security and benchmark checks pass."],
+      "completeness_criteria": ["Report lists all discovered suites, zero failures/errors/skips, 20 golden queries, 100% citations, 0 ineligible injection, 50000 files, 5000 pages and every timed result."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Full-suite orchestrator is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "purpose": "governance",
+      "status": "Proposed",
+      "cwd": ".",
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --governance",
+      "environment_prerequisites": ["Python 3.12+ on PATH"],
+      "timeout_seconds": 180,
+      "network_policy": "forbidden",
+      "allowed_writes": [],
+      "external_side_effects": [],
+      "success_criteria": ["Skill structure, links, schemas, authority boundaries, ID mappings, stage hooks and forbidden dependency/Git-action scans pass."],
+      "completeness_criteria": ["Validator covers project-knowledge plus every modified owner skill and reports zero findings."],
+      "absence_evidence": [{"probe": "rg --files .agents/skills/project-knowledge", "outcome": "Knowledge governance validator is absent at planning baseline.", "source_ref": "SRC-EVIDENCE"}]
+    }
+  ],
+  "work_packages": [
+    {
+      "wp_id": "WP-001",
+      "blocked_by": [],
+      "contract_refs": ["BDD-FWK-001", "BOOT-001", "BDD-002", "BDD-003", "BDD-004", "BDD-005", "TEST-002", "TEST-003", "TEST-004", "TEST-005", "CMD-BOOT-001", "CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-001", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-001", "CMD-RELATED-001", "WP-001"],
+      "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-RUNTIME", "SRC-REQUIREMENTS-WORKFLOW", "SRC-SKILL-GUIDE"],
+      "command_refs": ["CMD-BOOT-001", "CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-001", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-001", "CMD-RELATED-001"]
+    },
+    {
+      "wp_id": "WP-002",
+      "blocked_by": ["WP-001"],
+      "contract_refs": ["BDD-FWK-001", "BDD-001", "BDD-009", "BDD-012", "BDD-013", "BDD-014", "BDD-015", "BDD-017", "TEST-001", "TEST-009", "TEST-012", "TEST-013", "TEST-014", "TEST-015", "TEST-017", "CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-002", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-002", "CMD-RELATED-001", "WP-002"],
+      "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-RUNTIME"],
+      "command_refs": ["CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-002", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-002", "CMD-RELATED-001"]
+    },
+    {
+      "wp_id": "WP-003",
+      "blocked_by": ["WP-002"],
+      "contract_refs": ["BDD-FWK-001", "BDD-006", "BDD-007", "BDD-008", "BDD-010", "BDD-011", "TEST-006", "TEST-007", "TEST-008", "TEST-010", "TEST-011", "CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-003", "CMD-BDD-FOCUSED-004", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-003", "CMD-RELATED-001", "WP-003"],
+      "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-DELIVERY-CONTRACT", "SRC-DELIVERY-RECORD", "SRC-DELIVERY-RUNTIME", "SRC-REQUIREMENTS-WORKFLOW", "SRC-READY-PLAN", "SRC-IMPLEMENTATION-CONTRACT", "SRC-IMPLEMENTATION-WORKFLOW", "SRC-BUG-CONTRACT"],
+      "command_refs": ["CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-003", "CMD-BDD-FOCUSED-004", "CMD-BDD-FULL-001", "CMD-TDD-FOCUSED-003", "CMD-RELATED-001"]
+    },
+    {
+      "wp_id": "WP-004",
+      "blocked_by": ["WP-003"],
+      "contract_refs": ["BDD-FWK-001", "BDD-016", "TEST-016", "CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-004", "CMD-BDD-FULL-001", "CMD-BUILD-FULL-001", "CMD-TEST-FULL-001", "CMD-GOVERNANCE-001", "WP-004"],
+      "source_refs": ["SRC-REQ", "SRC-EVIDENCE", "SRC-GITIGNORE", "SRC-DELIVERY-CONTRACT"],
+      "command_refs": ["CMD-BDD-DISCOVERY-001", "CMD-BDD-FOCUSED-004", "CMD-BDD-FULL-001", "CMD-BUILD-FULL-001", "CMD-TEST-FULL-001", "CMD-GOVERNANCE-001"]
+    }
+  ],
+  "revision_impact": {
+    "revision": "candidate-20260831-01",
+    "changes": [
+      {
+        "changed_ref": "SRC-REQ",
+        "scope": "global-baseline",
+        "affected_wp_refs": ["WP-001", "WP-002", "WP-003", "WP-004"]
+      }
+    ]
+  }
+}

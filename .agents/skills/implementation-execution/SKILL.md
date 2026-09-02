@@ -37,6 +37,12 @@ description: 執行已核准的 ready-plan/v1：依 WP 進行 outside-in BDD／i
 - 既有 binding 或 Ready/source revision → [Resume 與 Revision](references/resume-and-revision.md)
 - 第一個 public seam／entrypoint 不存在 → [Greenfield Bootstrap](references/greenfield-bootstrap.md)
 
+Ready binding 通過後、取得產品寫入權前，執行 read-only 知識 preflight：
+
+`python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py query --repo . --stage implementation --query "<目前實作意圖>"`
+
+保存 `knowledge-context/v1` 到 Ledger，並在修改前重讀每個 result 的 `source_refs`。這個步驟不寫回 Wiki 或產品；typed dependency／contract error 為 Blocked。只有本身由 Ready `BOOT-*` 建立 project-knowledge seam 的 run 可使用明列的 bootstrap exception。
+
 Producer 缺口為 Awaiting upstream reapproval；workspace、能力、工具、baseline 或 dirty-state 問題為 Blocked。
 
 完成條件：全部適用契約通過、host-temp Ledger 已保存 evidence，且產品／測試／dependencies／Ready／外部狀態 hashes 與 Preflight 前相同；才進 Executing。
@@ -53,9 +59,9 @@ BUG plan 另須先重跑原始症狀 oracle，再取得 regression red；只做�
 
 完整讀取 [Reviewer 契約](references/reviewer-contract.md)。主代理 fresh 跑全部 full commands；失敗走 Fixing，使 affected WP 與必要 downstream 依序 Invalidated → Executing → Verified。
 
-全量通過後建立 canonical snapshot。每輪由一個 fresh read-only Reviewer 直接讀 raw artifacts／Ledger／outputs，自行重跑命令並回傳 implementation-review/v1。Blocking finding 走 Fixing 與另一位 Reviewer；snapshot drift 保存 invalid report 後回 Verifying；breaker 仍由 Reviewer 契約判定。
+全量通過後先由 fresh read-only Reviewer 完成不含outcome／Candidate binding的preliminary product review；主代理把report與每個raw output create-only保存於current run，並以report logical ref、path與SHA-256建立create-only `implementation-outcome/v1`。Required delivery接著封存knowledge Candidate並建立product／knowledge雙snapshot，再由另一個 fresh read-only Reviewer核對包含outcome的product bytes、Candidate與雙snapshot，回傳final `implementation-review/v1`。兩份report使用連續round且不同path；同一份preliminary report不能兼任final review。Blocking finding 走 Fixing 與另一位 Reviewer；任一snapshot drift 保存invalid report後回Verifying；breaker仍由Reviewer契約判定。
 
-完成條件：雙方 required commands passed、coverage 完整、沒有 blocking finding，report before／after 與目前 snapshot 相同。
+完成條件：preliminary report已實體保存並與Outcome逐command一致；final Reviewer的required commands passed、coverage完整、沒有blocking finding，report product before／after與目前snapshot相同；required overlay的knowledge before／after亦相同且Candidate ref／digest精確一致。
 
 BUG run 同時產生獨立 `bug-verification/v1`。Reviewer 的 `APPROVED` 只表示實作 snapshot 合格；BUG 結果另為 `verified | partial | failed`，兩者不得互相替代。
 
@@ -63,7 +69,7 @@ BUG run 同時產生獨立 `bug-verification/v1`。Reviewer 的 `APPROVED` 只�
 
 讀取 [品質契約](references/quality-contract.md)與 [交付協定](references/delivery-protocol.md)。前者只判 Pass／Fail；後者唯一擁有 state 與 terminal ordering。
 
-完成條件：結果唯一為 Complete、Awaiting upstream reapproval 或 Blocked。Complete 發生在 raw response／outputs／report 保存及保存後 snapshot 重算成功之後；worktree 與未提交 diff 保留。
+完成條件：implementation結果唯一為 Complete、Awaiting upstream reapproval 或 Blocked。Implementation Complete 發生在 raw response／outputs／report 保存及保存後 snapshots 重算成功之後；required delivery此時轉knowledge/awaiting_user而非宣稱delivery Complete，直到人工核准promotion與lint通過。Worktree 與未提交 diff 保留。
 
 ## 維護
 

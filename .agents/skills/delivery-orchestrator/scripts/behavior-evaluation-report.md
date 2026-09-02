@@ -222,3 +222,26 @@ The historical Fail rounds remain visible; the final Pass applies only to the co
 - Raw assessment and verification JSON are strictly checked before parsing and duplicate keys fail closed without reproducing known-value markers. Generation materialization, redirected-path rejection, inbox rollback／matching-orphan adoption, deferred three-way routing, two approvals, terminal evidence and Complete freeze remain covered.
 - The integrated author run passed **91/91** tests, five owner validators, five skill quick validations and `git diff --check`. The final fresh Reviewer independently passed Delivery mutations **20/20**, BUG overlay **14/14** and terminal **8/8**.
 - That Reviewer found no Delivery implementation issue; its sole blocking observation was the diagnosis report's stale header, corrected in this report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger and will be authoritative for the final verdict.
+
+## 2026-09-01 — Required knowledge gate correction and fresh re-review
+
+The first findings-first review of the required knowledge overlay returned `CHANGES_REQUESTED`. Its three blocking findings are retained in `host-temp:reviews/delivery-bundle-fresh-review.json`:
+
+- `DEL-FRESH-001`: Requirements and Planning Ready receipts without an exact `formal_paths` manifest were accepted.
+- `DEL-FRESH-002`: preliminary and final implementation reports could claim the same `attestation.agent_id`.
+- `DEL-FRESH-003`: the linked Candidate loader followed a real Windows junction in the registry ancestor chain.
+
+The owner reproduced all three before changing production bytes. The first two regressions failed 2/2 against the old Delivery consumer, and the real-junction regression failed 1/1 against the old Candidate loader. The corrected consumer now delegates stage receipt validation to the project-knowledge owner, persists canonical `formal_paths`, compares the preliminary and final reviewer identities, and rejects identity reuse. Candidate reads now walk every registry component and perform a stable no-follow read that detects redirected ancestors and read-time swaps.
+
+Author verification on the corrected bytes passed:
+
+- Delivery skill quick validation and owner validator.
+- Delivery mutation guards **21/21** and full workspace integration **50/50** in 339.212 seconds.
+- Requirements **8/8**, Technical Planning **8/8**, Implementation **18/18**, and Project Knowledge workflow **16/16**, with their applicable owner validators.
+- Project Knowledge BDD **17/17** in 542.671 seconds and Delivery transition **27/27** in 337.245 seconds.
+
+Before this report-only append, the corrected Delivery corpus excluding this report and cache files was **20 files, 490,863 bytes, SHA-256 `c283f116099c6f845cb678599f81083f3c2c757cc10a19fda330e60e14767889`**, using the sorted `relative-path<TAB>byte-count<TAB>file-sha256<LF>` manifest algorithm.
+
+The second fresh, independent, read-only Reviewer returned **`APPROVED` with no findings** in `host-temp:reviews/delivery-bundle-correction-review.json`. It did not use this report as an oracle. Its current-source evaluation passed EVAL-DEL-001 through EVAL-DEL-010 and recorded **134 successful case executions**: Delivery mutations 21, Delivery workspace 50, related owner tests 34, Project Knowledge workflow 16, and focused regressions 13. The focused manifest matrix rejected missing, empty/incomplete, and imprecise receipts while accepting exact Requirements and Planning manifests; the identity probe rejected the same reviewer and accepted different reviewers; a true Windows junction ancestor and a read-time swap were rejected while an ordinary path and a POSIX-stat object without Windows-only metadata remained ordinary. macOS was intentionally excluded by the approved platform scope.
+
+The Reviewer observed identical HEAD, status inventory and diff inventory before and after review, an empty staged diff, no residual target fixture, and a passing `git diff --check`. It made no product or Git write, delegation, stage, commit, push, merge, cleanup, deployment, or worktree deletion. The historical failed review remains evidence of the original gaps; the `APPROVED` verdict applies only to the corrected snapshot described above.

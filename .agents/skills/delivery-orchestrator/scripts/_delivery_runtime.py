@@ -48,12 +48,13 @@ PHASE_TRANSITIONS = {
     "workspace": {"workspace", "requirements"},
     "requirements": {"requirements", "planning"},
     "planning": {"planning", "requirements", "implementation"},
-    "implementation": {"implementation", "planning", "complete"},
+    "implementation": {"implementation", "planning", "knowledge", "complete"},
+    "knowledge": {"knowledge", "implementation", "complete"},
     "complete": set(),
 }
 STATUS_TRANSITIONS = {
     "active": {"active", "awaiting_user", "blocked", "complete"},
-    "awaiting_user": {"awaiting_user", "active", "blocked"},
+    "awaiting_user": {"awaiting_user", "active", "blocked", "complete"},
     "blocked": {"blocked", "active"},
     "complete": set(),
 }

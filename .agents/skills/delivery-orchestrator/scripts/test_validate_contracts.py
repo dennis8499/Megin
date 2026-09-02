@@ -115,6 +115,14 @@ class DeliveryContractMutationTests(unittest.TestCase):
         )
         self.assert_failure("record authority missing semantic primitive")
 
+    def test_historical_handoff_uses_its_approval_time_trust_root(self) -> None:
+        self.mutate(
+            "scripts/_delivery_record.py",
+            "_validate_historical_ready_contract(historical)",
+            "_validate_ready_contract(historical)",
+        )
+        self.assert_failure("record authority missing semantic primitive")
+
     def test_terminal_review_validation_mutation_is_rejected(self) -> None:
         self.mutate(
             "scripts/_delivery_record.py",
@@ -150,7 +158,7 @@ class DeliveryContractMutationTests(unittest.TestCase):
     def test_early_bug_verification_binding_guard_mutation_is_rejected(self) -> None:
         self.mutate(
             "scripts/_delivery_record.py",
-            "successful BUG verification may only bind during terminal Complete",
+            "successful BUG verification may only bind at legacy Complete or the reviewed knowledge gate",
             "BUG verification accepted before terminal",
         )
         self.assert_failure("record authority missing semantic primitive")
@@ -190,8 +198,8 @@ class DeliveryContractMutationTests(unittest.TestCase):
     def test_failed_bug_verification_guard_mutation_is_rejected(self) -> None:
         self.mutate(
             "scripts/_delivery_record.py",
-            "failed BUG verification cannot Complete delivery",
-            "failed BUG verification accepted for Complete delivery",
+            "failed BUG verification cannot enter a terminal knowledge gate",
+            "failed BUG verification accepted at the terminal knowledge gate",
         )
         self.assert_failure("record authority missing semantic primitive")
 

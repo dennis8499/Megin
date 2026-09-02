@@ -30,6 +30,12 @@ description: 探索仍待釐清的產品或軟體需求：以證據先行、一�
 
 ## 1. 查明可取得事實
 
+先執行 read-only 知識 preflight：
+
+`python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py query --repo . --stage requirements --query "<目前需求意圖>"`
+
+保存 `knowledge-context/v1` 作為 evidence，並在引用前重讀每個 result 的 `source_refs`。這個步驟不寫回 Wiki 或產品；typed dependency／contract error 使 evidence gate 保持 Blocked。只有 Ready BOOT plan 明列 skill 尚不存在時可使用其 bootstrap exception。
+
 在第一題前讀取適用治理、README、既有規格、詞彙、資料／介面、程式碼與近期變更。必要且獲准時查一手外部來源。可由 evidence 解決的事項直接記錄；需要人類決策、優先順序或不可存取資訊的事項才進 frontier。
 
 完成條件：所有目前可取得、且可能改變範圍、行為、風險或驗收的事實都有來源；剩餘未知需要人類決策或明示缺失來源。

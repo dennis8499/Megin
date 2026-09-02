@@ -1,0 +1,87 @@
+name: Knowledge portability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".agents/skills/project-knowledge/**"
+      - ".agents/skills/requirements-discovery/**"
+      - ".agents/skills/technical-planning/**"
+      - ".agents/skills/implementation-execution/**"
+      - ".agents/skills/bug-diagnosis/**"
+      - ".agents/skills/delivery-orchestrator/**"
+      - ".github/workflows/knowledge-portability.yml"
+      - ".gitignore"
+
+jobs:
+  platform:
+    name: ${{ matrix.os_name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os_name: linux
+            runner: ubuntu-latest
+          - os_name: windows
+            runner: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Ensure ripgrep
+        shell: bash
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            cargo install ripgrep --locked
+          fi
+          git --version
+          rg --version
+      - name: Benchmark and portability oracle
+        shell: bash
+        run: >-
+          python -X utf8 -B
+          .agents/skills/project-knowledge/scripts/knowledge_benchmark.py
+          --fixture-root .knowledge-test-tmp
+          > knowledge-portability-${{ matrix.os_name }}.json
+      - name: Full functional and owner suite
+        shell: bash
+        env:
+          KNOWLEDGE_PORTABILITY_REPORT: knowledge-portability-${{ matrix.os_name }}.json
+        run: >-
+          python -X utf8 -B
+          .agents/skills/project-knowledge/scripts/run_full_suite.py
+          --scope all --fixture-root .knowledge-test-tmp
+          > knowledge-suite-${{ matrix.os_name }}.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: knowledge-portability-${{ matrix.os_name }}
+          path: |
+            knowledge-portability-${{ matrix.os_name }}.json
+            knowledge-suite-${{ matrix.os_name }}.json
+          if-no-files-found: error
+
+  compare:
+    name: Compare normalized results
+    needs: platform
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: knowledge-portability-*
+          path: reports
+          merge-multiple: true
+      - name: Require equivalent Windows and Linux reports
+        run: >-
+          python -X utf8 -B
+          .agents/skills/project-knowledge/scripts/compare_portability_reports.py
+          --root reports
+

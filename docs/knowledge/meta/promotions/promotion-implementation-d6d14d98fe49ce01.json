@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "knowledge-owner",
+    "evidence": "conversation:implementation-knowledge-approved"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-d6d14d98fe49ce01/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "58abc0894fac784e349f9c432c81198c84d92550daf199dc6e767bea5cd31cce",
+  "promotion_id": "promotion-implementation-d6d14d98fe49ce01",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260831-project-knowledge-system-19202d78"
+}

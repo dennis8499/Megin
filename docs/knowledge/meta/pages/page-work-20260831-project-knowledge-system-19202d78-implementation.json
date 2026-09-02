@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260831-project-knowledge-system-19202d78-implementation",
+      "content_anchor": "implementation-outcome",
+      "contradicts": [],
+      "evidence_class": "observed",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "c5edf4c901bfc6eb9a3504743dc4e78d2020bcce6cc0c2aabd6033d6c6dbafad",
+          "locator": {
+            "end_line": 7,
+            "start_line": 7
+          },
+          "path": "docs/work/work-20260831-project-knowledge-system-19202d78/implementation/outcome.md",
+          "sha256": "7ec949892f506854f4077389e034090c4d9c4a3fd3767af2c8db8c275791efa3"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260831-project-knowledge-system-19202d78-implementation.md",
+  "content_sha256": "6c8b983eda6210a1806cb8c25cf751898bdf0917d3b74ce66c5eed0c9b6ee04e",
+  "lifecycle": "current",
+  "page_id": "page-work-20260831-project-knowledge-system-19202d78-implementation",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "implementation"
+  ],
+  "title": "Implementation Outcome"
+}

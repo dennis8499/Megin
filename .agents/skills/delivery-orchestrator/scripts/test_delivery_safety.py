@@ -5,6 +5,30 @@ from _delivery_test_support import *  # noqa: F403
 
 
 class DeliverySafetyTests(DeliveryFixture):
+    def test_historical_ready_trust_root_does_not_apply_later_coverage_rules(self) -> None:
+        historical = planning_fixture.ready_example()
+        historical["sources"].append(
+            {
+                "source_id": "SRC-002",
+                "kind": "project",
+                "location": "docs/legacy-source.md",
+                "revision": "legacy",
+                "sha256": planning_fixture.HASH,
+                "plan_refs": ["REQ-002"],
+                "wp_refs": ["WP-001"],
+            }
+        )
+        historical["work_packages"][0]["source_refs"].append("SRC-002")
+        for contract in historical["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["source_refs"] = ["SRC-002"]
+        historical["candidate"]["payload_sha256"] = workspace._ready_payload_sha256(historical)
+
+        with self.assertRaises(workspace.DeliveryError) as raised:
+            workspace._validate_ready_contract(historical)
+        self.assertEqual("INVALID_HANDOFF", raised.exception.code)
+        workspace._validate_historical_ready_contract(historical)
+
     def test_secret_shaped_logical_refs_are_rejected(self) -> None:
         primary = self.make_repo()
         delivery = Path(self.start(primary, "secret-ref-work")["worktree"])
@@ -155,6 +179,286 @@ class DeliverySafetyTests(DeliveryFixture):
 
         self.assertFalse(sentinel.exists(), "terminal snapshot executed a textconv driver")
         self.assertEqual(hashlib.sha256(expected).hexdigest(), snapshot["tracked_diff_sha256"])
+
+    def test_terminal_snapshot_reads_base_revision_sources_from_git(self) -> None:
+        primary = self.make_repo("base-source-snapshot")
+        result = self.start(primary, "base-source-snapshot-work")
+        delivery = Path(result["worktree"])
+        record = self.record(delivery, "base-source-snapshot-work")
+        generation = record["generations"][-1]
+        base_bytes = git(
+            delivery,
+            "cat-file",
+            "blob",
+            f"{generation['base_sha']}:app.txt",
+        ).stdout
+        base_sha256 = hashlib.sha256(base_bytes).hexdigest()
+
+        (delivery / "app.txt").write_text(
+            "implemented change\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        ready = {
+            "artifacts": [],
+            "sources": [
+                {
+                    "source_id": "SRC-BASE-001",
+                    "location": "app.txt",
+                    "revision": generation["base_sha"],
+                    "sha256": base_sha256,
+                }
+            ],
+        }
+
+        snapshot = workspace._current_implementation_snapshot(record, ready)
+
+        self.assertEqual(
+            [{"ref": "SRC-BASE-001", "sha256": base_sha256}],
+            snapshot["source_hashes"],
+        )
+        self.assertNotEqual(hashlib.sha256(b"").hexdigest(), snapshot["tracked_diff_sha256"])
+
+        wrong = copy.deepcopy(ready)
+        wrong["sources"][0]["sha256"] = "0" * 64
+        self.assert_error(
+            "INVALID_IMPLEMENTATION_REF",
+            lambda: workspace._current_implementation_snapshot(record, wrong),
+        )
+
+    def test_ready_base_sources_use_raw_git_bytes_during_plan_admission(self) -> None:
+        from _delivery_record import _verify_ready_local_sources
+
+        primary = self.make_repo("ready-base-source")
+        result = self.start(primary, "ready-base-source-work")
+        delivery = Path(result["worktree"])
+        record = self.record(delivery, "ready-base-source-work")
+        generation = record["generations"][-1]
+        base_bytes = git(
+            delivery,
+            "cat-file",
+            "blob",
+            f"{generation['base_sha']}:app.txt",
+        ).stdout
+        base_sha256 = hashlib.sha256(base_bytes).hexdigest()
+        handoff = {
+            "sources": [
+                {
+                    "source_id": "SRC-BASE-001",
+                    "location": "app.txt",
+                    "revision": generation["base_sha"],
+                    "sha256": base_sha256,
+                }
+            ]
+        }
+
+        (delivery / "app.txt").write_text(
+            "implementation changed this planned target\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+        _verify_ready_local_sources(
+            record,
+            handoff,
+            set(),
+            verify_current_sources=True,
+        )
+        _verify_ready_local_sources(
+            record,
+            handoff,
+            set(),
+            verify_current_sources=False,
+        )
+
+        wrong = copy.deepcopy(handoff)
+        wrong["sources"][0]["sha256"] = "0" * 64
+        self.assert_error(
+            "SOURCE_NOT_MATERIALIZABLE",
+            lambda: _verify_ready_local_sources(
+                record,
+                wrong,
+                set(),
+                verify_current_sources=True,
+            ),
+        )
+
+    def test_plan_revision_can_reuse_prior_ready_supporting_artifact(self) -> None:
+        primary = self.make_repo("prior-ready-supporting")
+        delivery = Path(self.start(primary, "prior-ready-supporting-work")["worktree"])
+        self.enter_requirements(delivery, "prior-ready-supporting-work")
+        requirements_path, requirements_sha = self.approve_requirements(
+            delivery,
+            "prior-ready-supporting-work",
+        )
+
+        def attach_supporting(
+            handoff_path: str,
+            payload: str,
+            *,
+            include_artifact: bool,
+        ) -> str:
+            del payload
+            handoff_file = delivery / Path(*handoff_path.split("/"))
+            handoff = json.loads(handoff_file.read_text(encoding="utf-8"))
+            supporting_relative = (
+                "docs/work/prior-ready-supporting-work/plan/source-evidence.md"
+            )
+            supporting = delivery / Path(*supporting_relative.split("/"))
+            if include_artifact:
+                supporting.write_text(
+                    "approved supporting evidence\n",
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                handoff["artifacts"].insert(
+                    -1,
+                    {
+                        "path": supporting_relative,
+                        "role": "supporting",
+                        "approval_status": "Ready",
+                        "sha256": digest(supporting),
+                    },
+                )
+            handoff["sources"].append(
+                {
+                    "source_id": "SRC-SUPPORTING-001",
+                    "kind": "supporting",
+                    "location": supporting_relative,
+                    "revision": "candidate-1",
+                    "sha256": digest(supporting),
+                    "plan_refs": ["REQ-001"],
+                    "wp_refs": ["WP-001"],
+                }
+            )
+            for contract in handoff["contract_index"]:
+                if contract["contract_id"] in {
+                    "REQ-001",
+                    "BDD-001",
+                    "TEST-001",
+                    "WP-001",
+                }:
+                    contract["source_refs"].append("SRC-SUPPORTING-001")
+            handoff["work_packages"][0]["source_refs"].append(
+                "SRC-SUPPORTING-001"
+            )
+            handoff["candidate"]["payload_sha256"] = workspace._ready_payload_sha256(
+                handoff
+            )
+            handoff_file.write_text(
+                json.dumps(handoff, ensure_ascii=False, sort_keys=True, indent=2)
+                + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            return handoff["candidate"]["payload_sha256"]
+
+        self.transition(
+            delivery,
+            "prior-ready-supporting-work",
+            "planning",
+            "awaiting_user",
+            "plan_1_candidate",
+        )
+        handoff_1, payload_1, evidence_1 = self.ready_handoff(
+            delivery,
+            "prior-ready-supporting-work",
+            requirements_path,
+            requirements_sha,
+        )
+        payload_1 = attach_supporting(
+            handoff_1,
+            payload_1,
+            include_artifact=True,
+        )
+        self.transition(
+            delivery,
+            "prior-ready-supporting-work",
+            "implementation",
+            "active",
+            "plan_1_approved",
+            handoff_path=handoff_1,
+            candidate_revision="candidate-1",
+            payload_sha256=payload_1,
+            plan_approval_refs=[evidence_1],
+        )
+
+        run_id = "a" * 64
+        self.transition(
+            delivery,
+            "prior-ready-supporting-work",
+            "planning",
+            "active",
+            "implementation_reapproval",
+            implementation_run_id=run_id,
+            implementation_ledger_ref="implementation:run-a",
+            implementation_status="Awaiting upstream reapproval",
+        )
+        self.transition(
+            delivery,
+            "prior-ready-supporting-work",
+            "planning",
+            "awaiting_user",
+            "plan_2_candidate",
+        )
+        handoff_2, payload_2, evidence_2 = self.ready_handoff(
+            delivery,
+            "prior-ready-supporting-work",
+            requirements_path,
+            requirements_sha,
+            2,
+        )
+        payload_2 = attach_supporting(
+            handoff_2,
+            payload_2,
+            include_artifact=False,
+        )
+        self.transition(
+            delivery,
+            "prior-ready-supporting-work",
+            "implementation",
+            "active",
+            "plan_2_approved",
+            handoff_path=handoff_2,
+            candidate_revision="candidate-2",
+            payload_sha256=payload_2,
+            plan_approval_refs=[evidence_2],
+        )
+
+        record = self.record(delivery, "prior-ready-supporting-work")
+        self.assertEqual(handoff_2, record["plans"]["current_handoff_path"])
+        materialized_paths = {
+            item["path"]
+            for item in workspace._approved_upstream_materialization(record)
+        }
+        self.assertIn(
+            "docs/work/prior-ready-supporting-work/plan/source-evidence.md",
+            materialized_paths,
+        )
+        self.assertIn(handoff_1, materialized_paths)
+
+        blocked_record = copy.deepcopy(record)
+        blocked_record["current_generation"] = 2
+        blocked_record["generations"].append(
+            {
+                "generation": 2,
+                "canonical_worktree": str(self.root / "blocked-generation"),
+                "worktree_key": "b" * 64,
+                "branch": "delivery/prior-ready-supporting-work-r2",
+                "base_sha": record["generations"][-1]["base_sha"],
+                "status": "blocked",
+                "created_at": "2026-08-30T00:00:00Z",
+            }
+        )
+        self.assertEqual(
+            materialized_paths,
+            {
+                item["path"]
+                for item in workspace._approved_upstream_materialization(
+                    blocked_record
+                )
+            },
+        )
 
 
     def test_request_and_evidence_records_do_not_persist_raw_secret(self) -> None:

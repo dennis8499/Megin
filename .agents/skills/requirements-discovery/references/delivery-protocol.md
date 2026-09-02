@@ -20,19 +20,20 @@
 ## Candidate 分支
 
 1. 完整讀取 [文件模板](requirements-analysis-template.md)。
-2. 在對話中展示完整 `Candidate—Awaiting confirmation` 文件與精確建議路徑。
-3. 以本回合唯一問題詢問是否確認該完整版本並同意寫入該路徑。
+2. 若delivery record含required knowledge overlay，使用`project-knowledge` requirements stage builder把正式Requirements與`required` claim page／sidecar／index組成同一sealed Candidate；若證據判定不需更新Wiki，則明列`decision: no-change`，仍將Requirements、精確promotion log與Ready receipt封入同一Candidate。以預期actor與stable evidence token建立prospective binding（不是預先核准），展示全部精確postimages、diff、payload digest與paths；不得另問第三次核准。Legacy或明列bootstrap exception維持單一文件Candidate。
+3. 在對話中展示完整 `Candidate—Awaiting confirmation` 文件、knowledge diff（若適用）與精確建議路徑。
+4. 以本回合唯一問題詢問是否確認該完整版本並同意寫入所有列出路徑。
 
 完成條件：使用者已看到完整 bytes 與精確路徑，只收到一個確認問題，filesystem 尚未改變。
 
 下一輪：
 
-- 明確確認同一版本與路徑：再次確認路徑仍不存在，只改狀態與確認者後以 create-only 寫入 `Ready`。
+- 明確確認同一版本與路徑：再次確認路徑仍不存在；required overlay只可用同一approval evidence套用sealed Candidate，使Ready Requirements與knowledge postimages一起寫入，full lint與Ready promotion receipt成功後才進Planning。Legacy只改狀態與確認者後以 create-only 寫入 `Ready`。
 - 路徑被占用：選最小後綴，重新展示路徑並單獨確認，本輪不寫。
 - 內容修改：重跑品質，完整展示新 Candidate，再確認。
 - 回覆含糊：只重新確認，本輪不寫。
 
-Ready 完成條件：磁碟 bytes 除狀態／確認者外與核准 Candidate 相同，path 是已確認且先前不存在的路徑，文件可直接交給 Planning。
+Ready 完成條件：磁碟 bytes 除狀態／確認者外與核准 Candidate 相同，path 是已確認且先前不存在的路徑；required overlay另有相同approval evidence的`knowledge-promotion/v1` Ready receipt與passed lint，文件才可直接交給 Planning。
 
 ### BUG overlay
 

@@ -51,16 +51,19 @@ Workspace ready 後讀取 [階段路由](references/stage-routing.md)，只載�
 - requirements → requirements-discovery
 - planning → technical-planning
 - implementation → implementation-execution
+- knowledge → 展示 reviewed Candidate，等待獨立 knowledge promotion 核准；產品修改則回 implementation
 
 Child 先持久化結果；orchestrator 再以一次 atomic transition 保存 refs／state。
 
-BUG run另依階段綁定：Requirements approval 同時保存 assessment JSON／Markdown hashes；Plan綁定`bug_context`；Implementation Complete需要獨立`bug-verification/v1`，`failed`不得Complete，`partial`只依已核准safeguards成立。
+Required knowledge overlay下，Requirements與Plan各自以原核准evidence同時綁定Ready knowledge receipt；planning receipt的`formal_paths`必須精確等於owner-validated完整Ready-plan bundle，`no-change`也不能省略。Implementation先實體保存preliminary fresh report／raw outputs，repo-side Outcome以current run ID、report path／hash與逐command evidence綁定；封存Candidate後由另一位final fresh Reviewer核對含Outcome的product snapshot及完整knowledge pre-tree／expected post-tree snapshot，再進knowledge phase，不能直達delivery Complete。Final finding修正使用下一個create-only Outcome revision，不覆寫舊版。舊record缺`knowledge_gate`時維持legacy routing。
+
+BUG run另依階段綁定：Requirements approval 同時保存 assessment JSON／Markdown hashes；Plan綁定`bug_context`；Implementation Complete需要獨立`bug-verification/v1`，`failed`不得Complete，`partial`只依已核准safeguards成立。Required overlay在進knowledge時綁verification，legacy在terminal Complete綁定。
 
 完成條件：record phase/status 與 child 狀態一致，current refs 可重算 hash；未完成 child 沒有被越過或重跑。
 
 ## 4. Resume／Blocked／Complete
 
-Resume 從最早未完成 action 繼續。Blocked 追加 blocker evidence；解除時在同 phase 追加 recovery evidence。Complete 先保存 implementation Ledger／review refs，再轉 complete/complete 並凍結。
+Resume 從最早未完成 action 繼續。Blocked 追加 blocker evidence；解除時在同 phase 追加 recovery evidence。Legacy Complete先保存 implementation Ledger／review refs，再轉 complete/complete；required overlay則先進knowledge/awaiting_user，只有matching promotion receipt、完整knowledge post-tree相符與full lint通過才凍結delivery。
 
 交付回報 work_id、generation、worktree／branch、phase／status、current refs、next action 與 record path；Complete 另含 fresh verdict 與未提交 diff。
 

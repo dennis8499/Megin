@@ -15,19 +15,25 @@
 
 每項依 handoff success／completeness 判定 `passed`，包含 exit 0、零 failure、零 skipped 與完整 discovery；runner 不提供計數時以 raw output 或 machine result 證明 inventory。任何 failure 依[執行迴圈](bdd-tdd-loop.md)走 `Verifying → Fixing`，尚未建立 review snapshot。
 
-全量通過後依 [execution records schema](execution-records.schema.json)建立 `implementation-snapshot/v1`：
+全量通過後先建立不含Outcome與knowledge Candidate的preliminary product snapshot，交給第一位fresh read-only Reviewer。Preliminary report必須`APPROVED`、含唯一`logical_ref`、穩定的before／after snapshot、完整command outcomes／coverage，且不得預填任何knowledge snapshot或Candidate欄位。主代理將report與它宣告的每份raw output create-only保存於current run；只填logical ref、未保存bytes或report hash漂移都不構成review。
+
+主代理接著以closed `implementation-outcome/v1`保存`docs/work/<work_id>/implementation/outcome.json`與對應Markdown：逐一列`implementation_run_id`、revision、實際changed path／SHA-256、commands、preliminary report logical ref／Ledger-relative path／SHA-256、deviations、knowledge decision，以及BUG verification／certainty（若有）。每個Outcome verification必須與report的同ID command outcome及實體raw output ref一致。Outcome create-only且屬product bytes；final Reviewer若要求修正，保留舊版並在新一輪preliminary review後寫最小連續`outcome-2.*`、`outcome-3.*`，不得覆寫或跳號。
+
+Required overlay再封存knowledge Candidate；然後依 [execution records schema](execution-records.schema.json)建立包含最新Outcome的final `implementation-snapshot/v1`：
 
 1. 固定 `repo_id`、`worktree_key`、`base_sha`、`head_sha`。
-2. Ready artifacts（含實際 handoff hash）按 normalized ref 排序；sources 按 `SRC-*` 排序並重算 SHA-256。
-3. 以 `git diff --binary --full-index --no-ext-diff --no-textconv <base_sha> --` 取得 base 至工作樹的原始 tracked bytes，禁止 external diff與textconv driver，SHA-256 寫入 `tracked_diff_sha256`。
-4. 以 `git ls-files --others --exclude-standard -z` 取得全部未忽略新檔；path 正規化為 `/`、依 Git path bytes 排序，逐檔雜湊原始 bytes。Snapshot 前清除 command contract 要求清除的 temporary outputs；只排除 Ledger、timestamps 與 handoff 明列的 allowed ignored build outputs。
+2. Ready artifacts（含實際 handoff hash）按 normalized ref 排序；sources 按 `SRC-*` 排序並依其revision重算 SHA-256：`revision == base_sha`的local source必須以`git cat-file blob <base_sha>:<normalized-path>`取得原始base blob，其他已核准／materialized local artifact則讀目前穩定bytes，URL沿用manifest hash。缺少base blob或任一hash不符都使snapshot失效；不得把合法實作後的working-tree bytes拿來取代planning-time base evidence。
+3. 以 `git diff --binary --full-index --no-ext-diff --no-textconv <base_sha> -- . :(exclude)docs/knowledge/**` 取得 base 至工作樹的原始 tracked product bytes，禁止 external diff與textconv driver，SHA-256 寫入 `tracked_diff_sha256`。唯一內容排除是`docs/knowledge/**`；outcome、Work ID artifacts與其他docs都在product snapshot。
+4. 以 `git ls-files --others --exclude-standard -z` 取得全部未忽略新檔；只略過`docs/knowledge/**`，其餘path正規化為 `/`、依 Git path bytes 排序，逐檔雜湊原始 bytes。Snapshot 前清除 command contract 要求清除的 temporary outputs；Ledger、timestamps 與 handoff 明列的 allowed ignored build outputs原本就不在eligible product set。
 5. 對不含 `snapshot_id` 的 object 使用 UTF-8（無 BOM）、object keys 字典序、arrays 依上述 ref/path 排序、`/` 分隔符、無額外 whitespace 或尾端 newline的 JSON：等價於 `ensure_ascii=false, sort_keys=true, separators=(",", ":")`。其 SHA-256 為 `snapshot_id`。
 
 Snapshot 本身不含 timestamp、Ledger path、review round 或 command output location。相同內容必須重算出相同 ID；任何 reviewed byte drift 使該輪失效並回 `Verifying`。
 
+Required delivery overlay另建立`knowledge-snapshot/v1`：綁sealed Candidate ref／payload、Candidate operations與每個Git-eligible `docs/knowledge/**`檔案的完整pre-tree；從Candidate registry的sealed postimage bytes重建expected post-tree與兩個tree snapshot IDs。第二位、不同的fresh Reviewer審查最新Outcome、final product snapshot與knowledge snapshot；送審前後snapshot必須完全相同，preliminary report不能兼任final report。任何Candidate外新增、修改或移除的knowledge path都使review失效。Product與knowledge兩份snapshot分開；人工核准promotion後除重算product外，completion還必須重算完整actual post-tree、比對reviewed expected post-tree並執行full lint，不能只比較caller提供的ID。
+
 ## 2. Fresh read-only Reviewer
 
-每輪只啟動一個全新 subagent，並要求其 report attestation 可驗證：
+每輪只啟動一個全新 subagent，preliminary與final各自使用不同fresh session，並要求其 report attestation 可驗證：
 
 - `implementation_conversation_received: false`：不帶實作對話、主代理推理、辯護、預期 verdict 或前一位 Reviewer 的未驗證結論；原始 Ledger evidence 仍是下一項所需的審查輸入；
 - 直接取得原始 source manifest、artifacts、plan revision、base SHA、完整 repository snapshot、Ledger evidence 與 raw command outputs；
@@ -58,7 +64,7 @@ Reviewer 必須自行重跑全量 build、test、BDD 與治理命令，並獨立
 
 ## 4. `implementation-review/v1`
 
-原始 report 必須符合 [execution records schema](execution-records.schema.json) 的 `reviewReport`：verdict、snapshot-before／after、Reviewer attestation、獨立 command outcomes、raw-output logical refs、逐一對應 `SRC-*`／`plan_refs` 的 requirement coverage、findings 與 summary 均完整。
+原始 report 必須符合 [execution records schema](execution-records.schema.json) 的 `reviewReport`：verdict、snapshot-before／after、Reviewer attestation、獨立 command outcomes、raw-output logical refs、逐一對應 `SRC-*`／`plan_refs` 的 requirement coverage、findings 與 summary 均完整。Preliminary report的`logical_ref`必填，其path與hash由Outcome實體綁定，且四個knowledge欄位必須完全缺席。Required knowledge overlay的final report則必須整組包含`knowledge_snapshot_before`、`knowledge_snapshot_after`、`knowledge_candidate_ref`、`knowledge_candidate_payload_sha256`；before／after相同，且與delivery gate及sealed Candidate精確一致。兩份report保存在不同path並使用連續round；Legacy final report可完全缺少四個knowledge欄位，不以空值補寫。
 
 BUG Ready plan 的report另必須同時保存`bug_verification_ref`與`bug_verification_result`。Reviewer分別判定：(1) implementation verdict；(2) BUG result。`verified`須有原始pre-fix present與post-fix absent、regression red→green及full pass；`partial`須是Plan事先核准的低信心分支，具proxy red→green、full pass、殘餘風險與follow-up；Ready與verification的reason／risk／follow-up需分別保留明確不確定性、風險語意與驗證動作，任何conclusive remediated／validated或中英文等價確定宣稱都拒絕。Verification與review兩份summary另採fail-closed canonical wording，只允許明示proxy已通過、結果為partial且原始症狀仍無法確認的中英文固定句，任何自由改寫（包含「The BUG has been verified as fixed.」）都拒絕。Partial review的完整公開claim-bearing欄位至少包含`summary`、`findings[].message`與`findings[].key_inputs.required_outcome`；後兩者也必須套用相同的中英文／改寫式overclaim guard。`failed`不得與`APPROVED`交付共存。原始症狀、regression／proxy red-green、full-command output及implementation review的每個ref必須是不同的canonical Ledger-relative path，實際存在且列在Complete terminal index；只填字串不構成evidence。
 
@@ -81,7 +87,7 @@ Verdict 只依下列分支：
 
 ## 5. 修正輪迴與進展式熔斷
 
-主代理逐項驗證 finding，不可因不同意就省略。實質 finding 依 BDD／TDD 契約修正；advisory 只記錄。每次修正後完整重跑主代理驗證，建立新 snapshot，再啟動另一個全新 Reviewer。
+主代理逐項驗證 finding，不可因不同意就省略。實質 finding 依 BDD／TDD 契約修正；advisory 只記錄。Final finding需要修改product或Outcome時，舊Outcome與Candidate保留為未採用證據；完整重跑主代理驗證與新preliminary review，建立下一個連續Outcome revision、重新封存Candidate與snapshot，再啟動另一個全新final Reviewer。
 
 Ledger 以 `finding_key` 保存每輪原始 ID、alias 與 transition。只有 key inputs 實質改變才是不同 finding；改寫 ID／message 不重置計數：
 

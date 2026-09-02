@@ -1465,5 +1465,192 @@ class BugVerificationTests(unittest.TestCase):
         self.assertTrue(any("unauthorized BUG dirty path" in error for error in standard_errors), standard_errors)
 
 
+class KnowledgeOutcomeContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.execution_schema = json.loads(
+            (
+                SKILLS_ROOT
+                / "implementation-execution/references/execution-records.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+
+    def approved_review(self) -> dict:
+        return {
+            "schema": "implementation-review/v1",
+            "logical_ref": "review:fresh-review:contract-fixture-r1",
+            "round": 1,
+            "verdict": "APPROVED",
+            "snapshot_before": "a" * 64,
+            "snapshot_after": "a" * 64,
+            "attestation": {
+                "agent_id": "knowledge-reviewer",
+                "fresh_session": True,
+                "read_only": True,
+                "implementation_conversation_received": False,
+                "delegation_used": False,
+                "write_actions": False,
+            },
+            "command_outcomes": [
+                {
+                    "command_id": "CMD-TEST-FULL-001",
+                    "outcome": "passed",
+                    "exit_code": 0,
+                    "failure_count": 0,
+                    "skipped_count": 0,
+                    "output_ref": "reviews/knowledge-test-output.txt",
+                    "not_run_reason": None,
+                }
+            ],
+            "raw_output_refs": ["reviews/knowledge-test-output.txt"],
+            "requirement_coverage": [
+                {
+                    "source_ref": "SRC-001",
+                    "obligation_ref": "REQ-001",
+                    "bdd_refs": ["BDD-001"],
+                    "test_refs": ["TEST-001"],
+                    "wp_refs": ["WP-001"],
+                    "code_evidence": ["src/feature.py:1"],
+                    "result": "covered",
+                }
+            ],
+            "findings": [],
+            "summary": "Fresh review approved both product and knowledge snapshots.",
+        }
+
+    def standard_outcome(self) -> dict:
+        work_id = "work-20260831-knowledge-outcome-12345678"
+        return {
+            "schema": "implementation-outcome/v1",
+            "work_id": work_id,
+            "implementation_run_id": "f" * 64,
+            "revision": 1,
+            "work_kind": "standard",
+            "result": "complete",
+            "summary": "The reviewed implementation preserves the approved behavior.",
+            "changes": [
+                {
+                    "path": "src/feature.py",
+                    "sha256": "a" * 64,
+                    "summary": "Implemented the approved behavior.",
+                }
+            ],
+            "verification": [
+                {
+                    "command_id": "CMD-TEST-FULL-001",
+                    "outcome": "passed",
+                    "evidence_refs": ["commands/full-test.json"],
+                }
+            ],
+            "review": {
+                "verdict": "APPROVED",
+                "evidence_refs": ["review:fresh-review:contract-fixture-r1"],
+                "report_ref": "reviews/contract-fixture-r1/report.json",
+                "report_sha256": "c" * 64,
+            },
+            "known_deviations": [],
+            "knowledge_decision": "change",
+            "bug_verification_ref": None,
+            "bug": None,
+            "markdown": {
+                "path": f"docs/work/{work_id}/implementation/outcome.md",
+                "sha256": "b" * 64,
+            },
+            "created_at": "2026-08-31T12:00:00+08:00",
+        }
+
+    def test_standard_outcome_is_closed_and_hash_bound(self) -> None:
+        outcome = self.standard_outcome()
+        self.assertEqual(
+            [],
+            validator.validate_instance(outcome, self.execution_schema, "implementationOutcome"),
+        )
+        self.assertEqual([], validator.validate_execution_record_semantics(outcome))
+        missing_hash = copy.deepcopy(outcome)
+        missing_hash["changes"][0].pop("sha256")
+        self.assertTrue(
+            validator.validate_instance(missing_hash, self.execution_schema, "implementationOutcome")
+        )
+        missing_report_hash = copy.deepcopy(outcome)
+        missing_report_hash["review"].pop("report_sha256")
+        self.assertTrue(
+            validator.validate_instance(
+                missing_report_hash,
+                self.execution_schema,
+                "implementationOutcome",
+            )
+        )
+
+    def test_complete_outcome_rejects_failed_commands_and_unbound_review(self) -> None:
+        failed_command = self.standard_outcome()
+        failed_command["verification"][0]["outcome"] = "failed"
+        errors = validator.validate_execution_record_semantics(failed_command)
+        self.assertTrue(any("every verification command" in error for error in errors), errors)
+
+        missing_evidence = self.standard_outcome()
+        missing_evidence["verification"][0]["evidence_refs"] = []
+        errors = validator.validate_execution_record_semantics(missing_evidence)
+        self.assertTrue(any("requires evidence" in error for error in errors), errors)
+
+        unbound_review = self.standard_outcome()
+        unbound_review["review"]["evidence_refs"] = ["reviews/round-1/report.json"]
+        errors = validator.validate_execution_record_semantics(unbound_review)
+        self.assertTrue(any("fresh-review logical ref" in error for error in errors), errors)
+
+    def test_review_knowledge_binding_is_all_or_none_and_drift_free(self) -> None:
+        report = self.approved_review()
+        report.update(
+            {
+                "knowledge_snapshot_before": "c" * 64,
+                "knowledge_snapshot_after": "c" * 64,
+                "knowledge_candidate_ref": "knowledge:candidates/promotion-review-knowledge/candidate.json",
+                "knowledge_candidate_payload_sha256": "d" * 64,
+            }
+        )
+        self.assertEqual(
+            [],
+            validator.validate_instance(report, self.execution_schema, "reviewReport"),
+        )
+        self.assertEqual([], validator.validate_execution_record_semantics(report))
+        drifted = copy.deepcopy(report)
+        drifted["knowledge_snapshot_after"] = "e" * 64
+        errors = validator.validate_execution_record_semantics(drifted)
+        self.assertTrue(any("knowledge snapshot" in error for error in errors), errors)
+        incomplete = copy.deepcopy(report)
+        incomplete.pop("knowledge_candidate_payload_sha256")
+        self.assertTrue(
+            validator.validate_instance(incomplete, self.execution_schema, "reviewReport")
+        )
+
+    def test_partial_bug_outcome_rejects_fix_overclaim(self) -> None:
+        _, verification = _bug_verification_example("partial")
+        outcome = self.standard_outcome()
+        outcome.update(
+            {
+                "work_kind": "bug",
+                "result": "partial",
+                "summary": verification["summary"],
+                "bug_verification_ref": "bug-verification:sample",
+                "bug": {
+                    "bug_id": verification["bug_id"],
+                    "original_reproduction": verification["original_reproduction"],
+                    "regression": verification["regression"],
+                    "proxy": verification["proxy"],
+                    "residual_risks": verification["residual_risks"],
+                    "follow_up": verification["follow_up"],
+                    "implementation_review_ref": verification["implementation_review_ref"],
+                },
+            }
+        )
+        self.assertEqual(
+            [],
+            validator.validate_instance(outcome, self.execution_schema, "implementationOutcome"),
+        )
+        self.assertEqual([], validator.validate_execution_record_semantics(outcome))
+        outcome["summary"] = "The BUG is verified fixed."
+        errors = validator.validate_execution_record_semantics(outcome)
+        self.assertTrue(any("overclaim" in error for error in errors), errors)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

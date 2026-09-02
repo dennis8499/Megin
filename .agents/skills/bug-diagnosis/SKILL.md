@@ -25,6 +25,12 @@ description: 診斷疑似 BUG、flaky failure、效能回歸或不明工程異�
 
 ## 1. 建立精確症狀訊號
 
+先執行 read-only 知識 preflight：
+
+`python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py query --repo . --stage bug --query "<目前症狀與元件>"`
+
+保存 `knowledge-context/v1` 作為 diagnosis evidence，並在提出假設前重讀每個 result 的 `source_refs`。這個步驟不寫回 Wiki、assessment 或產品；typed dependency／contract error 使 diagnosis 保持 Blocked。只有 Ready BOOT plan 明列 skill 尚不存在時可使用其 bootstrap exception。
+
 記錄 observed／expected behavior、首次或最近已知正常、環境與輸入、頻率／分布、影響、severity，以及能分辨「症狀存在／不存在」的 oracle。缺 expected behavior 時先標為未知，不把推測當 BUG。
 
 完成條件：同一操作可由另一位工程人員判斷是否出現同一症狀；severity 只影響優先與風險回報，不繞過任何 gate。

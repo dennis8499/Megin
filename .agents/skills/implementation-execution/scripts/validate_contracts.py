@@ -35,7 +35,7 @@ _validate_schema_refs = _shared._validate_schema_refs
 partial_overclaim = _shared.partial_overclaim
 partial_safeguard_prose_errors = _shared.partial_safeguard_prose_errors
 
-EXECUTION_SCHEMA_SHA256 = "001646122fe6b80cf099840a92c0d20746cee133f1aab7827cee464b8ab864d1"
+EXECUTION_SCHEMA_SHA256 = "3ccb5203e141068d0d68bb9b58f528d2d342ef52f682bf88557cc5acea5c54f3"
 AUTHORITY_FILES = {
     "implementation-entrypoint": "implementation-execution/SKILL.md",
     "execution-ledger": "implementation-execution/references/preflight-and-ledger.md",
@@ -102,6 +102,37 @@ EXECUTION_DEF_REQUIRED = {
         "follow_up",
         "implementation_review_ref",
         "summary",
+        "created_at",
+    },
+    "outcomeChange": {"path", "sha256", "summary"},
+    "outcomeVerification": {"command_id", "outcome", "evidence_refs"},
+    "outcomeReview": {"verdict", "evidence_refs", "report_ref", "report_sha256"},
+    "outcomeMarkdown": {"path", "sha256"},
+    "bugOutcomeDetails": {
+        "bug_id",
+        "original_reproduction",
+        "regression",
+        "proxy",
+        "residual_risks",
+        "follow_up",
+        "implementation_review_ref",
+    },
+    "implementationOutcome": {
+        "schema",
+        "work_id",
+        "implementation_run_id",
+        "revision",
+        "work_kind",
+        "result",
+        "summary",
+        "changes",
+        "verification",
+        "review",
+        "known_deviations",
+        "knowledge_decision",
+        "bug_verification_ref",
+        "bug",
+        "markdown",
         "created_at",
     },
     "binding": {"repo_id", "canonical_worktree", "worktree_key", "branch", "initial_base_sha", "run_id"},
@@ -1142,6 +1173,20 @@ def validate_execution_record_semantics(
             value is not None for value in bug_fields
         ):
             errors.append("review: BUG verification ref and result must be recorded together")
+        knowledge_fields = (
+            data.get("knowledge_snapshot_before"),
+            data.get("knowledge_snapshot_after"),
+            data.get("knowledge_candidate_ref"),
+            data.get("knowledge_candidate_payload_sha256"),
+        )
+        if any(value is not None for value in knowledge_fields) and not all(
+            value is not None for value in knowledge_fields
+        ):
+            errors.append("review: knowledge snapshots and Candidate binding must be recorded together")
+        if all(value is not None for value in knowledge_fields) and (
+            data.get("knowledge_snapshot_before") != data.get("knowledge_snapshot_after")
+        ):
+            errors.append("review: accepted knowledge snapshot must be identical before and after review")
         raw_ref_list = data.get("raw_output_refs", [])
         raw_refs = set(raw_ref_list)
         if len(raw_ref_list) != len(raw_refs):
@@ -1205,6 +1250,65 @@ def validate_execution_record_semantics(
                     known_secret_values=known_secret_values,
                 )
             )
+    elif schema_name == "implementation-outcome/v1":
+        changes = data.get("changes", [])
+        change_paths = [item.get("path") for item in changes if isinstance(item, dict)]
+        if len(change_paths) != len(set(change_paths)):
+            errors.append("outcome: duplicate changed path")
+        if any(
+            not isinstance(path, str) or path.startswith("docs/knowledge/")
+            for path in change_paths
+        ):
+            errors.append("outcome: product changes cannot target canonical knowledge")
+        work_id = data.get("work_id")
+        revision = data.get("revision")
+        suffix = "" if revision == 1 else f"-{revision}"
+        expected_markdown = f"docs/work/{work_id}/implementation/outcome{suffix}.md"
+        if data.get("markdown", {}).get("path") != expected_markdown:
+            errors.append("outcome: Markdown path is not canonical for the Work ID")
+        verification = data.get("verification", [])
+        result = data.get("result")
+        review = data.get("review", {})
+        if result in {"complete", "verified"} and any(
+            item.get("outcome") != "passed"
+            for item in verification
+            if isinstance(item, dict)
+        ):
+            errors.append("outcome: complete or verified requires every verification command to pass")
+        if any(
+            not isinstance(item, dict)
+            or not item.get("evidence_refs")
+            for item in verification
+        ):
+            errors.append("outcome: every verification command requires evidence")
+        if result in {"complete", "verified", "partial"} and review.get("verdict") != "APPROVED":
+            errors.append("outcome: accepted result requires APPROVED fresh review")
+        if result == "failed" and review.get("verdict") == "APPROVED":
+            errors.append("outcome: failed result cannot have APPROVED review")
+        if any(
+            not isinstance(ref, str)
+            or re.fullmatch(r"review:fresh-review:[a-z0-9][a-z0-9._-]{2,127}", ref) is None
+            for ref in review.get("evidence_refs", [])
+        ):
+            errors.append("outcome: review evidence ref is not a fresh-review logical ref")
+        if len(review.get("evidence_refs", [])) != 1:
+            errors.append("outcome: preliminary review requires exactly one logical ref")
+        if data.get("work_kind") == "bug":
+            bug = data.get("bug")
+            if not isinstance(bug, dict):
+                errors.append("outcome: BUG details are missing")
+            elif result == "partial" and partial_overclaim(
+                {
+                    "summary": data.get("summary"),
+                    "residual_risks": bug.get("residual_risks"),
+                    "follow_up": bug.get("follow_up"),
+                }
+            ):
+                errors.append("outcome: partial BUG contains a verified-fix overclaim")
+            if result == "failed" and data.get("knowledge_decision") != "no-change":
+                errors.append("outcome: failed BUG must use a no-change knowledge decision")
+        elif data.get("bug") is not None or data.get("bug_verification_ref") is not None:
+            errors.append("outcome: standard work cannot carry BUG bindings")
     elif schema_name == "implementation-breaker/v1":
         if breaker_reports is None:
             errors.append("breaker: persisted review report chain is required for semantic validation")
@@ -1613,6 +1717,9 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "A→B→C無證據輪換",
         "bug_verification_ref",
         "Reviewer分別判定",
+        "implementation-outcome/v1",
+        "knowledge_snapshot_before",
+        "knowledge_candidate_payload_sha256",
     ):
         if fragment not in reviewer:
             errors.append(f"reviewer authority missing shared semantic {fragment}")
@@ -1624,6 +1731,8 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "terminal/<sequence>-<step>.json",
         "結果為`failed`",
         "未materialize",
+        "knowledge/awaiting_user",
+        "knowledge-promotion/v1",
     ):
         if fragment not in delivery:
             errors.append(f"delivery authority missing terminal persistence semantic {fragment}")
@@ -1643,6 +1752,8 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         "partial public claim contains a verified-fix overclaim",
         "raw JSON contains a duplicate object key",
         "APPROVED review cannot carry failed BUG verification",
+        "outcome: partial BUG contains a verified-fix overclaim",
+        "review: knowledge snapshots and Candidate binding must be recorded together",
     ):
         if fragment not in validator_source:
             errors.append(f"implementation validator missing BUG semantic {fragment}")

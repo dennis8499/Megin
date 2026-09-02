@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.skills/project-knowledge/knowledge-contracts.schema.json",
+  "title": "Project knowledge contracts",
+  "oneOf": [
+    {"$ref": "#/$defs/page"},
+    {"$ref": "#/$defs/context"},
+    {"$ref": "#/$defs/candidate"},
+    {"$ref": "#/$defs/promotion"},
+    {"$ref": "#/$defs/applyResult"},
+    {"$ref": "#/$defs/lint"},
+    {"$ref": "#/$defs/snapshot"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "normalizedPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "locator", "excerpt_sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "locator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start_line", "end_line"],
+          "properties": {
+            "start_line": {"type": "integer", "minimum": 1},
+            "end_line": {"type": "integer", "minimum": 1}
+          }
+        },
+        "excerpt_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "evidence_class",
+        "lifecycle",
+        "content_anchor",
+        "source_refs",
+        "supersedes",
+        "contradicts"
+      ],
+      "properties": {
+        "claim_id": {"type": "string", "minLength": 1},
+        "evidence_class": {"enum": ["required", "planned", "observed", "verified", "partial"]},
+        "lifecycle": {"enum": ["current", "superseded", "contested", "stale"]},
+        "content_anchor": {"type": "string", "minLength": 1},
+        "source_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/sourceRef"}
+        },
+        "supersedes": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "contradicts": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "page_id",
+        "content_path",
+        "content_sha256",
+        "title",
+        "aliases",
+        "tags",
+        "lifecycle",
+        "claims",
+        "backlinks"
+      ],
+      "properties": {
+        "schema": {"const": "knowledge-page/v1"},
+        "page_id": {"type": "string", "minLength": 1},
+        "content_path": {"$ref": "#/$defs/normalizedPath"},
+        "content_sha256": {"$ref": "#/$defs/sha256"},
+        "title": {"type": "string", "minLength": 1},
+        "aliases": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "tags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "lifecycle": {"enum": ["current", "superseded", "contested", "stale"]},
+        "claims": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/claim"}},
+        "backlinks": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "contextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "lifecycle",
+        "match_reasons",
+        "path",
+        "start_line",
+        "claim_id",
+        "score",
+        "source_refs"
+      ],
+      "properties": {
+        "authority": {"enum": ["canonical", "raw"]},
+        "lifecycle": {"const": "current"},
+        "match_reasons": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "start_line": {"type": "integer", "minimum": 1},
+        "claim_id": {"type": ["string", "null"]},
+        "score": {"type": "integer", "minimum": 0},
+        "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceRef"}}
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "stage", "query", "results", "diagnostics", "generated_at"],
+      "properties": {
+        "schema": {"const": "knowledge-context/v1"},
+        "stage": {
+          "enum": ["requirements", "planning", "implementation", "bug", "ad-hoc"]
+        },
+        "query": {"type": "string", "minLength": 1},
+        "results": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {"$ref": "#/$defs/contextResult"}
+        },
+        "diagnostics": {"type": "array", "items": {"type": "string"}},
+        "generated_at": {"type": "string", "minLength": 1}
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "preimage_sha256", "postimage_sha256", "postimage_ref"],
+      "properties": {
+        "kind": {"enum": ["create", "update"]},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "preimage_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "postimage_sha256": {"$ref": "#/$defs/sha256"},
+        "postimage_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "fileHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "snapshotOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "preimage_sha256", "postimage_sha256", "postimage_ref", "postimage_size"],
+      "properties": {
+        "kind": {"enum": ["create", "update"]},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "preimage_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "postimage_sha256": {"$ref": "#/$defs/sha256"},
+        "postimage_ref": {"type": "string", "minLength": 1},
+        "postimage_size": {"type": "integer", "minimum": 0}
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "promotion_id",
+        "stage",
+        "work_id",
+        "decision",
+        "approval",
+        "source_snapshot",
+        "operations",
+        "payload_sha256",
+        "status"
+      ],
+      "properties": {
+        "schema": {"const": "knowledge-candidate/v1"},
+        "promotion_id": {"type": "string", "minLength": 1},
+        "stage": {"type": "string", "minLength": 1},
+        "work_id": {"type": "string", "minLength": 1},
+        "decision": {"enum": ["change", "no-change"]},
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actor", "evidence"],
+          "properties": {
+            "actor": {"type": "string", "minLength": 1},
+            "evidence": {"type": "string", "minLength": 1}
+          }
+        },
+        "source_snapshot": {"type": "array", "items": {"$ref": "#/$defs/sourceRef"}},
+        "operations": {"type": "array", "items": {"$ref": "#/$defs/operation"}},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "status": {"const": "Candidate"}
+      }
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "promotion_id",
+        "stage",
+        "work_id",
+        "candidate_ref",
+        "payload_sha256",
+        "decision",
+        "approval",
+        "lint",
+        "status"
+      ],
+      "properties": {
+        "schema": {"const": "knowledge-promotion/v1"},
+        "promotion_id": {"type": "string", "minLength": 1},
+        "stage": {"type": "string", "minLength": 1},
+        "work_id": {"type": "string", "minLength": 1},
+        "candidate_ref": {"type": "string", "minLength": 1},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "decision": {"enum": ["change", "no-change"]},
+        "formal_paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/normalizedPath"}
+        },
+        "approval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["actor", "evidence"],
+          "properties": {
+            "actor": {"type": "string", "minLength": 1},
+            "evidence": {"type": "string", "minLength": 1}
+          }
+        },
+        "lint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required_outcome"],
+          "properties": {"required_outcome": {"const": "passed"}}
+        },
+        "status": {"const": "Ready"}
+      }
+    },
+    "applyResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "promotion", "receipt_path", "receipt_sha256", "post_apply_lint"],
+      "properties": {
+        "schema": {"const": "knowledge-apply/v1"},
+        "promotion": {"$ref": "#/$defs/promotion"},
+        "receipt_path": {"$ref": "#/$defs/normalizedPath"},
+        "receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "post_apply_lint": {"$ref": "#/$defs/lint"}
+      }
+    },
+    "lintDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "message": {"type": "string", "minLength": 1}
+      }
+    },
+    "lint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "outcome", "diagnostics", "eligible_claim_ids"],
+      "properties": {
+        "schema": {"const": "knowledge-lint/v1"},
+        "outcome": {"enum": ["passed", "failed", "decision_required"]},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/lintDiagnostic"}},
+        "eligible_claim_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        ,
+        "repo_id": {"$ref": "#/$defs/sha256"},
+        "repair_candidate_ref": {"type": ["string", "null"]},
+        "repair_candidate_payload_sha256": {
+          "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "repo_id",
+        "candidate_ref",
+        "payload_sha256",
+        "preimages",
+        "postimages",
+        "operations",
+        "pre_snapshot_id",
+        "post_snapshot_id",
+        "snapshot_id"
+      ],
+      "properties": {
+        "schema": {"const": "knowledge-snapshot/v1"},
+        "repo_id": {"$ref": "#/$defs/sha256"},
+        "candidate_ref": {"type": "string", "minLength": 1},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "preimages": {"type": "array", "items": {"$ref": "#/$defs/fileHash"}},
+        "postimages": {"type": "array", "items": {"$ref": "#/$defs/fileHash"}},
+        "operations": {"type": "array", "items": {"$ref": "#/$defs/snapshotOperation"}},
+        "pre_snapshot_id": {"$ref": "#/$defs/sha256"},
+        "post_snapshot_id": {"$ref": "#/$defs/sha256"},
+        "snapshot_id": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
+
+

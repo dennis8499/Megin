@@ -1,4 +1,11 @@
+* text=auto eol=lf
+
 .agents/skills/delivery-orchestrator/references/delivery-run.schema.json text eol=lf
 .agents/skills/implementation-execution/references/execution-records.schema.json text eol=lf
 .agents/skills/technical-planning/references/ready-plan.schema.json text eol=lf
 .agents/skills/bug-diagnosis/references/assessment.schema.json text eol=lf
+.agents/skills/project-knowledge/** text eol=lf
+docs/work/** text eol=lf
+docs/bugs/** text eol=lf
+docs/knowledge/** text eol=lf
+.github/workflows/** text eol=lf

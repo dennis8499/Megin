@@ -18,6 +18,12 @@ description: 將已釐清的開發規格與專案證據轉成可核准的 Ready 
 
 ## 1. 鎖定來源與證據
 
+先執行 read-only 知識 preflight：
+
+`python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py query --repo . --stage planning --query "<目前規劃意圖>"`
+
+保存 `knowledge-context/v1` 作為 source evidence，並在形成設計前重讀每個 result 的 `source_refs`。這個步驟不寫回 Wiki 或規劃 artifacts；typed dependency／contract error 使 evidence gate 保持 Blocked。只有 Ready BOOT plan 明列 skill 尚不存在時可使用其 bootstrap exception。
+
 依序選取唯一來源規格：使用者明示來源、治理指定來源、工作區中唯一能對應成果的來源。若仍有多個合理候選，列出位置並只詢問使用者選擇來源。
 
 擷取目標、範圍外、規範性需求、驗收、品質屬性、技術限制及相容／移轉條件。先讀適用的 `AGENTS.md` 與治理，再依影響範圍查證 README、詞彙、ADR、manifests、lockfiles、版本與入口、模組／資料／契約、測試、BDD framework、CI、支援環境與相關 Git 歷史；使用 `rg` 或 `rg --files` 定位。沒有應用程式碼是 greenfield 的 `Observed` 證據。

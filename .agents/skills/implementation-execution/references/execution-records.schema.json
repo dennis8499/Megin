@@ -7,7 +7,8 @@
     {"$ref": "#/$defs/snapshot"},
     {"$ref": "#/$defs/reviewReport"},
     {"$ref": "#/$defs/breaker"},
-    {"$ref": "#/$defs/bugVerification"}
+    {"$ref": "#/$defs/bugVerification"},
+    {"$ref": "#/$defs/implementationOutcome"}
   ],
   "$defs": {
     "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
@@ -369,6 +370,118 @@
         "created_at": {"type": "string", "minLength": 1, "format": "date-time"}
       }
     },
+    "outcomeChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "summary"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "summary": {"type": "string", "minLength": 1}
+      }
+    },
+    "outcomeVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_id", "outcome", "evidence_refs"],
+      "properties": {
+        "command_id": {"type": "string", "pattern": "^CMD-[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "outcome": {"enum": ["passed", "failed", "not_run"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "outcomeReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "evidence_refs", "report_ref", "report_sha256"],
+      "properties": {
+        "verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {"type": "string", "pattern": "^review:fresh-review:[a-z0-9][a-z0-9._-]{2,127}$"}
+        },
+        "report_ref": {"type": "string", "pattern": "^reviews/[a-z0-9][a-z0-9._-]{2,127}/report\\.json$"},
+        "report_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "outcomeMarkdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "bugOutcomeDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug_id", "original_reproduction", "regression", "proxy", "residual_risks", "follow_up", "implementation_review_ref"],
+      "properties": {
+        "bug_id": {"$ref": "#/$defs/bugId"},
+        "original_reproduction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pre_fix", "post_fix"],
+          "properties": {
+            "pre_fix": {"$ref": "#/$defs/symptomEvidence"},
+            "post_fix": {"$ref": "#/$defs/symptomEvidence"}
+          }
+        },
+        "regression": {"$ref": "#/$defs/contractEvidence"},
+        "proxy": {"$ref": "#/$defs/contractEvidence"},
+        "residual_risks": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "follow_up": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "implementation_review_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "implementationOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "work_id", "implementation_run_id", "revision", "work_kind", "result", "summary", "changes", "verification", "review", "known_deviations", "knowledge_decision", "bug_verification_ref", "bug", "markdown", "created_at"],
+      "properties": {
+        "schema": {"const": "implementation-outcome/v1"},
+        "work_id": {"type": "string", "pattern": "^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "implementation_run_id": {"$ref": "#/$defs/sha256"},
+        "revision": {"type": "integer", "minimum": 1},
+        "work_kind": {"enum": ["standard", "bug"]},
+        "result": {"enum": ["complete", "verified", "partial", "failed"]},
+        "summary": {"type": "string", "minLength": 1},
+        "changes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/outcomeChange"}},
+        "verification": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/outcomeVerification"}},
+        "review": {"$ref": "#/$defs/outcomeReview"},
+        "known_deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "knowledge_decision": {"enum": ["change", "no-change"]},
+        "bug_verification_ref": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "bug": {"oneOf": [{"$ref": "#/$defs/bugOutcomeDetails"}, {"type": "null"}]},
+        "markdown": {"$ref": "#/$defs/outcomeMarkdown"},
+        "created_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"work_kind": {"const": "standard"}}, "required": ["work_kind"]},
+          "then": {
+            "properties": {
+              "result": {"const": "complete"},
+              "bug_verification_ref": {"type": "null"},
+              "bug": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"work_kind": {"const": "bug"}}, "required": ["work_kind"]},
+          "then": {
+            "properties": {
+              "result": {"enum": ["verified", "partial", "failed"]},
+              "bug_verification_ref": {"type": "string", "minLength": 1},
+              "bug": {"$ref": "#/$defs/bugOutcomeDetails"}
+            }
+          }
+        }
+      ]
+    },
     "reviewReport": {
       "type": "object",
       "additionalProperties": false,
@@ -387,6 +500,7 @@
       ],
       "properties": {
         "schema": {"const": "implementation-review/v1"},
+        "logical_ref": {"type": "string", "pattern": "^review:fresh-review:[a-z0-9][a-z0-9._-]{2,127}$"},
         "round": {"type": "integer", "minimum": 1},
         "verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]},
         "snapshot_before": {"$ref": "#/$defs/sha256"},
@@ -398,8 +512,32 @@
         "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
         "bug_verification_ref": {"type": "string", "minLength": 1},
         "bug_verification_result": {"enum": ["verified", "partial", "failed"]},
+        "knowledge_snapshot_before": {"$ref": "#/$defs/sha256"},
+        "knowledge_snapshot_after": {"$ref": "#/$defs/sha256"},
+        "knowledge_candidate_ref": {"type": "string", "pattern": "^knowledge:candidates/promotion-[a-z0-9]+(?:-[a-z0-9]+)*/candidate\\.json$"},
+        "knowledge_candidate_payload_sha256": {"$ref": "#/$defs/sha256"},
         "summary": {"type": "string", "minLength": 1}
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {"required": ["knowledge_snapshot_before"]},
+              {"required": ["knowledge_snapshot_after"]},
+              {"required": ["knowledge_candidate_ref"]},
+              {"required": ["knowledge_candidate_payload_sha256"]}
+            ]
+          },
+          "then": {
+            "required": [
+              "knowledge_snapshot_before",
+              "knowledge_snapshot_after",
+              "knowledge_candidate_ref",
+              "knowledge_candidate_payload_sha256"
+            ]
+          }
+        }
+      ]
     },
     "breakerFinding": {
       "type": "object",

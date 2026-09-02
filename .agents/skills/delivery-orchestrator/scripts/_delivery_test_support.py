@@ -144,6 +144,19 @@ class DeliveryFixture(unittest.TestCase):
             REQUEST_SHA,
             root=self.registry,
             generation=generation,
+            knowledge_policy="legacy",
+        )
+
+    def start_required(
+        self,
+        repo: Path,
+        work_id: str = "work-knowledge-required",
+    ) -> dict[str, Any]:
+        return workspace.start_workspace(
+            repo,
+            work_id,
+            REQUEST_SHA,
+            root=self.registry,
         )
 
     def assert_error(self, code: str, callback: Any) -> workspace.DeliveryError:
@@ -185,6 +198,7 @@ class DeliveryFixture(unittest.TestCase):
         run_id: str,
         *,
         bug_verification_result: str | None = None,
+        allow_preexisting_review_evidence: bool = False,
     ) -> tuple[str, str, str]:
         record = self.record(delivery, work_id)
         handoff_relative = record["plans"]["current_handoff_path"]
@@ -197,8 +211,27 @@ class DeliveryFixture(unittest.TestCase):
             / "runs"
         )
         run_dir = runs_root / run_id
-        self.assertFalse(run_dir.exists(), f"isolated implementation run already exists: {run_id}")
-        review_relative = "reviews/round-1/report.json"
+        if allow_preexisting_review_evidence:
+            self.assertTrue(run_dir.is_dir(), f"preliminary implementation run is absent: {run_id}")
+            existing = {
+                path.relative_to(run_dir).as_posix()
+                for path in run_dir.rglob("*")
+                if path.is_file()
+            }
+            self.assertTrue(existing)
+            self.assertTrue(
+                all(
+                    path == "run.json"
+                    or path.startswith("reviews/preliminary-")
+                    for path in existing
+                ),
+                existing,
+            )
+        else:
+            self.assertFalse(run_dir.exists(), f"isolated implementation run already exists: {run_id}")
+        review_round = 2 if allow_preexisting_review_evidence else 1
+        review_root = f"reviews/round-{review_round}"
+        review_relative = f"{review_root}/report.json"
         review_path = run_dir / Path(*review_relative.split("/"))
         review_path.parent.mkdir(parents=True)
         self.implementation_run_dirs.append(run_dir)
@@ -207,7 +240,7 @@ class DeliveryFixture(unittest.TestCase):
         for command in handoff["commands"]:
             if command["purpose"] not in {"build-full", "test-full", "bdd-full", "governance", "ci"}:
                 continue
-            output_ref = f"reviews/round-1/outputs/{command['command_id']}.txt"
+            output_ref = f"{review_root}/outputs/{command['command_id']}.txt"
             outcomes.append(
                 {
                     "command_id": command["command_id"],
@@ -324,7 +357,7 @@ class DeliveryFixture(unittest.TestCase):
         )
         report = {
             "schema": "implementation-review/v1",
-            "round": 1,
+            "round": review_round,
             "verdict": "APPROVED",
             "snapshot_before": snapshot["snapshot_id"],
             "snapshot_after": snapshot["snapshot_id"],
@@ -355,7 +388,7 @@ class DeliveryFixture(unittest.TestCase):
             encoding="utf-8",
             newline="\n",
         )
-        raw_response_relative = "reviews/round-1/raw-response.txt"
+        raw_response_relative = f"{review_root}/raw-response.txt"
         raw_response_path = run_dir / Path(*raw_response_relative.split("/"))
         raw_response_path.write_text("fresh reviewer response\n", encoding="utf-8", newline="\n")
         main_commands = [

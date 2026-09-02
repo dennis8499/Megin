@@ -91,6 +91,7 @@ from _delivery_record import (  # noqa: E402
     _result,
     _schema_errors,
     _transition_record_unlocked,
+    _validate_historical_ready_contract,
     _validate_ready_contract,
     _validate_ready_generation,
     load_record,
@@ -107,6 +108,7 @@ def start_workspace(
     generation: int = 1,
     work_kind: str | None = None,
     bug_id: str | None = None,
+    knowledge_policy: str = "required",
 ) -> dict[str, Any]:
     work_id = validate_work_id(work_id)
     validate_sha256(request_sha256, "request_sha256")
@@ -149,6 +151,7 @@ def start_workspace(
             branch,
             work_kind=work_kind,
             bug_id=bug_id,
+            knowledge_policy=knowledge_policy,
         )
         record_errors = validate_record(record)
         if record_errors:
@@ -335,7 +338,11 @@ def start_workspace(
                 copied = _materialize_approved_upstream(destination, materialization)
                 materialization_result_ref = f"evidence/upstream-materialized-r{generation}.json"
                 _atomic_write_json(run_dir / materialization_result_ref, copied)
-                _approved_upstream_materialization(record, verify_current_sources=True)
+                _approved_upstream_materialization(
+                    record,
+                    verify_current_sources=True,
+                    source_generation=generation_record,
+                )
                 event_refs.extend([materialization_plan_ref, materialization_result_ref])
             generation_record["status"] = "ready"
             _append_event(
@@ -464,6 +471,18 @@ def transition_record(
     bug_verification_path: str | None = None,
     bug_verification_sha256: str | None = None,
     bug_verification_result: str | None = None,
+    enable_knowledge: bool = False,
+    knowledge_candidate_ref: str | None = None,
+    knowledge_candidate_payload_sha256: str | None = None,
+    knowledge_snapshot_before: str | None = None,
+    knowledge_snapshot_after: str | None = None,
+    knowledge_product_snapshot_id: str | None = None,
+    knowledge_outcome_path: str | None = None,
+    knowledge_outcome_sha256: str | None = None,
+    knowledge_promotion_id: str | None = None,
+    knowledge_receipt_path: str | None = None,
+    knowledge_receipt_sha256: str | None = None,
+    knowledge_approval_evidence: str | None = None,
     known_secret_values: Sequence[str] = (),
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
@@ -510,6 +529,18 @@ def transition_record(
             bug_verification_path=bug_verification_path,
             bug_verification_sha256=bug_verification_sha256,
             bug_verification_result=bug_verification_result,
+            enable_knowledge=enable_knowledge,
+            knowledge_candidate_ref=knowledge_candidate_ref,
+            knowledge_candidate_payload_sha256=knowledge_candidate_payload_sha256,
+            knowledge_snapshot_before=knowledge_snapshot_before,
+            knowledge_snapshot_after=knowledge_snapshot_after,
+            knowledge_product_snapshot_id=knowledge_product_snapshot_id,
+            knowledge_outcome_path=knowledge_outcome_path,
+            knowledge_outcome_sha256=knowledge_outcome_sha256,
+            knowledge_promotion_id=knowledge_promotion_id,
+            knowledge_receipt_path=knowledge_receipt_path,
+            knowledge_receipt_sha256=knowledge_receipt_sha256,
+            knowledge_approval_evidence=knowledge_approval_evidence,
             known_secret_values=tuple(known_secret_values),
         )
 
@@ -600,6 +631,18 @@ def _parser() -> argparse.ArgumentParser:
     transition.add_argument("--bug-verification-path")
     transition.add_argument("--bug-verification-sha256")
     transition.add_argument("--bug-verification-result", choices=["verified", "partial", "failed"])
+    transition.add_argument("--enable-knowledge", action="store_true")
+    transition.add_argument("--knowledge-candidate-ref")
+    transition.add_argument("--knowledge-candidate-payload-sha256")
+    transition.add_argument("--knowledge-snapshot-before")
+    transition.add_argument("--knowledge-snapshot-after")
+    transition.add_argument("--knowledge-product-snapshot-id")
+    transition.add_argument("--knowledge-outcome-path")
+    transition.add_argument("--knowledge-outcome-sha256")
+    transition.add_argument("--knowledge-promotion-id")
+    transition.add_argument("--knowledge-receipt-path")
+    transition.add_argument("--knowledge-receipt-sha256")
+    transition.add_argument("--knowledge-approval-evidence")
     transition.add_argument("--known-secret-env", action="append", default=[])
     return parser
 
@@ -663,6 +706,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 bug_verification_path=args.bug_verification_path,
                 bug_verification_sha256=args.bug_verification_sha256,
                 bug_verification_result=args.bug_verification_result,
+                enable_knowledge=args.enable_knowledge,
+                knowledge_candidate_ref=args.knowledge_candidate_ref,
+                knowledge_candidate_payload_sha256=args.knowledge_candidate_payload_sha256,
+                knowledge_snapshot_before=args.knowledge_snapshot_before,
+                knowledge_snapshot_after=args.knowledge_snapshot_after,
+                knowledge_product_snapshot_id=args.knowledge_product_snapshot_id,
+                knowledge_outcome_path=args.knowledge_outcome_path,
+                knowledge_outcome_sha256=args.knowledge_outcome_sha256,
+                knowledge_promotion_id=args.knowledge_promotion_id,
+                knowledge_receipt_path=args.knowledge_receipt_path,
+                knowledge_receipt_sha256=args.knowledge_receipt_sha256,
+                knowledge_approval_evidence=args.knowledge_approval_evidence,
                 known_secret_values=_known_secret_values_from_env(args.known_secret_env),
             )
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))

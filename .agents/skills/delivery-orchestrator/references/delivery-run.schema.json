@@ -37,6 +37,7 @@
     "requirements": {"$ref": "#/$defs/requirementsSet"},
     "plans": {"$ref": "#/$defs/planSet"},
     "implementations": {"$ref": "#/$defs/implementationSet"},
+    "knowledge_gate": {"$ref": "#/$defs/knowledgeGate"},
     "work_kind": {"enum": ["standard", "bug"]},
     "bugs": {"$ref": "#/$defs/bugSet"},
     "events": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/event"}},
@@ -62,7 +63,7 @@
       "type": "string",
       "pattern": "^(?:(?!\\.{1,2}(?:/|$))[^/:\\\\]+)(?:/(?!(?:\\.{1,2})(?:/|$))[^/:\\\\]+)*$"
     },
-    "phase": {"enum": ["workspace", "requirements", "planning", "implementation", "complete"]},
+    "phase": {"enum": ["workspace", "requirements", "planning", "implementation", "knowledge", "complete"]},
     "status": {"enum": ["active", "awaiting_user", "blocked", "complete"]},
     "generation": {
       "type": "object",
@@ -139,6 +140,56 @@
       "properties": {
         "current_run_id": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
         "runs": {"type": "array", "items": {"$ref": "#/$defs/implementationRun"}}
+      }
+    },
+    "knowledgePromotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["promotion_id", "stage", "candidate_ref", "payload_sha256", "receipt_path", "receipt_sha256", "approval_evidence", "formal_paths", "status"],
+      "properties": {
+        "promotion_id": {"type": "string", "pattern": "^promotion-[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "stage": {"enum": ["requirements", "planning", "implementation", "bug"]},
+        "candidate_ref": {"type": "string", "pattern": "^knowledge:candidates/promotion-[a-z0-9]+(?:-[a-z0-9]+)*/candidate\\.json$"},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "receipt_path": {"$ref": "#/$defs/normalizedPath"},
+        "receipt_sha256": {"$ref": "#/$defs/sha256"},
+        "approval_evidence": {"$ref": "#/$defs/evidenceRef"},
+        "formal_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/normalizedPath"}
+        },
+        "status": {"const": "Ready"}
+      }
+    },
+    "knowledgeReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge_snapshot_before", "knowledge_snapshot_after", "candidate_ref", "payload_sha256"],
+      "properties": {
+        "knowledge_snapshot_before": {"$ref": "#/$defs/sha256"},
+        "knowledge_snapshot_after": {"$ref": "#/$defs/sha256"},
+        "candidate_ref": {"type": "string", "pattern": "^knowledge:candidates/promotion-[a-z0-9]+(?:-[a-z0-9]+)*/candidate\\.json$"},
+        "payload_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "knowledgeGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "enabled_at", "candidate_ref", "candidate_payload_sha256", "knowledge_snapshot_id", "knowledge_post_snapshot_id", "product_snapshot_id", "outcome_path", "outcome_sha256", "current_promotion_id", "promotions", "review"],
+      "properties": {
+        "policy": {"const": "required"},
+        "enabled_at": {"type": "string", "format": "date-time"},
+        "candidate_ref": {"oneOf": [{"type": "string", "pattern": "^knowledge:candidates/promotion-[a-z0-9]+(?:-[a-z0-9]+)*/candidate\\.json$"}, {"type": "null"}]},
+        "candidate_payload_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "knowledge_snapshot_id": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "knowledge_post_snapshot_id": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "product_snapshot_id": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "outcome_path": {"oneOf": [{"$ref": "#/$defs/normalizedPath"}, {"type": "null"}]},
+        "outcome_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "current_promotion_id": {"oneOf": [{"type": "string", "pattern": "^promotion-[a-z0-9]+(?:-[a-z0-9]+)*$"}, {"type": "null"}]},
+        "promotions": {"type": "array", "items": {"$ref": "#/$defs/knowledgePromotion"}},
+        "review": {"oneOf": [{"$ref": "#/$defs/knowledgeReview"}, {"type": "null"}]}
       }
     },
     "event": {
@@ -218,12 +269,13 @@
     "workspace": ["workspace", "requirements"],
     "requirements": ["requirements", "planning"],
     "planning": ["planning", "requirements", "implementation"],
-    "implementation": ["implementation", "planning", "complete"],
+    "implementation": ["implementation", "planning", "knowledge", "complete"],
+    "knowledge": ["knowledge", "implementation", "complete"],
     "complete": []
   },
   "x-status-transitions": {
     "active": ["active", "awaiting_user", "blocked", "complete"],
-    "awaiting_user": ["awaiting_user", "active", "blocked"],
+    "awaiting_user": ["awaiting_user", "active", "blocked", "complete"],
     "blocked": ["blocked", "active"],
     "complete": []
   }

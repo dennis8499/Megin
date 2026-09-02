@@ -1,0 +1,65 @@
+{
+  "schema": "bug-assessment/v1",
+  "bug_id": "bug-delivery-reviewer-identity-reuse",
+  "revision": 1,
+  "markdown": {
+    "path": "docs/bugs/bug-delivery-reviewer-identity-reuse/assessment-1.md",
+    "sha256": "9c805843a5a259d457be47d0808144dc423257e1f40b19f33c1f4427f2ea0d3c"
+  },
+  "source": {
+    "relation": "current-scope",
+    "work_id": "work-20260831-project-knowledge-system-19202d78",
+    "reported_by": "fresh independent Delivery bundle review",
+    "evidence_refs": [
+      "host-temp:evidence/bug-delivery-reviewer-identity-reuse-diagnosis.json",
+      "host-temp:evidence/bug-delivery-reviewer-identity-reuse-knowledge-context.json",
+      "host-temp:reviews/delivery-bundle-fresh-review.json#DEL-FRESH-002"
+    ]
+  },
+  "observed_behavior": "The required overlay accepts preliminary and final implementation review reports that claim the same attestation.agent_id.",
+  "expected_behavior": "Preliminary and final reviews are produced by different fresh Reviewer identities, and equal agent IDs fail closed.",
+  "impact": "One Reviewer can self-review the same delivery twice, bypassing the independent second perspective required by the dual-review gate.",
+  "verdict": "confirmed",
+  "severity": "high",
+  "reproduction": {
+    "status": "reproduced",
+    "symptom_oracle": "A required-overlay terminal transition with equal preliminary and final agent IDs must fail with INVALID_KNOWLEDGE_REVIEW; distinct valid identities continue to pass.",
+    "steps": [
+      "Patch only the isolated preliminary fixture attestation.agent_id to the existing final fixture value fresh-reviewer.",
+      "Keep commands, snapshots, output refs and all other report bytes unchanged.",
+      "Run the complete required-overlay transition test and observe successful completion."
+    ],
+    "sample": "One of one isolated test passed with zero failures and zero errors while same_agent_preliminary_and_final was true.",
+    "command_refs": [
+      "host-temp:commands/delivery-reviewer-identity-reuse-probe"
+    ],
+    "evidence_refs": [
+      "host-temp:evidence/bug-delivery-reviewer-identity-reuse-diagnosis.json"
+    ]
+  },
+  "root_cause": {
+    "status": "confirmed",
+    "confidence": "high",
+    "summary": "Delivery validates each report locally but never compares the preliminary report attestation.agent_id referenced by the Outcome with the final accepted terminal report identity.",
+    "evidence_refs": [
+      "host-temp:evidence/bug-delivery-reviewer-identity-reuse-diagnosis.json"
+    ]
+  },
+  "hypotheses": [],
+  "active_hypothesis_id": null,
+  "risk": {
+    "security_privacy_or_data_risk": false,
+    "redacted_summary": null,
+    "secure_evidence_refs": [],
+    "human_reviewer": null
+  },
+  "disposition": "current-run",
+  "evidence_refs": [
+    "host-temp:evidence/bug-delivery-reviewer-identity-reuse-diagnosis.json",
+    "host-temp:evidence/bug-delivery-reviewer-identity-reuse-knowledge-context.json",
+    "host-temp:reviews/delivery-bundle-fresh-review.json#DEL-FRESH-002"
+  ],
+  "next_action": "Implementation executor stays in Fixing, adds a same-agent regression red, compares persisted preliminary and final identities at the terminal knowledge gate, then reruns Delivery and Implementation consumer suites plus fresh review.",
+  "created_at": "2026-09-01T08:39:17.2281502Z"
+}
+

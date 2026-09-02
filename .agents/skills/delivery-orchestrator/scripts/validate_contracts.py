@@ -18,17 +18,18 @@ from urllib.parse import unquote, urlparse
 
 
 DEFAULT_SKILLS_ROOT = Path(__file__).resolve().parents[2]
-DELIVERY_SCHEMA_SHA256 = "052b283cb14737c44364119c58764cc309eca53064ca1c090ac99030a7dc1146"
+DELIVERY_SCHEMA_SHA256 = "e6973b241c4f754407f1667b1baaf7f263c6112f0fcf8165b935c01d482a5425"
 EXPECTED_PHASE_TRANSITIONS = {
     "workspace": {"workspace", "requirements"},
     "requirements": {"requirements", "planning"},
     "planning": {"planning", "requirements", "implementation"},
-    "implementation": {"implementation", "planning", "complete"},
+    "implementation": {"implementation", "planning", "knowledge", "complete"},
+    "knowledge": {"knowledge", "implementation", "complete"},
     "complete": set(),
 }
 EXPECTED_STATUS_TRANSITIONS = {
     "active": {"active", "awaiting_user", "blocked", "complete"},
-    "awaiting_user": {"awaiting_user", "active", "blocked"},
+    "awaiting_user": {"awaiting_user", "active", "blocked", "complete"},
     "blocked": {"blocked", "active"},
     "complete": set(),
 }
@@ -143,6 +144,25 @@ def _validate_schema(bundle: Path, helper: Any, errors: list[str]) -> None:
     verification = schema.get("$defs", {}).get("bugVerificationBinding", {})
     if not {"bug_id", "path", "sha256", "result"} <= set(verification.get("required", [])):
         errors.append("delivery schema BUG verification binding is incomplete")
+    knowledge_gate = schema.get("$defs", {}).get("knowledgeGate", {})
+    if not {
+        "policy",
+        "enabled_at",
+        "candidate_ref",
+        "candidate_payload_sha256",
+        "knowledge_snapshot_id",
+        "knowledge_post_snapshot_id",
+        "product_snapshot_id",
+        "outcome_path",
+        "outcome_sha256",
+        "current_promotion_id",
+        "promotions",
+        "review",
+    } <= set(knowledge_gate.get("required", [])):
+        errors.append("delivery schema knowledge gate is incomplete")
+    knowledge_promotion = schema.get("$defs", {}).get("knowledgePromotion", {})
+    if "formal_paths" not in set(knowledge_promotion.get("required", [])):
+        errors.append("delivery schema knowledge promotion omits formal_paths")
     if {
         key: set(value)
         for key, value in schema.get("x-phase-transitions", {}).items()
@@ -278,6 +298,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     for fragment in (
         "_schema_errors(record, _delivery_run_schema())",
         "_validate_ready_contract(handoff)",
+        "_validate_historical_ready_contract(historical)",
         "approval_evidence_refs",
         "_approved_upstream_materialization",
         '"cat-file", "blob"',
@@ -301,11 +322,17 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         "bug Ready plan must bind the current approved assessment",
         "validate_bug_verification_against_ready",
         "MISSING_BUG_VERIFICATION",
-        "failed BUG verification cannot Complete delivery",
+        "failed BUG verification cannot enter a terminal knowledge gate",
         "PENDING_BUG_EVIDENCE",
         "BUG_REQUIRES_REAPPROVAL",
         "BUG_INBOX_EXISTS",
-        "successful BUG verification may only bind during terminal Complete",
+        "successful BUG verification may only bind at legacy Complete or the reviewed knowledge gate",
+        "required knowledge delivery cannot Complete directly from implementation",
+        "review knowledge bindings differ from delivery gate",
+        "knowledge promotion receipt differs from the approved reviewed Candidate",
+        "knowledge_module.knowledge_workflow.validate_stage_promotion",
+        '"formal_paths": formal_paths',
+        "preliminary and final review agent identities must differ",
         "known_secret_values=known_secret_values",
         "sidecar_bytes=sidecar_bytes",
         "raw_json_bytes=verification_bytes",
@@ -313,6 +340,14 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     ):
         if fragment not in record_source:
             errors.append(f"record authority missing semantic primitive {fragment!r}")
+    if record_source.count("validator.validate_review_against_ready(") < 2:
+        errors.append(
+            "record authority missing semantic primitive for every Ready-bound review consumer"
+        )
+    if record_source.count('"cat-file", "blob"') < 2:
+        errors.append(
+            "record authority missing semantic primitive for both raw-base blob probes"
+        )
     if record_source.count("sidecar_bytes=sidecar_bytes") < 2:
         errors.append("record authority does not forward raw BUG assessment bytes to both consumers")
     if record_source.count("raw_json_bytes=verification_bytes") < 2:
@@ -347,7 +382,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     }
     if facade_defs != expected_defs:
         errors.append(f"public facade definitions drifted: {sorted(facade_defs ^ expected_defs)}")
-    if len(facade_source.splitlines()) > 700:
+    if len(facade_source.splitlines()) > 760:
         errors.append("public facade is no longer a thin orchestration/CLI layer")
     for fragment in (
         '"worktree",',
@@ -356,6 +391,8 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         '"stdout_sha256": sha256_bytes(completed.stdout)',
         "_git_failure_error(",
         '"--known-secret-env"',
+        '"--enable-knowledge"',
+        '"--knowledge-candidate-ref"',
     ):
         if fragment not in facade_source:
             errors.append(f"public facade missing creation primitive {fragment!r}")

@@ -481,4 +481,15 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-docs/
+# Repository-local SDLC and canonical knowledge are versioned. Keep every other
+# legacy docs subtree ignored unless it is explicitly migrated here.
+docs/*
+!docs/work/
+!docs/work/**
+!docs/bugs/
+!docs/bugs/**
+!docs/knowledge/
+!docs/knowledge/**
+
+# Deterministic knowledge-suite fixtures are disposable local state.
+.knowledge-test-tmp/

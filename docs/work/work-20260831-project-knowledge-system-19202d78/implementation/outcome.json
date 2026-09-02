@@ -1,0 +1,480 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/bug-diagnosis/SKILL.md",
+      "sha256": "2ef6fc0fb14179dfc09f94d2c659440f9bc74c0b2a243de3b30e3f3c5bef85a1",
+      "summary": "整合 BUG 診斷證據、驗證結果與知識萃取契約。"
+    },
+    {
+      "path": ".agents/skills/bug-diagnosis/scripts/behavior-evaluation-report.md",
+      "sha256": "38851690d66e3658aaeff30d2ba3765f81a583def2c1a356b820ed2f454cbc8c",
+      "summary": "整合 BUG 診斷證據、驗證結果與知識萃取契約。"
+    },
+    {
+      "path": ".agents/skills/bug-diagnosis/scripts/validate_contracts.py",
+      "sha256": "fd8d2db259139514ffdd27333d93878bbc5ddc16c47e755ac83a10bd35d17cff",
+      "summary": "整合 BUG 診斷證據、驗證結果與知識萃取契約。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/SKILL.md",
+      "sha256": "c558fd42d85400bce378c8340951d75abc294621986cbd3c6907dd0428713528",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/delivery-run.schema.json",
+      "sha256": "e6973b241c4f754407f1667b1baaf7f263c6112f0fcf8165b935c01d482a5425",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/stage-routing.md",
+      "sha256": "1108e0cecd37847ed109d7e0588b54720fdbc6a808f3e1b20c008f98725d6a7e",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/workspace-and-run.md",
+      "sha256": "4e4e1bc083d7d8681ef3779be1a5458cc65a53ce50ef57d6c27a39f7772a3456",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "sha256": "1a6eeea6d88e5c8ffd63540e3790f4445cdfb2e15591f5e9660629806c7dd458",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_runtime.py",
+      "sha256": "5f29f8212e6acf5c2d176e005c70284cef8e367756277bb7bc1841ff51711e77",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_test_support.py",
+      "sha256": "d776dbd18841f9b7bdd8755edda34b0388a4de49c7ad1459afa1e3d24b3bed6f",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/behavior-evaluation-report.md",
+      "sha256": "a5138c52d9d40fb4637026a003bf6fa68aad482d8e3072b47a90aab219387e75",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+      "sha256": "9c4381699e488f0cdbd25a1794c4dcf875b7a80a0583e78e294b7923b25cc35e",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_safety.py",
+      "sha256": "26ee23af9c434430fc50bba4dcba4ec49de8b026052817f4210603d1b9a59fa7",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py",
+      "sha256": "5233e3ea62c68babdea526c97f1b8809bcc725737b69d3662aca6bdc8f2fd078",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py",
+      "sha256": "49d5310efa8b0f4e97429302be81609b7d3f820a1d225b09178ee3326f9e548a",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/validate_contracts.py",
+      "sha256": "99e39155b8766564266d5d94ad88dd2199999e6508fc6ba1af95455a05185428",
+      "summary": "強化交付狀態、產品快照、知識閘門與安全性驗證。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/SKILL.md",
+      "sha256": "186aaa3ba5bf9c4c0a52acb1d3a730ffb5579bc83f3fd2088af9ba014669fb2c",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/delivery-protocol.md",
+      "sha256": "80adf7082d021fc2da2c5471633bd6f5ab5216fffd27d62279256464d81e9324",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/execution-records.schema.json",
+      "sha256": "3ccb5203e141068d0d68bb9b58f528d2d342ef52f682bf88557cc5acea5c54f3",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/orchestrated-delivery.md",
+      "sha256": "3645598999e8b9108f5aa7ab1ce6df127232b5461a3f3a0fcc6aa775aa66d33a",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/reviewer-contract.md",
+      "sha256": "3bf209e0fd7cdcb3a4ddbec4399e031a47eaa3feb29992adbec27dbe10d63acd",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/test_validate_contracts.py",
+      "sha256": "6e3d2ecffdd98f82d8cabbb0c28fe4ceac154f75f0a3e61ce361f16c9b6d136e",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/validate_contracts.py",
+      "sha256": "5bc07f279398d63e9b7ea09e4f6fdf99605f03619d5d94476a439bf57e3d5b0f",
+      "summary": "加入 fresh review、Outcome、雙快照與 Candidate 核准交付流程。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/SKILL.md",
+      "sha256": "eb0423743321c988385a06e8f0fe9421475d364901846fb4498041544b05c60f",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/agents/openai.yaml",
+      "sha256": "deeb670b1f9472fcf86a86f4a499e601643488424d2d5446f28eb4b63d4ad29f",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/schemas/knowledge-contracts.schema.json",
+      "sha256": "c9f684c87f3a75e1a440bc33162fd8ba115052d6cb37a5763303666d4552ba9e",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/compare_portability_reports.py",
+      "sha256": "a9f95bf14bbeb3f2937af83349b2cc35d3b9e7a4bda55b764c2a531a4b06290c",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_benchmark.py",
+      "sha256": "40372435c1d5ea1a11e46fe015e50e283e1081798fc58fb25babec7f4c1f589e",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_cli.py",
+      "sha256": "0fb13bf50c1273b0681a5e6b047c03c7b1931a0b977ac8f24d2fba7de850fe09",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_delivery.py",
+      "sha256": "1cf839a6dee254075ac8bd6f16d972200f14b367f084ffc3aeeb8c221ef06560",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_governance.py",
+      "sha256": "35f3113c0c3a4f62a51a02d16ed0f4b04c5f821eb153a226bb09bf57b48f06f8",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_outcome.py",
+      "sha256": "4003603bb783edf7ce9ffdee9009ac0cedffd4be638ee236991a2cb978a00df6",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_promotion.py",
+      "sha256": "2cec0ec9308d0d53c000cc5aeaa86f8fd8ef523c2f2e57dc5f51015f909ff12f",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "sha256": "a1360dfc6dce2ea9e4ce832f83180a3adc54c2b22a463efe8b500d261e0155a3",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_workflow.py",
+      "sha256": "0682ba7aa954513196e12a6182016b6489f5d5c9904c93d71ad3691ce66678b8",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/run_full_suite.py",
+      "sha256": "532062a432c8ad40c5768c3becda19d84bf1a950a981c3932624c38176432686",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_behavior.py",
+      "sha256": "efbd0960b77c72559b2b5f5886579d70a11867f4bd45137fb51f5a6a8c483581",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_governance.py",
+      "sha256": "8496ce19a7e04549346dda8a3a715176ae9f61fa9d2e4d5ebceabcbec86c3d3f",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_query.py",
+      "sha256": "565f6d99fc2b8641d86d59620fcdc76c132599d257e1f0a3a9e0db42e9560c5b",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_workflow.py",
+      "sha256": "69f8606e1f925c3787cb095401404762bffcaefd35fb2f2be24b14e598b799ba",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/validate_contracts.py",
+      "sha256": "ebbb9f7f8a0fe673f47df9c0fa13f7a974a307e24318e934e4dd1b018dd38533",
+      "summary": "新增本機優先知識索引、Outcome、Candidate、promotion 與跨平台驗證能力。"
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/SKILL.md",
+      "sha256": "8e3cf3ad2881d8b1db1947715d449fca9fee38a2dbfb648ee95993924447f01e",
+      "summary": "讓需求探索輸出可追溯並可供後續知識萃取。"
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/references/delivery-protocol.md",
+      "sha256": "f41d3100909a1032bb336e01de19580d7e8773eeeffa467b4e60de4433b47911",
+      "summary": "讓需求探索輸出可追溯並可供後續知識萃取。"
+    },
+    {
+      "path": ".agents/skills/technical-planning/SKILL.md",
+      "sha256": "1918e8e2e7f0ba2006ff5f5acc478c146c478465d5e4b11cd0474e56e288d739",
+      "summary": "讓 Ready 計畫與來源證據可供實作及知識萃取驗證。"
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/delivery-protocol.md",
+      "sha256": "1be600fc987bc77dad048f91ce23aecee52c404110deeec5f57964388f9f1ff6",
+      "summary": "讓 Ready 計畫與來源證據可供實作及知識萃取驗證。"
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+      "sha256": "a8a2a47dbe041e53d2491f2588c221635439811f0429701c9cb19a3e88971f5c",
+      "summary": "讓 Ready 計畫與來源證據可供實作及知識萃取驗證。"
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/validate_contracts.py",
+      "sha256": "342b66bfb682452da6b0dbf30859856fe9a0ba2031fb33e8d691451e147609d9",
+      "summary": "讓 Ready 計畫與來源證據可供實作及知識萃取驗證。"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "b7544b41ebb8856a5da9e4873406c2c0efe46569a583881e053c47faab822db2",
+      "summary": "設定跨平台文字與暫存檔規則，避免污染知識索引。"
+    },
+    {
+      "path": ".github/workflows/knowledge-portability.yml",
+      "sha256": "514c1d2e669ff29511129cc64a7a19cd607f3f706620a618b5aa2e0c78024e7a",
+      "summary": "新增 Windows/Linux 知識系統 CI 與可攜性驗證。"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "8dc4a22f1b0b2296991c198b5161cc5fd347eac7e6f130d2aca94ddfd2dc1463",
+      "summary": "設定跨平台文字與暫存檔規則，避免污染知識索引。"
+    },
+    {
+      "path": "docs/bugs/bug-delivery-knowledge-formal-paths-bypass/assessment-1.json",
+      "sha256": "a60bdeb359557ec85325bbb4e58b641a826f1f284bc006c7a5b992ffff551b3d",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-delivery-knowledge-formal-paths-bypass/assessment-1.md",
+      "sha256": "766f38b9dcbca75f14da5c2366d64b8382664a3af774f9c26b530b6c686ad941",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-delivery-reviewer-identity-reuse/assessment-1.json",
+      "sha256": "02f7aa454102964adc091192fec64c4fbef9feca99c86306b4413d3fa04457a3",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-delivery-reviewer-identity-reuse/assessment-1.md",
+      "sha256": "9c805843a5a259d457be47d0808144dc423257e1f40b19f33c1f4427f2ea0d3c",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.json",
+      "sha256": "66c95628534c115437e49357c8fc8403080f5db19e5809c230720b5d33f5761d",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.md",
+      "sha256": "89b4e3171e846d065a06ce36d6831801adb38a715302bc5db2bf5ad216e9ea5d",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-apply-concurrent-state-loss/assessment-1.json",
+      "sha256": "b0e6176ef454c820ea779fe75d78a751cb4e96c2325c61ba06133dc0c0ccdb69",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-apply-concurrent-state-loss/assessment-1.md",
+      "sha256": "7f2be2c218171e7600da69dd71b04dac597b0e853e8249e88c211fd3851c8146",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-candidate-ancestor-redirect/assessment-1.json",
+      "sha256": "259113e67eb385cd0e6642821e9b2c44e3747467de8bfa94ad6bcb4ccf59e4cc",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-candidate-ancestor-redirect/assessment-1.md",
+      "sha256": "9e53edb9529995413ba3eef4122ec5be770fba070334f3a0708a650dc0e8d357",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-candidate-publish-overwrite/assessment-1.json",
+      "sha256": "e8836fb0b09effcf58ff98c9c84e89e1484dcc41afcd384b9abaf14227b1de11",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-candidate-publish-overwrite/assessment-1.md",
+      "sha256": "105bfee0e5ff4d00e46d5c59b55b031755894c594c8992e9ef3bf2d8105a1531",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-1.json",
+      "sha256": "39e06d5780237bb41926fa50c71ae91ce229ba86f87ebbfccf729eca4be160e4",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-1.md",
+      "sha256": "e8cefc07010a8ea3482c3cb837cdf412bff620e57aee474b2dd66eb3fcda5e5a",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-2.json",
+      "sha256": "25eb90bcba71566bb007741ed2ad537e424b1566b55d7a8dc446f7071f84ea8c",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-2.md",
+      "sha256": "b579a1cf76e0e7fa03bb976e2b8675a83946cbffbac454b9da64635f3cfdaa46",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-page-closed-contract-lint/assessment-1.json",
+      "sha256": "f18d346852046e6472bcb8924fdf93fc99cb920d4a7c828666c54cd8b6a8c815",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-page-closed-contract-lint/assessment-1.md",
+      "sha256": "7db526ec135ac56028769b65f75e6bbceef765b1fbe8df2f822fd0cf83b7fc8c",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-promotion-registry-component-validation/assessment-1.json",
+      "sha256": "cb7d3bf8f6d3eefdffe29362bf56e1aec75203561be238d4f8039b3dc0667735",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-promotion-registry-component-validation/assessment-1.md",
+      "sha256": "bc315dc62762f2d4040dc4579af1ac68b7a1b0a499263249a85c1036b61a8868",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.json",
+      "sha256": "9478a3fa1be00b228a2068ec8c67f6b6bcf16a42f775ca9b18686aafe3c0fb6a",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.md",
+      "sha256": "f3d1bf38269b69ca06c4f7bc93add93a470ea1b56baf40594f508e5992eef604",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.json",
+      "sha256": "5d17f8f8f1fa35d282f52a54e85b50c80d818bc3ce562182b43a5d625dac8933",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.md",
+      "sha256": "f703b6082a8aa76bbbef31e22b560615c8c69d0262a5943949c7fda0bda3fa61",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-linux-posix-path-classification/assessment-1.json",
+      "sha256": "60d262288a6482d4fb3ab8274ceccf777bc5c816357ee04f9ac1fc47e6d99880",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-linux-posix-path-classification/assessment-1.md",
+      "sha256": "663481a83863ccb29ee5449f571096092c19ad00bbf6b48c347b199cc0fd47f4",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-preliminary-review-ready-validation/assessment-1.json",
+      "sha256": "4674db3cbee5af09614366331a4f546c7e504dd5dedeacfb537c2dec5a8a7092",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/bugs/bug-preliminary-review-ready-validation/assessment-1.md",
+      "sha256": "9d255e9ae2548abfbd3ce8b105e3ed5bca878629cafa11b64e683ff679fcd07a",
+      "summary": "保存實作期間發現、重現與處置的 BUG assessment。"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan-3/handoff.json",
+      "sha256": "f148f53e646643f11cd5a1e0c8672ac9cde43fbd347d978fd0b3dd30c67a7c05",
+      "summary": "保存本 Work ID 的需求、來源證據、技術計畫與 Ready handoff。"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan-3/plan.md",
+      "sha256": "9b7655f80a356072704ee4edfb04e2b5a0b899c8e2469a1c11f646e00909cf57",
+      "summary": "保存本 Work ID 的需求、來源證據、技術計畫與 Ready handoff。"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/handoff.json",
+      "sha256": "48ae7f876ff63e8b90eef448f4ca02cfc2a35fe7da8ae9a5fdfad2b5ea6b6cb4",
+      "summary": "保存本 Work ID 的需求、來源證據、技術計畫與 Ready handoff。"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/plan/source-evidence.md",
+      "sha256": "12559af63c890d0c188fb1fb91fa9e683f52da8beb56a7eadc7c7a5832429c04",
+      "summary": "保存本 Work ID 的需求、來源證據、技術計畫與 Ready handoff。"
+    },
+    {
+      "path": "docs/work/work-20260831-project-knowledge-system-19202d78/requirements-2.md",
+      "sha256": "f950021657a8a5a39e3571075840d1f0e35c3f64729fca11a0affd99e1769589",
+      "summary": "保存本 Work ID 的需求、來源證據、技術計畫與 Ready handoff。"
+    }
+  ],
+  "created_at": "2026-09-01T20:23:39.081500Z",
+  "implementation_run_id": "772d259835b3ebb80a04936c90bbe029d4b99421b2b39f4d0e04483fa89872e6",
+  "knowledge_decision": "change",
+  "known_deviations": [],
+  "markdown": {
+    "path": "docs/work/work-20260831-project-knowledge-system-19202d78/implementation/outcome.md",
+    "sha256": "7ec949892f506854f4077389e034090c4d9c4a3fd3767af2c8db8c275791efa3"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-r4-fresh"
+    ],
+    "report_ref": "reviews/preliminary-r4-fresh/report.json",
+    "report_sha256": "9b498e4756d85244683b23237b9c25cd70b8472f98f6803c07181ae8875e89cd",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "本次交付建立本機優先的專案知識系統，將需求、計畫、實作與 BUG 證據納入可追溯索引，並以 create-only Outcome、封存 Candidate、Windows/Linux 可攜性驗證及明確人工核准閘門保護知識晉升。",
+  "verification": [
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r4-fresh/outputs/01-CMD-BDD-FULL-001.observation.json"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r4-fresh/outputs/02-CMD-BUILD-FULL-001.observation.json"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r4-fresh/outputs/03-CMD-TEST-FULL-001.observation.json"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "reviews/preliminary-r4-fresh/outputs/04-CMD-GOVERNANCE-001.observation.json"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-PORTABILITY-001",
+      "evidence_refs": [
+        "reviews/preliminary-r4-fresh/outputs/05-CMD-PORTABILITY-001.observation.json"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260831-project-knowledge-system-19202d78",
+  "work_kind": "standard"
+}

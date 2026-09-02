@@ -1,0 +1,68 @@
+{
+  "schema": "bug-assessment/v1",
+  "bug_id": "bug-knowledge-outcome-create-only-toctou",
+  "revision": 2,
+  "markdown": {
+    "path": "docs/bugs/bug-knowledge-outcome-create-only-toctou/assessment-2.md",
+    "sha256": "b579a1cf76e0e7fa03bb976e2b8675a83946cbffbac454b9da64635f3cfdaa46"
+  },
+  "source": {
+    "relation": "current-scope",
+    "work_id": "work-20260831-project-knowledge-system-19202d78",
+    "reported_by": "fresh preliminary product review round 3",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-r3-diagnosis.json",
+      "host-temp:commands/preliminary-r3-fixing/windows-WP-003-red-retry-2.json",
+      "host-temp:reviews/preliminary-r3-fresh/report.json#PRELIM-R3-002"
+    ]
+  },
+  "observed_behavior": "Rollback deletes a byte-identical independently replaced first pair entry when publication of the second entry collides.",
+  "expected_behavior": "Pair publication preserves every independent entry and rolls back only a first target whose file identity and bytes still prove ownership by the current writer.",
+  "impact": "Create-only preliminary review or Outcome history can lose an independently owned entry, leaving an incomplete audit chain.",
+  "verdict": "confirmed",
+  "severity": "high",
+  "reproduction": {
+    "status": "reproduced",
+    "symptom_oracle": "Both collision codes are returned while the byte-identical independently replaced first entry and the second competitor remain present.",
+    "steps": [
+      "Publish the first entry of an initially absent two-file pair.",
+      "Remove that directory entry and independently recreate it with byte-identical content.",
+      "Create a competitor at the second target immediately before its atomic publication and inspect rollback state."
+    ],
+    "sample": "Windows and Linux each produced only the expected regression failures: two subtest failures report that rollback deleted the independent first entry; both fresh-review probes reported first_exists_after_rollback=false.",
+    "command_refs": [
+      "host-temp:commands/preliminary-r3-fixing/windows-WP-003-red-retry-2.json",
+      "host-temp:commands/preliminary-r3-fixing/linux-WP-003-red.json"
+    ],
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-r3-diagnosis.json",
+      "host-temp:reviews/preliminary-r3-fresh/outputs/06-outcome-identical-owner-windows.observation.json",
+      "host-temp:reviews/preliminary-r3-fresh/outputs/07-outcome-identical-owner-linux.observation.json"
+    ]
+  },
+  "root_cause": {
+    "status": "confirmed",
+    "confidence": "high",
+    "summary": "_rollback_pair_publication equates payload byte equality with writer ownership, so it deletes a byte-identical independent replacement.",
+    "evidence_refs": [
+      "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-r3-diagnosis.json"
+    ]
+  },
+  "hypotheses": [],
+  "active_hypothesis_id": null,
+  "risk": {
+    "security_privacy_or_data_risk": false,
+    "redacted_summary": null,
+    "secure_evidence_refs": [],
+    "human_reviewer": null
+  },
+  "disposition": "current-run",
+  "evidence_refs": [
+    "host-temp:evidence/bug-knowledge-outcome-create-only-toctou-r3-diagnosis.json",
+    "host-temp:commands/preliminary-r3-fixing/windows-WP-003-red-retry-2.json",
+    "host-temp:commands/preliminary-r3-fixing/linux-WP-003-red.json",
+    "host-temp:reviews/preliminary-r3-fresh/report.json#PRELIM-R3-002"
+  ],
+  "next_action": "Implementation executor records publication file identity before commit, makes rollback conditional on both identity and bytes, then reruns Windows/Linux focused, full and fresh review.",
+  "created_at": "2026-09-01T18:28:00Z"
+}

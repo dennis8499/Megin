@@ -206,6 +206,67 @@ class ReadyPlanContractTests(unittest.TestCase):
         errors = validator.validate_ready_cross_references(local_observed_baseline)
         self.assertTrue(any("CMD-BDD-FULL-001 requires global-baseline" in error for error in errors), errors)
 
+    def test_each_source_owns_direct_bdd_test_and_shared_wp_coverage(self) -> None:
+        borrowed = copy.deepcopy(ready_example())
+        borrowed["sources"].append(
+            {
+                "source_id": "SRC-002",
+                "kind": "spec",
+                "location": "docs/second-spec.md",
+                "revision": "1",
+                "sha256": HASH,
+                "plan_refs": ["REQ-002"],
+                "wp_refs": ["WP-001"],
+            }
+        )
+        borrowed["work_packages"][0]["source_refs"].append("SRC-002")
+        for contract in borrowed["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["source_refs"] = ["SRC-002"]
+        borrowed["candidate"]["payload_sha256"] = validator.ready_payload_sha256(borrowed)
+        errors = validator.validate_ready_cross_references(borrowed)
+        self.assertTrue(
+            any("source SRC-001 has no direct bdd-scenario contract sharing a WP" in error for error in errors),
+            errors,
+        )
+        self.assertTrue(
+            any("source SRC-001 has no direct inner-test contract sharing a WP" in error for error in errors),
+            errors,
+        )
+
+        disjoint = copy.deepcopy(ready_example())
+        disjoint["contract_index"].append(
+            {
+                "contract_id": "WP-002",
+                "kind": "work-package",
+                "source_refs": [],
+                "wp_refs": ["WP-002"],
+            }
+        )
+        disjoint["work_packages"].append(
+            {
+                "wp_id": "WP-002",
+                "blocked_by": [],
+                "contract_refs": ["BDD-001", "TEST-001", "WP-002"],
+                "source_refs": [],
+                "command_refs": [],
+            }
+        )
+        for contract in disjoint["contract_index"]:
+            if contract["kind"] in {"bdd-scenario", "inner-test"}:
+                contract["wp_refs"] = ["WP-002"]
+                disjoint["work_packages"][0]["contract_refs"].remove(contract["contract_id"])
+        disjoint["candidate"]["payload_sha256"] = validator.ready_payload_sha256(disjoint)
+        errors = validator.validate_ready_cross_references(disjoint)
+        self.assertTrue(
+            any("source SRC-001 has no direct bdd-scenario contract sharing a WP" in error for error in errors),
+            errors,
+        )
+        self.assertTrue(
+            any("source SRC-001 has no direct inner-test contract sharing a WP" in error for error in errors),
+            errors,
+        )
+
     def test_ready_mutations_are_detected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             copied = Path(temp_dir) / "skills"

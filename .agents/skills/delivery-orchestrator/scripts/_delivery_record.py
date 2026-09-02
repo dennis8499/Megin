@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -67,6 +68,86 @@ _READY_PLAN_SCHEMA: dict[str, Any] | None = None
 _DELIVERY_RUN_SCHEMA: dict[str, Any] | None = None
 _EXECUTION_RECORDS_SCHEMA: dict[str, Any] | None = None
 _BUG_CONTRACT_VALIDATOR: Any | None = None
+KNOWLEDGE_CANDIDATE_RE = re.compile(
+    r"^knowledge:candidates/(promotion-[a-z0-9]+(?:-[a-z0-9]+)*)/candidate\.json$"
+)
+PRELIMINARY_REVIEW_REPORT_RE = re.compile(
+    r"^reviews/[a-z0-9][a-z0-9._-]{2,127}/report\.json$"
+)
+
+
+_KNOWLEDGE_DELIVERY_MODULE: Any | None = None
+
+
+def _knowledge_delivery_module() -> Any:
+    global _KNOWLEDGE_DELIVERY_MODULE
+    if _KNOWLEDGE_DELIVERY_MODULE is not None:
+        return _KNOWLEDGE_DELIVERY_MODULE
+    scripts = Path(__file__).resolve().parents[2] / "project-knowledge" / "scripts"
+    path = scripts / "knowledge_delivery.py"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    spec = importlib.util.spec_from_file_location("delivery_project_knowledge", path)
+    if spec is None or spec.loader is None:
+        raise DeliveryError(
+            "project-knowledge delivery verifier is unavailable",
+            code="INVALID_KNOWLEDGE_REVIEW",
+        )
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, RuntimeError) as exc:
+        raise DeliveryError(
+            "project-knowledge delivery verifier cannot be loaded",
+            code="INVALID_KNOWLEDGE_REVIEW",
+        ) from exc
+    _KNOWLEDGE_DELIVERY_MODULE = module
+    return module
+
+
+def _verified_knowledge_snapshot(
+    record: dict[str, Any],
+    *,
+    candidate_ref: str,
+    payload_sha256: str,
+) -> dict[str, Any]:
+    module = _knowledge_delivery_module()
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    repo_id = module.knowledge_governance.repository_id(worktree)
+    try:
+        return module.build_knowledge_snapshot(
+            str(worktree),
+            sealed={
+                "schema": "knowledge-candidate-seal/v1",
+                "repo_id": repo_id,
+                "candidate_ref": candidate_ref,
+                "payload_sha256": payload_sha256,
+                "status": "Candidate",
+            },
+        )
+    except module.KnowledgeError as exc:
+        raise DeliveryError(
+            "knowledge Candidate or canonical tree cannot reproduce the reviewed snapshot",
+            code="KNOWLEDGE_SNAPSHOT_DRIFT",
+            details={"knowledge_error": exc.code},
+        ) from exc
+
+
+def _new_knowledge_gate(enabled_at: str) -> dict[str, Any]:
+    return {
+        "policy": "required",
+        "enabled_at": enabled_at,
+        "candidate_ref": None,
+        "candidate_payload_sha256": None,
+        "knowledge_snapshot_id": None,
+        "knowledge_post_snapshot_id": None,
+        "product_snapshot_id": None,
+        "outcome_path": None,
+        "outcome_sha256": None,
+        "current_promotion_id": None,
+        "promotions": [],
+        "review": None,
+    }
 
 
 class _DuplicateBugJSONKey(ValueError):
@@ -247,6 +328,17 @@ def _validate_ready_contract(handoff: dict[str, Any]) -> None:
         )
 
 
+def _validate_historical_ready_contract(handoff: dict[str, Any]) -> None:
+    """Validate stable shape without retroactively applying newer producer rules."""
+
+    schema_errors = _schema_errors(handoff, _ready_plan_schema())
+    if schema_errors:
+        raise DeliveryError(
+            f"historical Ready handoff violates ready-plan/v1 schema ({len(schema_errors)} issue(s))",
+            code="INVALID_HANDOFF",
+        )
+
+
 def _append_event(
     record: dict[str, Any],
     *,
@@ -339,10 +431,10 @@ def _is_reparse_path(path: Path) -> bool:
     if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
         return True
     try:
-        attributes = path.lstat().st_file_attributes
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
     except FileNotFoundError:
         return False
-    except (AttributeError, OSError):
+    except OSError:
         return True
     return os.name == "nt" and bool(attributes & 0x400)
 
@@ -390,6 +482,19 @@ def _current_implementation_snapshot(
         location = source["location"]
         if urlparse(location).scheme:
             actual = source["sha256"]
+        elif source.get("revision") == generation["base_sha"]:
+            relative = _normalized_repo_path(location)
+            base_source = _git(
+                worktree,
+                ["cat-file", "blob", f"{generation['base_sha']}:{relative}"],
+                check=False,
+            )
+            if base_source.returncode != 0:
+                raise DeliveryError(
+                    "Ready base-revision source is unavailable",
+                    code="INVALID_IMPLEMENTATION_REF",
+                )
+            actual = sha256_bytes(base_source.stdout)
         else:
             actual = sha256_bytes(_snapshot_file(worktree, location))
         if actual != source["sha256"]:
@@ -407,6 +512,8 @@ def _current_implementation_snapshot(
             "--no-textconv",
             generation["base_sha"],
             "--",
+            ".",
+            ":(exclude)docs/knowledge/**",
         ],
     ).stdout
     raw_unignored = _git(
@@ -423,6 +530,8 @@ def _current_implementation_snapshot(
                 "unignored snapshot path is not UTF-8",
                 code="INVALID_IMPLEMENTATION_REF",
             ) from exc
+        if relative.startswith("docs/knowledge/"):
+            continue
         unignored_files.append(
             {
                 "path": relative,
@@ -493,7 +602,11 @@ def _complete_implementation_errors(
     except (AttributeError, KeyError, TypeError, ValueError, DeliveryError):
         return ["Complete implementation Ledger validation could not complete"]
     if ledger_schema_errors or ledger_semantic_errors:
-        return ["Complete implementation Ledger violates its contract"]
+        details = [*ledger_schema_errors, *ledger_semantic_errors]
+        return [
+            "Complete implementation Ledger violates its contract: "
+            + "; ".join(dict.fromkeys(details))
+        ]
 
     generation = record["generations"][-1]
     binding = ledger.get("binding", {})
@@ -662,6 +775,66 @@ def _complete_implementation_errors(
     if not bug_verification_valid:
         errors.append("Complete BUG verification is missing, drifted, or invalid")
 
+    knowledge_gate = record.get("knowledge_gate")
+    knowledge_review = (
+        knowledge_gate.get("review")
+        if isinstance(knowledge_gate, dict)
+        else None
+    )
+    preliminary_agent_id: str | None = None
+    if isinstance(knowledge_review, dict):
+        try:
+            outcome_raw = _verify_repo_file(
+                record,
+                str(knowledge_gate.get("outcome_path")),
+                str(knowledge_gate.get("outcome_sha256")),
+            )
+            outcome = _strict_bug_json_object(
+                outcome_raw,
+                label="knowledge gate implementation outcome",
+                code="INVALID_KNOWLEDGE_REVIEW",
+                known_secret_values=known_secret_values,
+            )
+            preliminary_ref = _ledger_relative_ref(
+                outcome.get("review", {}).get("report_ref")
+            )
+            preliminary_path = (
+                _ledger_evidence_path(run_dir, preliminary_ref)
+                if preliminary_ref is not None
+                else None
+            )
+            if preliminary_path is None:
+                raise DeliveryError(
+                    "preliminary review report is not persisted",
+                    code="INVALID_KNOWLEDGE_REVIEW",
+                )
+            preliminary_report = _strict_bug_json_object(
+                _stable_read_file(run_dir, preliminary_path),
+                label="preliminary implementation review",
+                code="INVALID_KNOWLEDGE_REVIEW",
+                known_secret_values=known_secret_values,
+            )
+            candidate_agent_id = preliminary_report.get("attestation", {}).get(
+                "agent_id"
+            )
+            if not isinstance(candidate_agent_id, str) or not candidate_agent_id:
+                raise DeliveryError(
+                    "preliminary review agent identity is invalid",
+                    code="INVALID_KNOWLEDGE_REVIEW",
+                )
+            preliminary_agent_id = candidate_agent_id
+        except (
+            AttributeError,
+            KeyError,
+            OSError,
+            TypeError,
+            ValueError,
+            DeliveryError,
+        ):
+            errors.append(
+                "Complete knowledge review lacks a persisted preliminary Reviewer identity"
+            )
+
     approved_review_paths: set[str] = set()
     for relative, evidence_path in persisted_paths.items():
         try:
@@ -707,6 +880,26 @@ def _complete_implementation_errors(
             )
         ):
             report_errors.append("review BUG verification verdict differs from delivery binding")
+        if isinstance(knowledge_review, dict) and (
+            report.get("knowledge_snapshot_before")
+            != knowledge_review.get("knowledge_snapshot_before")
+            or report.get("knowledge_snapshot_after")
+            != knowledge_review.get("knowledge_snapshot_after")
+            or report.get("knowledge_candidate_ref")
+            != knowledge_review.get("candidate_ref")
+            or report.get("knowledge_candidate_payload_sha256")
+            != knowledge_review.get("payload_sha256")
+            or accepted_snapshot_id != knowledge_gate.get("product_snapshot_id")
+        ):
+            report_errors.append("review knowledge bindings differ from delivery gate")
+        if isinstance(knowledge_review, dict) and (
+            preliminary_agent_id is None
+            or report.get("attestation", {}).get("agent_id")
+            == preliminary_agent_id
+        ):
+            report_errors.append(
+                "preliminary and final review agent identities must differ"
+            )
         if verification_record is not None and (
             verification_record.get("implementation_review_ref") != relative
             or verification_record.get("full_verification") != report.get("command_outcomes")
@@ -739,6 +932,13 @@ def _complete_implementation_errors(
         errors.append("Complete delivery event does not reference the canonical snapshot")
     if isinstance(bug_verification_binding, dict) and bug_verification_binding.get("path") not in delivery_refs:
         errors.append("Complete delivery event does not reference BUG verification")
+    knowledge_gate = record.get("knowledge_gate")
+    if (
+        isinstance(knowledge_gate, dict)
+        and isinstance(knowledge_gate.get("review"), dict)
+        and knowledge_gate.get("outcome_path") not in delivery_refs
+    ):
+        errors.append("Complete delivery event does not reference the reviewed implementation outcome")
     return errors
 
 
@@ -838,7 +1038,7 @@ def validate_record(record: dict[str, Any]) -> list[str]:
                     or any(not isinstance(ref, str) or not EVIDENCE_REF_RE.fullmatch(ref) for ref in refs)
                 ):
                     errors.append(f"bug assessment binding {index} approval refs are invalid")
-            if record.get("phase") in {"planning", "implementation", "complete"}:
+            if record.get("phase") in {"planning", "implementation", "knowledge", "complete"}:
                 if not bug_assessments or bug_assessments[0].get("bug_id") != primary_bug_id:
                     errors.append("bug delivery lacks its primary approved assessment")
     else:
@@ -961,6 +1161,73 @@ def validate_record(record: dict[str, Any]) -> list[str]:
         errors.append(f"unknown status {status!r}")
     if (phase == "complete") != (status == "complete"):
         errors.append("phase/status complete must be paired")
+
+    knowledge_gate = record.get("knowledge_gate")
+    if isinstance(knowledge_gate, dict):
+        candidate_ref = knowledge_gate.get("candidate_ref")
+        candidate_payload = knowledge_gate.get("candidate_payload_sha256")
+        if (candidate_ref is None) != (candidate_payload is None):
+            errors.append("knowledge gate Candidate ref and payload must be paired")
+        promotions = knowledge_gate.get("promotions", [])
+        promotion_ids = [
+            item.get("promotion_id")
+            for item in promotions
+            if isinstance(item, dict)
+        ]
+        receipt_paths = [
+            item.get("receipt_path")
+            for item in promotions
+            if isinstance(item, dict)
+        ]
+        if len(promotion_ids) != len(set(promotion_ids)):
+            errors.append("knowledge promotion IDs are not unique")
+        if len(receipt_paths) != len(set(receipt_paths)):
+            errors.append("knowledge promotion receipt paths are not unique")
+        current_promotion_id = knowledge_gate.get("current_promotion_id")
+        if current_promotion_id is not None and current_promotion_id not in promotion_ids:
+            errors.append("knowledge current promotion does not identify a recorded receipt")
+        review = knowledge_gate.get("review")
+        review_dependent = (
+            knowledge_gate.get("knowledge_snapshot_id"),
+            knowledge_gate.get("knowledge_post_snapshot_id"),
+            knowledge_gate.get("product_snapshot_id"),
+            knowledge_gate.get("outcome_path"),
+            knowledge_gate.get("outcome_sha256"),
+        )
+        if review is None:
+            if any(value is not None for value in review_dependent):
+                errors.append("knowledge gate has review-dependent fields without a review")
+        elif isinstance(review, dict):
+            if (
+                any(value is None for value in review_dependent)
+                or review.get("knowledge_snapshot_before")
+                != review.get("knowledge_snapshot_after")
+                or review.get("knowledge_snapshot_before")
+                != knowledge_gate.get("knowledge_snapshot_id")
+                or review.get("candidate_ref") != candidate_ref
+                or review.get("payload_sha256") != candidate_payload
+            ):
+                errors.append("knowledge review bindings differ from the delivery gate")
+        if phase == "knowledge" and not isinstance(review, dict):
+            errors.append("knowledge phase lacks fresh review bindings")
+        if phase == "complete":
+            current_promotion = next(
+                (
+                    item
+                    for item in promotions
+                    if isinstance(item, dict)
+                    and item.get("promotion_id") == current_promotion_id
+                ),
+                None,
+            )
+            if (
+                not isinstance(review, dict)
+                or not isinstance(current_promotion, dict)
+                or current_promotion.get("stage") not in {"implementation", "bug"}
+                or current_promotion.get("candidate_ref") != candidate_ref
+                or current_promotion.get("payload_sha256") != candidate_payload
+            ):
+                errors.append("complete knowledge gate lacks its reviewed Ready promotion")
 
     generations = record.get("generations")
     if not isinstance(generations, list) or not generations:
@@ -1223,6 +1490,7 @@ def _new_record(
     *,
     work_kind: str | None = None,
     bug_id: str | None = None,
+    knowledge_policy: str = "required",
 ) -> dict[str, Any]:
     if work_kind not in {None, "standard", "bug"}:
         raise DeliveryError("work_kind must be standard or bug", code="INVALID_WORK_KIND")
@@ -1232,6 +1500,11 @@ def _new_record(
         validate_bug_id(bug_id)
     elif bug_id is not None:
         raise DeliveryError("bug_id is only valid for bug work", code="INVALID_BUG_ID")
+    if knowledge_policy not in {"required", "legacy"}:
+        raise DeliveryError(
+            "knowledge_policy must be required or legacy",
+            code="INVALID_KNOWLEDGE_POLICY",
+        )
     now = utc_now()
     record: dict[str, Any] = {
         "schema": SCHEMA,
@@ -1261,6 +1534,8 @@ def _new_record(
         "events": [],
         "updated_at": now,
     }
+    if knowledge_policy == "required":
+        record["knowledge_gate"] = _new_knowledge_gate(now)
     if work_kind == "bug":
         record["work_kind"] = "bug"
         record["bugs"] = {
@@ -1376,10 +1651,16 @@ def _ready_payload_sha256(handoff: dict[str, Any]) -> str:
     return sha256_bytes(canonical_json(normalized))
 
 
-def _verify_repo_file(record: dict[str, Any], relative: str, expected_sha256: str) -> bytes:
+def _verify_repo_file(
+    record: dict[str, Any],
+    relative: str,
+    expected_sha256: str,
+    *,
+    worktree: Path | None = None,
+) -> bytes:
     validate_sha256(expected_sha256, "artifact sha256")
     _normalized_repo_path(relative)
-    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    worktree = worktree or Path(record["generations"][-1]["canonical_worktree"])
     lexical = worktree / Path(*relative.split("/"))
     if _has_reparse_component(lexical, worktree):
         raise DeliveryError("artifact path uses a symlink or reparse point", code="INVALID_PATH")
@@ -1388,6 +1669,375 @@ def _verify_repo_file(record: dict[str, Any], relative: str, expected_sha256: st
     if actual != expected_sha256:
         raise DeliveryError(f"artifact hash differs for {relative}", code="ARTIFACT_DRIFT")
     return value
+
+
+def _validated_knowledge_outcome(
+    record: dict[str, Any],
+    *,
+    path: str,
+    expected_sha256: str,
+    known_secret_values: Sequence[str],
+) -> tuple[str, str]:
+    relative = _normalized_repo_path(path)
+    outcome_root = f"{record['artifact_root']}/implementation"
+    path_match = re.fullmatch(
+        re.escape(outcome_root) + r"/outcome(?:-([1-9][0-9]*))?\.json",
+        relative,
+    )
+    path_revision = 1 if path_match is not None and path_match.group(1) is None else (
+        int(path_match.group(1)) if path_match is not None else 0
+    )
+    if path_match is None or path_revision < 1 or path_match.group(1) == "1":
+        raise DeliveryError(
+            "knowledge gate outcome is outside the Work ID implementation root",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    raw = _verify_repo_file(record, relative, expected_sha256)
+    outcome = _strict_bug_json_object(
+        raw,
+        label="implementation outcome",
+        code="INVALID_KNOWLEDGE_OUTCOME",
+        known_secret_values=known_secret_values,
+    )
+    validator = _execution_validator()
+    schema = _execution_records_schema()
+    try:
+        outcome_errors = list(
+            validator.validate_instance(outcome, schema, "implementationOutcome")
+        )
+        outcome_errors.extend(
+            validator.validate_execution_record_semantics(
+                outcome,
+                known_secret_values=tuple(known_secret_values),
+            )
+        )
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        raise DeliveryError(
+            "knowledge gate outcome validation could not complete",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        ) from exc
+    current_run_id = record.get("implementations", {}).get("current_run_id")
+    review = outcome.get("review", {})
+    revision = outcome.get("revision")
+    suffix = "" if revision == 1 else f"-{revision}"
+    if (
+        outcome_errors
+        or outcome.get("work_id") != record.get("work_id")
+        or outcome.get("implementation_run_id") != current_run_id
+        or revision != path_revision
+        or relative != f"{outcome_root}/outcome{suffix}.json"
+        or review.get("verdict") != "APPROVED"
+    ):
+        raise DeliveryError(
+            "knowledge gate outcome is not a valid reviewed record for the current run",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+    )
+    markdown = outcome.get("markdown", {})
+    expected_markdown = f"{outcome_root}/outcome{suffix}.md"
+    try:
+        markdown_raw = _verify_repo_file(
+            record,
+            str(markdown.get("path", "")),
+            str(markdown.get("sha256", "")),
+        )
+    except DeliveryError as exc:
+        raise DeliveryError(
+            "knowledge gate outcome Markdown is missing or drifted",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        ) from exc
+    if markdown.get("path") != expected_markdown or not markdown_raw:
+        raise DeliveryError(
+            "knowledge gate outcome Markdown binding is invalid",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    for prior_revision in range(1, revision):
+        prior_suffix = "" if prior_revision == 1 else f"-{prior_revision}"
+        for extension in ("json", "md"):
+            prior_relative = f"{outcome_root}/outcome{prior_suffix}.{extension}"
+            prior_path = worktree / Path(*prior_relative.split("/"))
+            if _has_reparse_component(prior_path, worktree) or not prior_path.is_file():
+                raise DeliveryError(
+                    "knowledge gate outcome revision history is incomplete",
+                    code="INVALID_KNOWLEDGE_OUTCOME",
+                )
+    for change in outcome.get("changes", []):
+        try:
+            _verify_repo_file(record, change["path"], change["sha256"])
+        except (KeyError, TypeError, DeliveryError) as exc:
+            raise DeliveryError(
+                "knowledge gate outcome changed-file hash is missing or drifted",
+                code="INVALID_KNOWLEDGE_OUTCOME",
+            ) from exc
+
+    report_ref = review.get("report_ref")
+    report_sha256 = review.get("report_sha256")
+    if (
+        not isinstance(current_run_id, str)
+        or not isinstance(report_ref, str)
+        or PRELIMINARY_REVIEW_REPORT_RE.fullmatch(report_ref) is None
+        or _ledger_relative_ref(report_ref) != report_ref
+        or not isinstance(report_sha256, str)
+        or SHA256_RE.fullmatch(report_sha256) is None
+    ):
+        raise DeliveryError(
+            "knowledge gate preliminary review binding is invalid",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    run_dir = canonical_path(_implementation_root() / "runs" / current_run_id)
+    report_path = _ledger_evidence_path(run_dir, report_ref)
+    if report_path is None:
+        raise DeliveryError(
+            "knowledge gate preliminary review report is not persisted",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    try:
+        report_raw = _stable_read_file(run_dir, report_path)
+    except DeliveryError as exc:
+        raise DeliveryError(
+            "knowledge gate preliminary review report could not be read stably",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        ) from exc
+    if sha256_bytes(report_raw) != report_sha256:
+        raise DeliveryError(
+            "knowledge gate preliminary review report hash drifted",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    report = _strict_bug_json_object(
+        report_raw,
+        label="preliminary implementation review",
+        code="INVALID_KNOWLEDGE_OUTCOME",
+        known_secret_values=known_secret_values,
+    )
+    handoff_relative = record.get("plans", {}).get("current_handoff_path")
+    plan_entry = next(
+        (
+            item
+            for item in record.get("plans", {}).get("revisions", [])
+            if item.get("handoff_path") == handoff_relative
+            and item.get("status") == "Ready"
+        ),
+        None,
+    )
+    try:
+        if not isinstance(handoff_relative, str) or not isinstance(plan_entry, dict):
+            raise DeliveryError("current Ready handoff is absent", code="INVALID_HANDOFF")
+        normalized_handoff = _normalized_repo_path(handoff_relative)
+        handoff_path = worktree / Path(*normalized_handoff.split("/"))
+        if _has_reparse_component(handoff_path, worktree):
+            raise DeliveryError("Ready handoff path is redirected", code="INVALID_PATH")
+        ready = _strict_bug_json_object(
+            _stable_read_file(worktree, handoff_path),
+            label="current Ready handoff",
+            code="INVALID_HANDOFF",
+            known_secret_values=known_secret_values,
+        )
+        _validate_ready_contract(ready)
+        approval = ready.get("approval", {})
+        candidate = ready.get("candidate", {})
+        if (
+            approval.get("status") != "Ready"
+            or approval.get("evidence") not in plan_entry.get("approval_evidence_refs", [])
+            or candidate.get("revision") != plan_entry.get("candidate_revision")
+            or candidate.get("payload_sha256") != plan_entry.get("payload_sha256")
+            or _ready_payload_sha256(ready) != plan_entry.get("payload_sha256")
+        ):
+            raise DeliveryError(
+                "Ready handoff differs from the delivery plan binding",
+                code="INVALID_HANDOFF",
+            )
+    except (AttributeError, KeyError, TypeError, ValueError, DeliveryError) as exc:
+        raise DeliveryError(
+            "knowledge gate cannot resolve the current Ready review contract",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        ) from exc
+    report_errors = list(validator.validate_instance(report, schema, "reviewReport"))
+    report_errors.extend(
+        validator.validate_execution_record_semantics(
+            report,
+            known_secret_values=tuple(known_secret_values),
+        )
+    )
+    report_errors.extend(
+        validator.validate_review_against_ready(
+            report,
+            ready,
+            tuple(known_secret_values),
+        )
+    )
+    evidence_refs = review.get("evidence_refs", [])
+    if (
+        report.get("logical_ref") not in evidence_refs
+        or len(evidence_refs) != 1
+        or report.get("verdict") != review.get("verdict")
+        or any(
+            report.get(field) is not None
+            for field in (
+                "knowledge_snapshot_before",
+                "knowledge_snapshot_after",
+                "knowledge_candidate_ref",
+                "knowledge_candidate_payload_sha256",
+            )
+        )
+    ):
+        report_errors.append("preliminary report differs from the outcome or is not preliminary")
+    raw_refs = report.get("raw_output_refs", [])
+    raw_ref_set = set(raw_refs) if isinstance(raw_refs, list) else set()
+    if len(raw_ref_set) != len(raw_refs):
+        report_errors.append("preliminary review raw output refs are duplicated")
+    for raw_ref in raw_ref_set:
+        normalized = _ledger_relative_ref(raw_ref) if isinstance(raw_ref, str) else None
+        evidence_path = (
+            _ledger_evidence_path(run_dir, normalized)
+            if normalized is not None and normalized == raw_ref
+            else None
+        )
+        if evidence_path is None:
+            report_errors.append(f"preliminary review raw output is missing: {raw_ref}")
+            continue
+        try:
+            _stable_read_file(run_dir, evidence_path)
+        except DeliveryError:
+            report_errors.append(f"preliminary review raw output drifted: {raw_ref}")
+    report_commands = {
+        item.get("command_id"): item
+        for item in report.get("command_outcomes", [])
+        if isinstance(item, dict)
+    }
+    for command in outcome.get("verification", []):
+        reviewed = report_commands.get(command.get("command_id"))
+        output_ref = reviewed.get("output_ref") if isinstance(reviewed, dict) else None
+        if (
+            not isinstance(reviewed, dict)
+            or reviewed.get("outcome") != command.get("outcome")
+            or not isinstance(output_ref, str)
+            or output_ref not in command.get("evidence_refs", [])
+            or output_ref not in raw_ref_set
+        ):
+            report_errors.append(
+                f"outcome verification differs from preliminary report: {command.get('command_id')}"
+            )
+    if report_errors:
+        raise DeliveryError(
+            f"knowledge gate preliminary review violates its binding ({len(report_errors)} issue(s))",
+            code="INVALID_KNOWLEDGE_OUTCOME",
+        )
+    return relative, expected_sha256
+
+
+def _validated_knowledge_promotion_binding(
+    record: dict[str, Any],
+    *,
+    promotion_id: str,
+    receipt_path: str,
+    receipt_sha256: str,
+    candidate_ref: str,
+    payload_sha256: str,
+    approval_evidence: str,
+    expected_stages: set[str],
+    known_secret_values: Sequence[str],
+) -> dict[str, Any]:
+    candidate_match = KNOWLEDGE_CANDIDATE_RE.fullmatch(candidate_ref)
+    validate_sha256(payload_sha256, "knowledge candidate payload_sha256")
+    if candidate_match is None or candidate_match.group(1) != promotion_id:
+        raise DeliveryError(
+            "knowledge Candidate ref and promotion ID differ",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+    approval = _logical_refs([approval_evidence], "knowledge approval")[0]
+    relative = _normalized_repo_path(receipt_path)
+    expected_path = f"docs/knowledge/meta/promotions/{promotion_id}.json"
+    if relative != expected_path:
+        raise DeliveryError(
+            "knowledge promotion receipt path is not canonical",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+    raw = _verify_repo_file(record, relative, receipt_sha256)
+    receipt = _strict_bug_json_object(
+        raw,
+        label="knowledge promotion receipt",
+        code="INVALID_KNOWLEDGE_PROMOTION",
+        known_secret_values=known_secret_values,
+    )
+    receipt_approval = receipt.get("approval", {})
+    lint = receipt.get("lint", {})
+    raw_formal_paths = receipt.get("formal_paths")
+    try:
+        if not isinstance(raw_formal_paths, list) or any(
+            not isinstance(value, str) for value in raw_formal_paths
+        ):
+            raise ValueError("formal_paths is not a string array")
+        formal_paths = [_normalized_repo_path(value) for value in raw_formal_paths]
+    except (DeliveryError, ValueError) as exc:
+        raise DeliveryError(
+            "knowledge promotion receipt has an invalid formal artifact manifest",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        ) from exc
+    canonical_formal_paths = sorted(
+        set(formal_paths),
+        key=lambda value: value.encode("utf-8"),
+    )
+    if formal_paths != canonical_formal_paths:
+        raise DeliveryError(
+            "knowledge promotion receipt formal artifact manifest is not canonical",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+    if (
+        receipt.get("schema") != "knowledge-promotion/v1"
+        or receipt.get("promotion_id") != promotion_id
+        or receipt.get("stage") not in expected_stages
+        or receipt.get("work_id") != record.get("work_id")
+        or receipt.get("candidate_ref") != candidate_ref
+        or receipt.get("payload_sha256") != payload_sha256
+        or receipt_approval.get("evidence") != approval
+        or not isinstance(receipt_approval.get("actor"), str)
+        or not receipt_approval.get("actor")
+        or lint.get("required_outcome") != "passed"
+        or receipt.get("status") != "Ready"
+    ):
+        raise DeliveryError(
+            "knowledge promotion receipt differs from the approved reviewed Candidate",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+    knowledge_module = _knowledge_delivery_module()
+    worktree = record["generations"][-1]["canonical_worktree"]
+    if receipt["stage"] in {"requirements", "planning"}:
+        try:
+            stage_gate = knowledge_module.knowledge_workflow.validate_stage_promotion(
+                worktree,
+                work_id=str(record.get("work_id")),
+                stage=receipt["stage"],
+                receipt_path=relative,
+                receipt_sha256=receipt_sha256,
+                approval_evidence=approval,
+            )
+        except knowledge_module.KnowledgeError as exc:
+            raise DeliveryError(
+                "knowledge promotion receipt does not bind the owner-validated formal artifacts",
+                code="INVALID_KNOWLEDGE_PROMOTION",
+            ) from exc
+        if stage_gate.get("formal_paths") != formal_paths:
+            raise DeliveryError(
+                "knowledge promotion receipt formal artifacts differ from the owner gate",
+                code="INVALID_KNOWLEDGE_PROMOTION",
+            )
+    full_lint = knowledge_module.knowledge_governance.lint_repository(worktree)
+    if full_lint.get("outcome") != "passed":
+        raise DeliveryError(
+            "knowledge repository does not pass full lint at completion",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+    return {
+        "promotion_id": promotion_id,
+        "stage": receipt["stage"],
+        "candidate_ref": candidate_ref,
+        "payload_sha256": payload_sha256,
+        "receipt_path": relative,
+        "receipt_sha256": receipt_sha256,
+        "approval_evidence": approval,
+        "formal_paths": formal_paths,
+        "status": "Ready",
+    }
 
 
 def _validated_bug_assessment_binding(
@@ -1739,10 +2389,11 @@ def _verify_ready_local_sources(
     materialized_paths: set[str],
     *,
     verify_current_sources: bool,
+    source_generation: dict[str, Any] | None = None,
 ) -> None:
-    worktree = Path(record["generations"][-1]["canonical_worktree"])
-    base_sha = record["generations"][-1]["base_sha"]
-    filter_drivers = _active_filter_drivers(worktree) if verify_current_sources else []
+    generation = source_generation or record["generations"][-1]
+    worktree = Path(generation["canonical_worktree"])
+    base_sha = generation["base_sha"]
     for source in handoff["sources"]:
         location = source["location"]
         if urlparse(location).scheme:
@@ -1764,11 +2415,12 @@ def _verify_ready_local_sources(
                         "local Ready source is neither base-tracked nor an approved materialized artifact"
                     ),
                 )
-            if not verify_current_sources and sha256_bytes(base_bytes.stdout) != expected:
+            if sha256_bytes(base_bytes.stdout) != expected:
                 raise DeliveryError(
                     "local Ready source bytes differ from the recorded Git base",
                     code="SOURCE_NOT_MATERIALIZABLE",
                 )
+            continue
         if not verify_current_sources:
             continue
         try:
@@ -1780,38 +2432,38 @@ def _verify_ready_local_sources(
             raise DeliveryError("local Ready source is missing or escapes its worktree", code="SOURCE_DRIFT") from exc
         if sha256_bytes(source_bytes) != expected:
             raise DeliveryError("local Ready source hash differs from its manifest", code="SOURCE_DRIFT")
-        if relative not in materialized_paths:
-            source_status = _git(
-                worktree,
-                [
-                    *_filter_disable_config(filter_drivers),
-                    "status",
-                    "--porcelain=v2",
-                    "-z",
-                    "--untracked-files=all",
-                    "--ignore-submodules=none",
-                    "--",
-                    relative,
-                ],
-            ).stdout
-            if source_status:
-                raise DeliveryError(
-                    "non-artifact Ready source differs from the recorded Git base",
-                    code="SOURCE_NOT_MATERIALIZABLE",
-                )
 
 
 def _approved_upstream_materialization(
     record: dict[str, Any],
     *,
     verify_current_sources: bool = False,
+    source_generation: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Read and verify only the approved upstream bytes for a later generation."""
-    source_worktree = Path(record["generations"][-1]["canonical_worktree"])
+    source_generation = source_generation or next(
+        (
+            generation
+            for generation in reversed(record["generations"])
+            if generation.get("status") == "ready"
+        ),
+        None,
+    )
+    if source_generation is None:
+        raise DeliveryError(
+            "delivery has no Ready generation to materialize",
+            code="WORKSPACE_NOT_READY",
+        )
+    source_worktree = Path(source_generation["canonical_worktree"])
     materialization: dict[str, dict[str, Any]] = {}
 
     def include(relative: str, expected_sha256: str) -> None:
-        value = _verify_repo_file(record, relative, expected_sha256)
+        value = _verify_repo_file(
+            record,
+            relative,
+            expected_sha256,
+            worktree=source_worktree,
+        )
         existing = materialization.get(relative)
         item = {"path": relative, "sha256": expected_sha256, "bytes": value}
         if existing is not None and (existing["sha256"] != expected_sha256 or existing["bytes"] != value):
@@ -1885,7 +2537,7 @@ def _approved_upstream_materialization(
     baseline = handoff.get("planning_baseline", {})
     if (
         baseline.get("repo_id") != record["repo_id"]
-        or baseline.get("head_sha") != record["generations"][-1]["base_sha"]
+        or baseline.get("head_sha") != source_generation["base_sha"]
     ):
         raise DeliveryError("current handoff planning baseline differs from delivery generation", code="INVALID_HANDOFF")
     candidate = handoff.get("candidate", {})
@@ -1933,11 +2585,124 @@ def _approved_upstream_materialization(
         "sha256": actual_handoff_sha,
         "bytes": handoff_bytes,
     }
+
+    referenced_sources = {
+        (_normalized_repo_path(source["location"]), source["revision"]): source["sha256"]
+        for source in sources
+        if not urlparse(source["location"]).scheme
+    }
+    for historical_entry in record["plans"]["revisions"]:
+        historical_handoff_path = historical_entry["handoff_path"]
+        if historical_handoff_path == handoff_path:
+            continue
+        historical_key_prefix = (
+            historical_handoff_path,
+            historical_entry["candidate_revision"],
+        )
+        referenced_historical_paths = {
+            relative: expected
+            for (relative, revision), expected in referenced_sources.items()
+            if revision == historical_key_prefix[1]
+        }
+        if not referenced_historical_paths:
+            continue
+        try:
+            historical_bytes = _stable_read_file(
+                source_worktree,
+                source_worktree / Path(*historical_handoff_path.split("/")),
+            )
+            historical = json.loads(historical_bytes.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise DeliveryError(
+                f"cannot read historical Ready handoff: {exc}",
+                code="INVALID_HANDOFF",
+            ) from exc
+        if not isinstance(historical, dict):
+            raise DeliveryError("historical handoff is not a JSON object", code="INVALID_HANDOFF")
+        _validate_historical_ready_contract(historical)
+        historical_approval = historical.get("approval", {})
+        historical_candidate = historical.get("candidate", {})
+        if (
+            historical_entry.get("status") != "Ready"
+            or not historical_entry.get("approval_evidence_refs")
+            or historical_approval.get("status") != "Ready"
+            or historical_approval.get("evidence")
+            not in historical_entry["approval_evidence_refs"]
+            or historical_candidate.get("revision")
+            != historical_entry["candidate_revision"]
+            or historical_candidate.get("payload_sha256")
+            != historical_entry["payload_sha256"]
+            or _ready_payload_sha256(historical)
+            != historical_entry["payload_sha256"]
+        ):
+            raise DeliveryError(
+                "historical Ready handoff differs from its approval record",
+                code="INVALID_HANDOFF",
+            )
+        historical_root = historical_handoff_path.rsplit("/", 1)[0]
+        historical_artifacts = historical.get("artifacts")
+        if not isinstance(historical_artifacts, list):
+            raise DeliveryError(
+                "historical Ready handoff artifact manifest is missing",
+                code="INVALID_HANDOFF",
+            )
+        historical_handoff_entries = 0
+        for historical_artifact in historical_artifacts:
+            if (
+                not isinstance(historical_artifact, dict)
+                or historical_artifact.get("approval_status") != "Ready"
+            ):
+                raise DeliveryError(
+                    "historical plan artifact is not Ready",
+                    code="INVALID_HANDOFF",
+                )
+            historical_relative = _normalized_repo_path(
+                str(historical_artifact.get("path", ""))
+            )
+            if not historical_relative.startswith(f"{historical_root}/"):
+                raise DeliveryError(
+                    "historical plan artifact escapes its approved bundle",
+                    code="INVALID_HANDOFF",
+                )
+            if historical_relative == historical_handoff_path:
+                historical_handoff_entries += 1
+                if (
+                    historical_artifact.get("role") != "handoff"
+                    or historical_artifact.get("sha256") is not None
+                ):
+                    raise DeliveryError(
+                        "historical handoff self-manifest entry is invalid",
+                        code="INVALID_HANDOFF",
+                    )
+                historical_expected = sha256_bytes(historical_bytes)
+                include(historical_relative, historical_expected)
+                continue
+            if historical_relative not in referenced_historical_paths:
+                continue
+            else:
+                historical_expected = historical_artifact.get("sha256")
+                validate_sha256(
+                    historical_expected,
+                    f"historical artifact {historical_relative} sha256",
+                )
+            if referenced_historical_paths[historical_relative] != historical_expected:
+                raise DeliveryError(
+                    "historical Ready source differs from its approved artifact",
+                    code="SOURCE_NOT_MATERIALIZABLE",
+                )
+            include(historical_relative, historical_expected)
+        if historical_handoff_entries != 1:
+            raise DeliveryError(
+                "historical artifact manifest must identify its handoff exactly once",
+                code="INVALID_HANDOFF",
+            )
+
     _verify_ready_local_sources(
         record,
         handoff,
         set(materialization),
         verify_current_sources=verify_current_sources,
+        source_generation=source_generation,
     )
     return [materialization[key] for key in sorted(materialization)]
 
@@ -2008,6 +2773,18 @@ def _transition_record_unlocked(
     bug_verification_path: str | None = None,
     bug_verification_sha256: str | None = None,
     bug_verification_result: str | None = None,
+    enable_knowledge: bool = False,
+    knowledge_candidate_ref: str | None = None,
+    knowledge_candidate_payload_sha256: str | None = None,
+    knowledge_snapshot_before: str | None = None,
+    knowledge_snapshot_after: str | None = None,
+    knowledge_product_snapshot_id: str | None = None,
+    knowledge_outcome_path: str | None = None,
+    knowledge_outcome_sha256: str | None = None,
+    knowledge_promotion_id: str | None = None,
+    knowledge_receipt_path: str | None = None,
+    knowledge_receipt_sha256: str | None = None,
+    knowledge_approval_evidence: str | None = None,
     known_secret_values: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
@@ -2029,8 +2806,11 @@ def _transition_record_unlocked(
         raise DeliveryError(f"illegal status transition {current_status} -> {status}", code="ILLEGAL_TRANSITION")
     if current_status == "blocked" and status == "active" and phase != current_phase:
         raise DeliveryError("blocked recovery must remain in the same phase", code="ILLEGAL_TRANSITION")
-    if status == "awaiting_user" and phase not in {"requirements", "planning"}:
-        raise DeliveryError("awaiting_user is only valid for requirements or planning", code="ILLEGAL_TRANSITION")
+    if status == "awaiting_user" and phase not in {"requirements", "planning", "knowledge"}:
+        raise DeliveryError(
+            "awaiting_user is only valid for requirements, planning, or knowledge",
+            code="ILLEGAL_TRANSITION",
+        )
     if (phase == "complete") != (status == "complete"):
         raise DeliveryError("complete phase and status must be paired", code="ILLEGAL_TRANSITION")
 
@@ -2047,6 +2827,10 @@ def _transition_record_unlocked(
         deferred_bug_redacted_summary or "",
         deferred_bug_human_reviewer or "",
         implementation_ledger_ref or "",
+        knowledge_candidate_ref or "",
+        knowledge_outcome_path or "",
+        knowledge_receipt_path or "",
+        knowledge_approval_evidence or "",
     )
     if any(
         secret in value
@@ -2059,6 +2843,69 @@ def _transition_record_unlocked(
             code="INVALID_EVIDENCE_REF",
         )
     known_secret_values = known_secrets
+
+    knowledge_gate = record.get("knowledge_gate")
+    if enable_knowledge:
+        if knowledge_gate is not None:
+            raise DeliveryError(
+                "delivery already has a knowledge gate",
+                code="KNOWLEDGE_GATE_ALREADY_ENABLED",
+            )
+        if (
+            current_phase != "implementation"
+            or (phase, status) != ("implementation", "active")
+            or record.get("requirements", {}).get("current_path") is None
+            or record.get("plans", {}).get("current_handoff_path") is None
+        ):
+            raise DeliveryError(
+                "enable-knowledge requires implementation/active with approved requirements and plan",
+                code="MISSING_KNOWLEDGE_GATE",
+            )
+        record["knowledge_gate"] = _new_knowledge_gate(utc_now())
+        knowledge_gate = record["knowledge_gate"]
+
+    if isinstance(knowledge_gate, dict):
+        if current_phase == "implementation" and phase == "complete":
+            raise DeliveryError(
+                "required knowledge delivery cannot Complete directly from implementation",
+                code="KNOWLEDGE_GATE_REQUIRED",
+            )
+    elif phase == "knowledge":
+        raise DeliveryError(
+            "legacy delivery has no knowledge overlay",
+            code="MISSING_KNOWLEDGE_GATE",
+        )
+
+    review_values = (
+        knowledge_snapshot_before,
+        knowledge_snapshot_after,
+        knowledge_product_snapshot_id,
+        knowledge_outcome_path,
+        knowledge_outcome_sha256,
+    )
+    review_supplied = any(value is not None for value in review_values)
+    if review_supplied and (
+        not all(value is not None for value in review_values)
+        or knowledge_candidate_ref is None
+        or knowledge_candidate_payload_sha256 is None
+    ):
+        raise DeliveryError(
+            "knowledge review requires Candidate, dual snapshots, product snapshot, and outcome",
+            code="INCOMPLETE_KNOWLEDGE_REVIEW",
+        )
+    promotion_values = (
+        knowledge_promotion_id,
+        knowledge_receipt_path,
+        knowledge_receipt_sha256,
+        knowledge_approval_evidence,
+    )
+    promotion_supplied = any(value is not None for value in promotion_values)
+    if promotion_supplied and not all(value is not None for value in promotion_values):
+        raise DeliveryError(
+            "knowledge promotion requires ID, receipt path/hash, and approval evidence",
+            code="INCOMPLETE_KNOWLEDGE_PROMOTION",
+        )
+    promotion_consumed = False
 
     pending_inbox: tuple[str, list[str], bool, str | None, str | None] | None = None
 
@@ -2286,6 +3133,42 @@ def _transition_record_unlocked(
         record["requirements"]["current_path"] = requirements_path
         if bug_entry is not None:
             record["bugs"]["assessments"].append(bug_entry)
+        if isinstance(knowledge_gate, dict):
+            if (
+                not promotion_supplied
+                or knowledge_candidate_ref is None
+                or knowledge_candidate_payload_sha256 is None
+            ):
+                raise DeliveryError(
+                    "required requirements approval lacks its Ready knowledge promotion",
+                    code="MISSING_KNOWLEDGE_GATE",
+                )
+            if knowledge_approval_evidence not in approval_refs:
+                raise DeliveryError(
+                    "requirements and knowledge promotion must use the same approval evidence",
+                    code="INVALID_KNOWLEDGE_PROMOTION",
+                )
+            promotion = _validated_knowledge_promotion_binding(
+                record,
+                promotion_id=str(knowledge_promotion_id),
+                receipt_path=str(knowledge_receipt_path),
+                receipt_sha256=str(knowledge_receipt_sha256),
+                candidate_ref=knowledge_candidate_ref,
+                payload_sha256=knowledge_candidate_payload_sha256,
+                approval_evidence=str(knowledge_approval_evidence),
+                expected_stages={"requirements"},
+                known_secret_values=known_secret_values,
+            )
+            if promotion["receipt_path"] not in evidence_refs:
+                raise DeliveryError(
+                    "requirements event must reference its knowledge promotion receipt",
+                    code="MISSING_KNOWLEDGE_GATE",
+                )
+            knowledge_gate["candidate_ref"] = promotion["candidate_ref"]
+            knowledge_gate["candidate_payload_sha256"] = promotion["payload_sha256"]
+            knowledge_gate["current_promotion_id"] = promotion["promotion_id"]
+            knowledge_gate["promotions"].append(promotion)
+            promotion_consumed = True
 
     elif bug_assessment_supplied:
         raise DeliveryError("BUG assessment must be bound with Requirements approval", code="MISSING_GATE")
@@ -2410,6 +3293,42 @@ def _transition_record_unlocked(
         record["plans"]["revisions"].append(entry)
         record["plans"]["current_handoff_path"] = handoff_path
         _approved_upstream_materialization(record, verify_current_sources=True)
+        if isinstance(knowledge_gate, dict):
+            if (
+                not promotion_supplied
+                or knowledge_candidate_ref is None
+                or knowledge_candidate_payload_sha256 is None
+            ):
+                raise DeliveryError(
+                    "required plan approval lacks its Ready knowledge promotion",
+                    code="MISSING_KNOWLEDGE_GATE",
+                )
+            if knowledge_approval_evidence not in approval_refs:
+                raise DeliveryError(
+                    "plan and knowledge promotion must use the same approval evidence",
+                    code="INVALID_KNOWLEDGE_PROMOTION",
+                )
+            promotion = _validated_knowledge_promotion_binding(
+                record,
+                promotion_id=str(knowledge_promotion_id),
+                receipt_path=str(knowledge_receipt_path),
+                receipt_sha256=str(knowledge_receipt_sha256),
+                candidate_ref=knowledge_candidate_ref,
+                payload_sha256=knowledge_candidate_payload_sha256,
+                approval_evidence=str(knowledge_approval_evidence),
+                expected_stages={"planning"},
+                known_secret_values=known_secret_values,
+            )
+            if promotion["receipt_path"] not in evidence_refs:
+                raise DeliveryError(
+                    "plan event must reference its knowledge promotion receipt",
+                    code="MISSING_KNOWLEDGE_GATE",
+                )
+            knowledge_gate["candidate_ref"] = promotion["candidate_ref"]
+            knowledge_gate["candidate_payload_sha256"] = promotion["payload_sha256"]
+            knowledge_gate["current_promotion_id"] = promotion["promotion_id"]
+            knowledge_gate["promotions"].append(promotion)
+            promotion_consumed = True
 
     verification_values = (
         bug_verification_path,
@@ -2420,19 +3339,25 @@ def _transition_record_unlocked(
     if verification_supplied and not all(value is not None for value in verification_values):
         raise DeliveryError("BUG verification requires path, hash, and result", code="INCOMPLETE_ARTIFACT_REF")
     if verification_supplied:
-        if (
-            record.get("work_kind", "standard") == "bug"
-            and bug_verification_result == "failed"
-            and phase == "complete"
-        ):
-            raise DeliveryError("failed BUG verification cannot Complete delivery", code="FAILED_BUG_VERIFICATION")
-        if (
-            phase != "complete"
-            or status != "complete"
-            or implementation_status != "Complete"
-        ):
+        if record.get("work_kind", "standard") == "bug" and bug_verification_result == "failed":
             raise DeliveryError(
-                "successful BUG verification may only bind during terminal Complete",
+                "failed BUG verification cannot enter a terminal knowledge gate",
+                code="FAILED_BUG_VERIFICATION",
+            )
+        legacy_terminal = (
+            not isinstance(knowledge_gate, dict)
+            and (phase, status) == ("complete", "complete")
+            and implementation_status == "Complete"
+        )
+        knowledge_review_terminal = (
+            isinstance(knowledge_gate, dict)
+            and current_phase == "implementation"
+            and (phase, status) == ("knowledge", "active")
+            and implementation_status == "Complete"
+        )
+        if not legacy_terminal and not knowledge_review_terminal:
+            raise DeliveryError(
+                "successful BUG verification may only bind at legacy Complete or the reviewed knowledge gate",
                 code="INVALID_BUG_VERIFICATION",
             )
 
@@ -2493,6 +3418,178 @@ def _transition_record_unlocked(
     elif verification_supplied:
         raise DeliveryError("BUG verification must bind the implementation run atomically", code="INCOMPLETE_ARTIFACT_REF")
 
+    if current_phase == "knowledge" and phase == "implementation":
+        if not isinstance(knowledge_gate, dict) or implementation_status != "Active":
+            raise DeliveryError(
+                "product changes from knowledge require an Active implementation attempt",
+                code="MISSING_GATE",
+            )
+        knowledge_gate.update(
+            {
+                "candidate_ref": None,
+                "candidate_payload_sha256": None,
+                "knowledge_snapshot_id": None,
+                "knowledge_post_snapshot_id": None,
+                "product_snapshot_id": None,
+                "outcome_path": None,
+                "outcome_sha256": None,
+                "review": None,
+            }
+        )
+
+    if review_supplied:
+        if (
+            not isinstance(knowledge_gate, dict)
+            or current_phase != "implementation"
+            or (phase, status) != ("knowledge", "active")
+            or implementation_status != "Complete"
+        ):
+            raise DeliveryError(
+                "reviewed knowledge bindings must atomically enter knowledge/active",
+                code="INVALID_KNOWLEDGE_REVIEW",
+            )
+        candidate_match = KNOWLEDGE_CANDIDATE_RE.fullmatch(str(knowledge_candidate_ref))
+        if candidate_match is None:
+            raise DeliveryError(
+                "reviewed knowledge Candidate ref is invalid",
+                code="INVALID_KNOWLEDGE_REVIEW",
+            )
+        validate_sha256(
+            str(knowledge_candidate_payload_sha256),
+            "knowledge candidate payload_sha256",
+        )
+        for label, value in (
+            ("knowledge_snapshot_before", str(knowledge_snapshot_before)),
+            ("knowledge_snapshot_after", str(knowledge_snapshot_after)),
+            ("knowledge_product_snapshot_id", str(knowledge_product_snapshot_id)),
+        ):
+            validate_sha256(value, label)
+        if knowledge_snapshot_before != knowledge_snapshot_after:
+            raise DeliveryError(
+                "fresh review observed knowledge snapshot drift",
+                code="KNOWLEDGE_SNAPSHOT_DRIFT",
+            )
+        verified_knowledge = _verified_knowledge_snapshot(
+            record,
+            candidate_ref=str(knowledge_candidate_ref),
+            payload_sha256=str(knowledge_candidate_payload_sha256),
+        )
+        if verified_knowledge.get("snapshot_id") != knowledge_snapshot_before:
+            raise DeliveryError(
+                "caller-provided knowledge snapshot does not match the canonical tree and sealed Candidate",
+                code="KNOWLEDGE_SNAPSHOT_DRIFT",
+            )
+        outcome_relative, outcome_sha = _validated_knowledge_outcome(
+            record,
+            path=str(knowledge_outcome_path),
+            expected_sha256=str(knowledge_outcome_sha256),
+            known_secret_values=known_secret_values,
+        )
+        knowledge_gate.update(
+            {
+                "candidate_ref": knowledge_candidate_ref,
+                "candidate_payload_sha256": knowledge_candidate_payload_sha256,
+                "knowledge_snapshot_id": knowledge_snapshot_before,
+                "knowledge_post_snapshot_id": verified_knowledge["post_snapshot_id"],
+                "product_snapshot_id": knowledge_product_snapshot_id,
+                "outcome_path": outcome_relative,
+                "outcome_sha256": outcome_sha,
+                "review": {
+                    "knowledge_snapshot_before": knowledge_snapshot_before,
+                    "knowledge_snapshot_after": knowledge_snapshot_after,
+                    "candidate_ref": knowledge_candidate_ref,
+                    "payload_sha256": knowledge_candidate_payload_sha256,
+                },
+            }
+        )
+        current_run_id = record["implementations"]["current_run_id"]
+        current_run = next(
+            (
+                item
+                for item in record["implementations"]["runs"]
+                if item["run_id"] == current_run_id
+            ),
+            None,
+        )
+        if current_run is None or current_run.get("status") != "Complete":
+            raise DeliveryError(
+                "knowledge review requires a Complete implementation run",
+                code="MISSING_GATE",
+            )
+        review_errors = _complete_implementation_errors(
+            record,
+            current_run,
+            evidence_refs,
+            known_secret_values,
+        )
+        if review_errors:
+            raise DeliveryError(
+                "knowledge review bindings differ from persisted implementation evidence: "
+                + "; ".join(review_errors),
+                code="INVALID_KNOWLEDGE_REVIEW",
+                details={"errors": review_errors},
+            )
+    elif current_phase == "implementation" and phase == "knowledge":
+        raise DeliveryError(
+            "entering knowledge requires reviewed Candidate, snapshots, and outcome",
+            code="MISSING_KNOWLEDGE_GATE",
+        )
+
+    if current_phase == "knowledge" and phase == "knowledge" and status == "awaiting_user":
+        if not isinstance(knowledge_gate, dict) or not isinstance(knowledge_gate.get("review"), dict):
+            raise DeliveryError(
+                "knowledge Candidate cannot be presented before fresh review",
+                code="MISSING_KNOWLEDGE_GATE",
+            )
+
+    if current_phase == "knowledge" and phase == "complete":
+        if not isinstance(knowledge_gate, dict) or current_status != "awaiting_user":
+            raise DeliveryError(
+                "knowledge completion requires the awaiting-user approval state",
+                code="MISSING_KNOWLEDGE_GATE",
+            )
+        if not promotion_supplied:
+            raise DeliveryError(
+                "knowledge completion requires a persisted Ready promotion",
+                code="MISSING_KNOWLEDGE_GATE",
+            )
+        promotion = _validated_knowledge_promotion_binding(
+            record,
+            promotion_id=str(knowledge_promotion_id),
+            receipt_path=str(knowledge_receipt_path),
+            receipt_sha256=str(knowledge_receipt_sha256),
+            candidate_ref=str(knowledge_gate.get("candidate_ref")),
+            payload_sha256=str(knowledge_gate.get("candidate_payload_sha256")),
+            approval_evidence=str(knowledge_approval_evidence),
+            expected_stages={"implementation", "bug"},
+            known_secret_values=known_secret_values,
+        )
+        knowledge_module = _knowledge_delivery_module()
+        actual_post_snapshot = knowledge_module.compute_knowledge_tree_snapshot(
+            record["generations"][-1]["canonical_worktree"]
+        )
+        if (
+            actual_post_snapshot.get("snapshot_id")
+            != knowledge_gate.get("knowledge_post_snapshot_id")
+        ):
+            raise DeliveryError(
+                "canonical knowledge differs from the reviewed Candidate postimage tree",
+                code="KNOWLEDGE_SNAPSHOT_DRIFT",
+            )
+        if promotion["receipt_path"] not in evidence_refs:
+            raise DeliveryError(
+                "Complete event must reference the knowledge promotion receipt",
+                code="MISSING_KNOWLEDGE_GATE",
+            )
+        knowledge_gate["promotions"].append(promotion)
+        knowledge_gate["current_promotion_id"] = promotion["promotion_id"]
+        promotion_consumed = True
+    elif promotion_supplied and not promotion_consumed:
+        raise DeliveryError(
+            "knowledge promotion is not valid for this phase transition",
+            code="INVALID_KNOWLEDGE_PROMOTION",
+        )
+
     if phase == "planning" and current_phase == "requirements" and requirements_path is None:
         raise DeliveryError("planning requires a newly persisted Ready requirements revision", code="MISSING_GATE")
     if phase == "implementation" and current_phase == "planning" and handoff_path is None:
@@ -2517,7 +3614,9 @@ def _transition_record_unlocked(
             raise DeliveryError("delivery Complete requires a Complete implementation run", code="MISSING_GATE")
         if record.get("work_kind", "standard") == "bug":
             verification = record.get("bugs", {}).get("verification")
-            if not verification_supplied or not isinstance(verification, dict):
+            if not isinstance(verification, dict) or (
+                not isinstance(knowledge_gate, dict) and not verification_supplied
+            ):
                 raise DeliveryError("bug delivery Complete requires bug-verification/v1", code="MISSING_BUG_VERIFICATION")
             if verification.get("path") not in evidence_refs:
                 raise DeliveryError("Complete event must reference BUG verification", code="MISSING_BUG_VERIFICATION")

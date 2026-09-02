@@ -28,10 +28,10 @@
 
 此分支的前置條件是[品質契約](quality-contract.md)已通過。
 
-1. 依建議路徑配置完整 artifact set，產生唯一 Candidate revision、primary／supporting hashes、canonical payload digest 與 `handoff.json`，確認所有路徑可用。
-2. 在對話中按精確 path 展示每份 artifact 的完整序列化內容，包括 `approval.status: Candidate` 的 handoff；每個 path 使用獨立內容區塊，並維持檔案系統原狀。Hash、byte count、manifest、摘要或「內部已固定」不是 artifact bytes 的替代品；回覆長度不改變這項 payload。
+1. 依建議路徑配置完整 artifact set，產生唯一 Candidate revision、primary／supporting hashes、canonical payload digest 與 `handoff.json`，確認所有路徑可用。若delivery record含required knowledge overlay，使用`project-knowledge` planning stage builder把整組正式plan bundle與`planned` decision claim／sidecar／index封為同一promotion Candidate；若沒有新的planning knowledge，明列`decision: no-change`並仍封入精確promotion log與Ready receipt。以預期actor與stable evidence token建立prospective binding（不是預先核准）；不得將planned誤標為observed。Legacy或明列bootstrap exception維持既有bundle。
+2. 在對話中按精確 path 展示每份 artifact 的完整序列化內容，包括 `approval.status: Candidate` 的 handoff；required overlay同時展示全部knowledge postimages、diff、Candidate ref與digest。每個 path 使用獨立內容區塊，並維持檔案系統原狀。Hash、byte count、manifest、摘要或「內部已固定」不是 artifact bytes 的替代品；回覆長度不改變這項 payload。
 3. 最後提供方案摘要、關鍵決策、主要風險及使用 `role`／`approval_status` 的 manifest。
-4. 以本回合唯一問題詢問：「是否確認上述完整技術規劃，並同意寫入列出的所有 artifact paths？」
+4. 以本回合唯一問題詢問：「是否確認上述完整技術規劃與knowledge diff，並同意寫入列出的所有 paths？」同一回答同時是plan與knowledge的approval evidence，不新增第三個 gate。
 
 **完成條件：** 使用者已看到與 digest 對應的最後一份 artifact 最後一個 byte 及全部 paths；工作區與外部系統未變更。在此之前回覆只是未完成草稿，不宣告 `Candidate—Awaiting confirmation`、不詢問核准。
 
@@ -42,8 +42,8 @@
 1. 驗證核准回覆可定位到目前 revision、payload digest 與全部 paths，再重新檢查整組 paths。
 2. 任一路徑被占用時保留現有內容、整組不寫入；配置最小可用後綴，重新展示並重新核准。
 3. 依 [`ready-plan/v1`](ready-plan-contract.md)只更新 approval metadata 與 artifact approval statuses；重新驗證 primary／supporting bytes、hashes、revision 與 digest 未變。
-4. 以可復原的一次性變更寫入整組 artifacts。部分寫入時停止、列出實際狀態，狀態維持非 Ready。
-5. 重新讀取 `handoff.json`、驗證 schema 與所有已寫入 hashes，回報 Primary、supporting 與 handoff paths。
+4. Required overlay只可透過sealed Candidate的optimistic transaction，以同一approval evidence寫入整組plan artifacts與knowledge postimages；任何source／preimage drift、replace、lint或receipt失敗都不進Implementation。Legacy使用既有可復原一次性變更。部分寫入時停止、列出實際狀態，狀態維持非 Ready。
+5. 重新讀取`handoff.json`、驗證schema與所有已寫入hashes；required overlay另要求`knowledge-promotion/v1.formal_paths`精確等於完整artifact manifest，透過Technical Planning owner validator重驗Ready approval、payload、primary/supporting bytes與handoff self-hash規則，再驗證stage/work ID、Candidate digest與passed lint，最後回報Primary、全部supporting、handoff與receipt paths。
 
 Ready 只代表可交給 `$implementation-execution`；實作、commit、tickets、部署或其他外部變更需要各自既有授權。交接提供 `handoff.json` 與 Primary path，consumer 從 versioned contract 取得其餘索引。
 

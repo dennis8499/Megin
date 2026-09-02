@@ -514,10 +514,10 @@ def _is_reparse_path(path: Path) -> bool:
     if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
         return True
     try:
-        attributes = path.lstat().st_file_attributes
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
     except FileNotFoundError:
         return False
-    except (AttributeError, OSError):
+    except OSError:
         return True
     return os.name == "nt" and bool(attributes & 0x400)
 

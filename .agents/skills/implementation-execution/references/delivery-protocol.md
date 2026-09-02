@@ -23,7 +23,7 @@ Preflight → Executing → Verifying → Reviewing → Complete
 
 終止狀態只有：
 
-- `Complete`：主代理 full verification 通過，fresh Reviewer 對相同 snapshot `APPROVED`，且已按 terminal ordering 保存。
+- `Complete`：主代理full verification通過；preliminary fresh report已實體綁定最新create-only Outcome；另一位final fresh Reviewer對含Outcome與Candidate的相同snapshot `APPROVED`，且已按terminal ordering保存。
 - `Awaiting upstream reapproval`：Ready plan、BDD contract、來源或追溯需要上游修改並重新核准。
 - `Blocked`：能力、Git、環境、baseline、Ledger、Reviewer 或進展式熔斷阻止可靠完成。
 
@@ -31,21 +31,23 @@ Preflight → Executing → Verifying → Reviewing → Complete
 
 ## Complete
 
-`Complete` 必須依序發生：Reviewer response received → 寫入前重算 snapshot 且相同 → 原樣保存 raw response／outputs／report → 保存後重算 snapshot 且相同 → append `Complete`。前六步各寫一份有序`terminal/<sequence>-<step>.json` machine witness，最後的Ledger transition證明`complete_appended`。Machine ordering的`report_persisted`代表current round raw response、report宣告的每個raw output ref與schema-valid report整組均已有可讀bytes；consumer validator以canonical run root驗證terminal index、capability／baseline、main command raw outputs與六個witness的精確集合，不接受phantom ref或只列部分outputs。最後transition使用[Ledger terminal index](preflight-and-ledger.md)逐一引用；任一步失敗走 Reviewer 契約的 drift 或 `Blocked` 分支，不先凍結 run。
+進入terminal ordering前必須依序完成：preliminary fresh response → create-only保存其report與全部raw outputs → 以run ID、logical ref、report path／hash及逐command output binding寫入最新連續Outcome revision → 封存Candidate → 另一位fresh Reviewer完成final review。`Complete`再依序發生：final Reviewer response received → 寫入前重算product與required knowledge snapshots且相同 → 原樣保存raw response／outputs／report → 保存後重算snapshots且相同 → append implementation `Complete`。Knowledge snapshot必須由sealed Candidate與完整Git-eligible knowledge tree重建，不接受caller自行宣告相等。前六步各寫一份有序`terminal/<sequence>-<step>.json` machine witness，最後的Ledger transition證明`complete_appended`。Machine ordering的`report_persisted`代表current round raw response、report宣告的每個raw output ref與schema-valid final report整組均已有可讀bytes；consumer validator以canonical run root驗證連續report chain、terminal index、capability／baseline、main command raw outputs與六個witness的精確集合，不接受phantom ref或只列部分outputs。最後transition使用[Ledger terminal index](preflight-and-ledger.md)逐一引用；任一步失敗走Reviewer契約的drift或`Blocked`分支，不先凍結run。
+
+Implementation Ledger `Complete`不等於required delivery Complete。若delivery record有`knowledge_gate.policy: required`，主代理把Ledger、accepted review、`implementation-outcome/v1`、product snapshot與knowledge Candidate binding原子交給delivery，進`knowledge/active`；完整diff展示後進`knowledge/awaiting_user`。只有使用者核准且matching `knowledge-promotion/v1` Ready receipt、actual完整knowledge post-tree等於reviewed expected post-tree與post-apply full lint通過，delivery才可`complete/complete`。Legacy record沒有overlay時維持既有terminal transition。
 
 交付回報：
 
 - Ready plan path／revision、base SHA 與 run ID；
 - 完成或 `Satisfied by existing implementation` 的 `WP-*` 摘要；
 - 主代理完整 build／test／BDD／治理 commands 的結果；
-- Reviewer attestation、round、snapshot-before／after、獨立 command outcomes 與 `APPROVED`；
+- Preliminary與final Reviewer attestation、連續round、各自snapshot-before／after、獨立command outcomes與`APPROVED`；
 - 非 blocking advisories；
 - Ledger 的精確 path。
 - BUG run 的assessment path／hash、`bug-verification/v1` path／hash、implementation verdict與獨立`verified | partial`結果；`partial`明示原始症狀未驗證、殘餘風險及staging／人工follow-up。
 
 交付後被審內容與 Ledger 只讀；不自動 stage、commit、push、merge、部署、建立 ticket、清理 artifacts 或刪除 worktree。
 
-BUG run若缺verification、結果為`failed`、review與verification雙結論不一致、verification evidence未實際保存並列入terminal index，或仍有未materialize的途中BUG evidence，均不得Complete。Verification只在同一次`complete/complete` transition綁定；implementation期間的提早綁定不得占用create-only path。Critical／high只改變優先與風險回報，不繞過gate；安全／隱私／資料風險只引用遮蔽摘要、安全evidence ref與具名人工reviewer。
+BUG run若缺verification、結果為`failed`、review與verification雙結論不一致、verification evidence未實際保存並列入terminal index，或仍有未materialize的途中BUG evidence，均不得Complete。Legacy verification只在同一次`complete/complete` transition綁定；required overlay則在accepted review進`knowledge/active`時綁定並於promotion後重驗，更早綁定不得占用create-only path。Critical／high只改變優先與風險回報，不繞過gate；安全／隱私／資料風險只引用遮蔽摘要、安全evidence ref與具名人工reviewer。
 
 ## Awaiting upstream reapproval
 
