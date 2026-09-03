@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -51,6 +52,81 @@ GIT_ENV_PREFIX_REMOVE = (
 )
 FILTER_DRIVER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _TRUST_FAILURE_MARKERS = (b"detected dubious ownership", b"safe.directory")
+
+
+@dataclass(frozen=True)
+class RepositoryIdentity:
+    """Immutable repository identity captured by one scoped Git probe."""
+
+    requested_path: str
+    canonical_worktree: str
+    worktree_key: str
+    common_dir: str
+    repo_id: str
+    head_sha: str
+
+
+@dataclass(frozen=True)
+class RepositoryStateEvidence:
+    """Immutable provenance for a full repository state observation."""
+
+    identity: RepositoryIdentity
+    lock_epoch: str | None
+    primary_worktree: str
+    branch_ref: str | None
+    status: bytes
+    worktrees: tuple[tuple[tuple[str, str | bool], ...], ...]
+    filter_drivers: tuple[tuple[str, tuple[str, ...]], ...]
+    submodules: tuple[tuple[str, tuple[str, ...]], ...]
+    hooks_executed: bool = False
+    trust_validated: bool = True
+    merge_base: tuple[str, bool] | None = None
+
+    def as_probe(self) -> dict[str, Any]:
+        """Return the existing mutable public probe shape without exposing tokens."""
+        top = self.identity.canonical_worktree
+        branch_ref = self.branch_ref
+        return {
+            "repo_id": self.identity.repo_id,
+            "requested_path": self.identity.requested_path,
+            "canonical_worktree": top,
+            "worktree_key": self.identity.worktree_key,
+            "primary_worktree": self.primary_worktree,
+            "is_primary": canonical_path_text(top)
+            == canonical_path_text(self.primary_worktree),
+            "branch_ref": branch_ref,
+            "branch": branch_ref.removeprefix("refs/heads/") if branch_ref else None,
+            "attached": branch_ref is not None,
+            "head_sha": self.identity.head_sha,
+            "strict_clean": self.status == b"",
+            "status_sha256": sha256_bytes(self.status),
+            "worktrees": [dict(items) for items in self.worktrees],
+        }
+
+    def matches(
+        self,
+        probe: dict[str, Any],
+        *,
+        canonical_worktree: str | Path,
+        lock_epoch: str | None,
+    ) -> bool:
+        """Accept reuse only for the exact path, identity, HEAD, and lock epoch."""
+        expected_path = canonical_path_text(canonical_worktree)
+        return (
+            self.lock_epoch == lock_epoch
+            and canonical_path_text(self.identity.canonical_worktree) == expected_path
+            and canonical_path_text(str(probe.get("canonical_worktree", "")))
+            == expected_path
+            and probe.get("worktree_key") == self.identity.worktree_key
+            and probe.get("repo_id") == self.identity.repo_id
+            and probe.get("head_sha") == self.identity.head_sha
+        )
+
+
+@dataclass
+class _StrictStatusCollector:
+    filter_drivers: list[tuple[str, tuple[str, ...]]]
+    submodules: list[tuple[str, tuple[str, ...]]]
 
 
 def _git_failure_error(
@@ -113,8 +189,13 @@ def _decode(value: bytes) -> str:
     return value.decode("utf-8", errors="replace")
 
 
-def _active_filter_drivers(repo: str | Path) -> list[str]:
-    tracked = _git(repo, ["-c", "core.fsmonitor=false", "ls-files", "-z"]).stdout
+def _active_filter_drivers(
+    repo: str | Path,
+    *,
+    tracked: bytes | None = None,
+) -> list[str]:
+    if tracked is None:
+        tracked = _git(repo, ["-c", "core.fsmonitor=false", "ls-files", "-z"]).stdout
     if not tracked:
         return []
     attributes = _git(
@@ -162,24 +243,45 @@ def _filter_disable_config(drivers: Sequence[str]) -> list[str]:
     return config
 
 
-def _indexed_gitlinks(repo: str | Path) -> list[str]:
+def _index_inventory(repo: str | Path) -> tuple[bytes, list[str]]:
+    """Return tracked paths and gitlinks from one stage-aware index scan."""
     output = _git(repo, ["-c", "core.fsmonitor=false", "ls-files", "--stage", "-z"]).stdout
+    tracked_paths: list[bytes] = []
+    seen_paths: set[bytes] = set()
     result: set[str] = set()
     for entry in output.split(b"\0"):
         if not entry:
             continue
         metadata, separator, raw_path = entry.partition(b"\t")
-        if not separator or not metadata.startswith(b"160000 "):
+        if not separator:
+            raise DeliveryError("git ls-files returned an invalid index inventory", code="STATUS_PROBE_FAILED")
+        if raw_path not in seen_paths:
+            tracked_paths.append(raw_path)
+            seen_paths.add(raw_path)
+        if not metadata.startswith(b"160000 "):
             continue
         try:
             relative = raw_path.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise DeliveryError("submodule path is not valid UTF-8", code="UNSAFE_SUBMODULE") from exc
         result.add(_normalized_repo_path(relative))
-    return sorted(result, key=lambda value: value.encode("utf-8"))
+    tracked = b"\0".join(tracked_paths)
+    if tracked:
+        tracked += b"\0"
+    return tracked, sorted(result, key=lambda value: value.encode("utf-8"))
 
 
-def _strict_status(repo: str | Path, *, visited: set[str] | None = None, depth: int = 0) -> bytes:
+def _indexed_gitlinks(repo: str | Path) -> list[str]:
+    return _index_inventory(repo)[1]
+
+
+def _strict_status(
+    repo: str | Path,
+    *,
+    visited: set[str] | None = None,
+    depth: int = 0,
+    collector: _StrictStatusCollector | None = None,
+) -> bytes:
     """Return empty only when this worktree and every initialized submodule are clean."""
     if depth > 32:
         raise DeliveryError("submodule nesting exceeds the safe probe limit", code="UNSAFE_SUBMODULE")
@@ -190,7 +292,11 @@ def _strict_status(repo: str | Path, *, visited: set[str] | None = None, depth: 
         raise DeliveryError("submodule graph contains a worktree cycle", code="UNSAFE_SUBMODULE")
     seen.add(key)
     try:
-        filter_drivers = _active_filter_drivers(top)
+        tracked, gitlinks = _index_inventory(top)
+        filter_drivers = _active_filter_drivers(top, tracked=tracked)
+        if collector is not None:
+            collector.filter_drivers.append((key, tuple(filter_drivers)))
+            collector.submodules.append((key, tuple(gitlinks)))
         status = _git(
             top,
             [
@@ -206,7 +312,7 @@ def _strict_status(repo: str | Path, *, visited: set[str] | None = None, depth: 
         ).stdout
         if status:
             return status
-        for relative in _indexed_gitlinks(top):
+        for relative in gitlinks:
             lexical = top / Path(*relative.split("/"))
             is_junction = getattr(lexical, "is_junction", lambda: False)
             if lexical.is_symlink() or is_junction():
@@ -228,7 +334,12 @@ def _strict_status(repo: str | Path, *, visited: set[str] | None = None, depth: 
             child_top = canonical_path(_decode(child_top_result.stdout).strip())
             if canonical_path_text(child_top) != canonical_path_text(lexical):
                 return b"submodule-redirected\0" + relative.encode("utf-8")
-            child_status = _strict_status(child_top, visited=seen, depth=depth + 1)
+            child_status = _strict_status(
+                child_top,
+                visited=seen,
+                depth=depth + 1,
+                collector=collector,
+            )
             if child_status:
                 return (
                     b"submodule-dirty\0"
@@ -257,22 +368,82 @@ def _parse_worktrees(output: bytes) -> list[dict[str, str | bool]]:
     return records
 
 
-def probe_repository(repo: str | Path) -> dict[str, Any]:
+def probe_repository_identity(repo: str | Path) -> RepositoryIdentity:
+    """Capture repository location and HEAD, batching the normal Git path."""
     requested = canonical_path(repo)
-    bare = _git(requested, ["rev-parse", "--is-bare-repository"], check=False)
-    if bare.returncode != 0:
-        raise _git_failure_error(
-            bare,
-            fallback_code="NOT_A_REPOSITORY",
-            fallback_message=f"not a Git repository: {requested}",
-        )
-    if _decode(bare.stdout).strip() == "true":
-        raise DeliveryError(f"bare repositories are not supported: {requested}", code="BARE_REPOSITORY")
-
-    top = canonical_path(_decode(_git(requested, ["rev-parse", "--show-toplevel"]).stdout).strip())
-    common_dir = canonical_path(
-        _decode(_git(top, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).stdout).strip()
+    identity = _git(
+        requested,
+        [
+            "rev-parse",
+            "--is-bare-repository",
+            "--show-toplevel",
+            "--path-format=absolute",
+            "--git-common-dir",
+            "HEAD",
+        ],
+        check=False,
     )
+    fields = _decode(identity.stdout).splitlines()
+    if identity.returncode == 0 and len(fields) == 4 and fields[0] in {"false", "true"}:
+        bare_value, top_value, common_value, head_sha = fields
+    else:
+        # The fallback preserves precise not-a-repository/bare errors and paths
+        # containing line separators. The common, budgeted case remains one call.
+        bare = _git(requested, ["rev-parse", "--is-bare-repository"], check=False)
+        if bare.returncode != 0:
+            raise _git_failure_error(
+                bare,
+                fallback_code="NOT_A_REPOSITORY",
+                fallback_message=f"not a Git repository: {requested}",
+            )
+        bare_value = _decode(bare.stdout).strip()
+        if bare_value == "true":
+            raise DeliveryError(
+                f"bare repositories are not supported: {requested}",
+                code="BARE_REPOSITORY",
+            )
+        top_value = _decode(
+            _git(requested, ["rev-parse", "--show-toplevel"]).stdout
+        ).strip()
+        top = canonical_path(top_value)
+        common_value = _decode(
+            _git(
+                top,
+                ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+            ).stdout
+        ).strip()
+        head_sha = _decode(_git(top, ["rev-parse", "HEAD"]).stdout).strip()
+    if bare_value == "true":
+        raise DeliveryError(
+            f"bare repositories are not supported: {requested}",
+            code="BARE_REPOSITORY",
+        )
+    if bare_value != "false":
+        raise DeliveryError(
+            "git rev-parse returned an invalid repository identity",
+            code="WORKTREE_PROBE_FAILED",
+        )
+
+    top = canonical_path(top_value)
+    common_dir = canonical_path(common_value)
+    return RepositoryIdentity(
+        requested_path=str(requested),
+        canonical_worktree=str(top),
+        worktree_key=path_key(top),
+        common_dir=str(common_dir),
+        repo_id=sha256_bytes(canonical_path_text(common_dir).encode("utf-8")),
+        head_sha=head_sha,
+    )
+
+
+def probe_repository_state(
+    repo: str | Path,
+    *,
+    lock_epoch: str | None = None,
+) -> RepositoryStateEvidence:
+    identity = probe_repository_identity(repo)
+    top = Path(identity.canonical_worktree)
+
     worktrees = _parse_worktrees(_git(top, ["worktree", "list", "--porcelain"]).stdout)
     if not worktrees or "worktree" not in worktrees[0]:
         raise DeliveryError("git worktree list did not identify a primary worktree", code="WORKTREE_PROBE_FAILED")
@@ -280,24 +451,22 @@ def probe_repository(repo: str | Path) -> dict[str, Any]:
 
     symbolic = _git(top, ["symbolic-ref", "--quiet", "HEAD"], check=False)
     branch_ref = _decode(symbolic.stdout).strip() if symbolic.returncode == 0 else None
-    head_sha = _decode(_git(top, ["rev-parse", "HEAD"]).stdout).strip()
-    status = _strict_status(top)
-    repo_id = sha256_bytes(canonical_path_text(common_dir).encode("utf-8"))
-    return {
-        "repo_id": repo_id,
-        "requested_path": str(requested),
-        "canonical_worktree": str(top),
-        "worktree_key": path_key(top),
-        "primary_worktree": str(primary),
-        "is_primary": canonical_path_text(top) == canonical_path_text(primary),
-        "branch_ref": branch_ref,
-        "branch": branch_ref.removeprefix("refs/heads/") if branch_ref else None,
-        "attached": branch_ref is not None,
-        "head_sha": head_sha,
-        "strict_clean": status == b"",
-        "status_sha256": sha256_bytes(status),
-        "worktrees": worktrees,
-    }
+    collector = _StrictStatusCollector(filter_drivers=[], submodules=[])
+    status = _strict_status(top, collector=collector)
+    return RepositoryStateEvidence(
+        identity=identity,
+        lock_epoch=lock_epoch,
+        primary_worktree=str(primary),
+        branch_ref=branch_ref,
+        status=status,
+        worktrees=tuple(tuple(item.items()) for item in worktrees),
+        filter_drivers=tuple(collector.filter_drivers),
+        submodules=tuple(collector.submodules),
+    )
+
+
+def probe_repository(repo: str | Path) -> dict[str, Any]:
+    return probe_repository_state(repo).as_probe()
 
 
 def _branch_exists(repo: str | Path, branch: str) -> bool:

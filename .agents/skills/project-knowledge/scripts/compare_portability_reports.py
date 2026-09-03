@@ -54,16 +54,45 @@ def compare_reports(reports: Iterable[dict[str, Any]]) -> dict[str, Any]:
             diagnostics.append(f"{os_name}: functional payload hash is invalid")
         if functional_sha != EXPECTED_FUNCTIONAL_SHA256:
             diagnostics.append(f"{os_name}: functional oracle differs")
+        warm_query_sha = report.get("warm_queries_sha256")
+        cold_query_sha = report.get("cold_queries_sha256")
+        functional_queries = functional.get("queries") if isinstance(functional, dict) else None
+        if (
+            not isinstance(warm_query_sha, str)
+            or len(warm_query_sha) != 64
+            or not isinstance(functional_queries, list)
+            or canonical_sha256(functional_queries) != warm_query_sha
+        ):
+            diagnostics.append(f"{os_name}: warm query hash is invalid")
+        if not isinstance(cold_query_sha, str) or len(cold_query_sha) != 64:
+            diagnostics.append(f"{os_name}: cold query hash is invalid")
+        elif cold_query_sha != warm_query_sha:
+            diagnostics.append(f"{os_name}: cold/warm query hashes differ")
         durations = report.get("durations_seconds")
-        if not isinstance(durations, dict) or not isinstance(durations.get("queries"), list):
+        if not isinstance(durations, dict):
             diagnostics.append(f"{os_name}: durations are missing")
             continue
-        timed = [*durations["queries"], durations.get("index_candidate")]
-        if len(timed) != 6 or any(
+        warm_queries = durations.get("queries")
+        cold_queries = durations.get("cold_queries")
+        if not isinstance(warm_queries, list) or len(warm_queries) != 5:
+            diagnostics.append(f"{os_name}: warm query durations are missing or invalid")
+            continue
+        if not isinstance(cold_queries, list) or len(cold_queries) != 5:
+            diagnostics.append(f"{os_name}: cold query durations are missing or invalid")
+            continue
+        fixture_setup = durations.get("fixture_setup")
+        if (
+            isinstance(fixture_setup, bool)
+            or not isinstance(fixture_setup, (int, float))
+            or fixture_setup < 0
+        ):
+            diagnostics.append(f"{os_name}: fixture setup duration is missing or invalid")
+        timed = [*cold_queries, *warm_queries, durations.get("index_candidate")]
+        if any(
             isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0
             for value in timed
         ):
-            diagnostics.append(f"{os_name}: durations are invalid")
+            diagnostics.append(f"{os_name}: query or index durations are invalid")
             continue
         maximum = max(maximum, *(float(value) for value in timed))
         if any(float(value) > MAX_SECONDS for value in timed):
@@ -117,4 +146,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

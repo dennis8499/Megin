@@ -1,0 +1,1158 @@
+{
+  "approval": {
+    "actor": "user",
+    "confirmed_at": "2026-09-02T07:47:24Z",
+    "evidence": "conversation:planning-work-20260902-skill-script-performance-0ae7b62a-candidate-2",
+    "status": "Ready"
+  },
+  "artifacts": [
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/plan-2/plan.md",
+      "role": "primary",
+      "sha256": "1a8d4bac8ee084666593a533ac94aa75eed290299b919eef913c7f6428985638"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/plan-2/handoff.json",
+      "role": "handoff",
+      "sha256": null
+    }
+  ],
+  "candidate": {
+    "payload_sha256": "f9c001bb436284fb81e1c5fd6ae77c338e9b624631a15f24c5e279169b568ba4",
+    "revision": "candidate-20260902-delivery-02"
+  },
+  "commands": [
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --list-scenarios",
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "completeness_criteria": [
+        "Report shows run=0, failed=0, skipped=0 and discovered equals the registered inventory count (baseline 17; final 19 after BDD-018 and BDD-020 are registered)."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-discovery",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; every scenario in the command's registered inventory is listed exactly once."
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "No pure list option at baseline.",
+          "probe": "rg -n --fixed-strings -- \"--list-tests\" .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+          "source_ref": "SRC-DEL-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py --list-tests",
+      "command_id": "CMD-BDD-DISCOVERY-002",
+      "completeness_criteria": [
+        "All aggregated Delivery tests, including DeliveryPerformanceTests, are listed without execution."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-discovery",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and inventory includes performance plus safety cases."
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Baseline group choices exclude performance.",
+          "probe": "rg -n --fixed-strings \"performance\" .agents/skills/project-knowledge/scripts/test_behavior.py",
+          "source_ref": "SRC-PK-BDD"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Command cleanup/finally removes the fixture; completion asserts absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --group performance --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "completeness_criteria": [
+        "All performance scenarios run with zero skip.",
+        "Fixture is removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; BDD-018/020 parity and performance budgets pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Performance owner class absent at baseline.",
+          "probe": "rg -n --fixed-strings \"class DeliveryPerformanceTests\" .agents/skills/delivery-orchestrator/scripts",
+          "source_ref": "SRC-DEL-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py DeliveryPerformanceTests",
+      "command_id": "CMD-BDD-FOCUSED-002",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; BDD-019 Git budgets and safety invariants pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "Command cleanup/finally removes the fixture; completion asserts absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_behavior.py --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-BDD-FULL-001",
+      "completeness_criteria": [
+        "Report shows run=discovered, failed=0, skipped=0 (baseline 17; final 19 after BDD-018 and BDD-020 are registered).",
+        "Temporary fixture is removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; every scenario currently returned by CMD-BDD-DISCOVERY-001 passes with zero unexpected skip."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "command_id": "CMD-BDD-FULL-002",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "bdd-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; full Delivery owner surface passes with zero unexpected skip."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "PerformanceTests absent at baseline.",
+          "probe": "rg -n --fixed-strings \"class PerformanceTests\" .agents/skills/project-knowledge/scripts/test_query.py",
+          "source_ref": "SRC-PK-QUERY"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_query.py PerformanceTests",
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; TEST-018 and TEST-020 pass."
+      ],
+      "timeout_seconds": 240
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Named test absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_ready_transition_reuses_fresh_probe_within_budget\" .agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py",
+          "source_ref": "SRC-DEL-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py DeliveryTransitionTests.test_ready_transition_reuses_fresh_probe_within_budget",
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; TEST-019 freshness and ≤8-call oracle pass."
+      ],
+      "timeout_seconds": 240
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "Command cleanup/finally removes the fixture; completion asserts absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope related --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-RELATED-001",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; related Knowledge unit/behavior/integration checks pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_safety.py",
+      "command_id": "CMD-RELATED-002",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; all Delivery safety tests pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --syntax-all",
+      "command_id": "CMD-BUILD-FULL-001",
+      "completeness_criteria": [
+        "Complete syntax inventory is checked."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "build-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; all Project Knowledge syntax/contracts validate."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/validate_contracts.py",
+      "command_id": "CMD-BUILD-FULL-002",
+      "completeness_criteria": [
+        "Complete Delivery validator surface runs."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "build-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; Delivery owner/integration contracts validate."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "Command cleanup/finally removes the fixture; completion asserts absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-TEST-FULL-001",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; all Knowledge tests pass with zero unexpected skip."
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "command_id": "CMD-TEST-FULL-002",
+      "completeness_criteria": [
+        "Named inventory/suite completes.",
+        "Temporary artifacts are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory/finally lifecycle.",
+          "effect": "Create isolated Git repositories/test fixtures and remove them.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; all Delivery tests pass with zero unexpected skip."
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "Command cleanup/finally removes the fixture; completion asserts absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_benchmark.py --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-CI-001",
+      "completeness_criteria": [
+        "Report covers exactly 50,000 tracked files and 5,000 wiki pages, contains five samples for every query timing series declared by its current schema, and includes every timing field required by that schema.",
+        "Fixture is removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "ci",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; report outcome is passed, functional_sha256 equals expected_functional_sha256, and every emitted timed operation is ≤2.0 seconds."
+      ],
+      "timeout_seconds": 1200
+    }
+  ],
+  "contract_index": [
+    {
+      "contract_id": "BDD-FWK-001",
+      "kind": "bdd-framework",
+      "source_refs": [
+        "SRC-PK-BDD",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-FWK-002",
+      "kind": "bdd-framework",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "BDD-018",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "TEST-018",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "BDD-019",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-DEL-GIT",
+        "SRC-DEL-WS",
+        "SRC-DEL-RECORD",
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "TEST-019",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-DEL-GIT",
+        "SRC-DEL-WS",
+        "SRC-DEL-RECORD",
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "BDD-020",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE",
+        "SRC-PK-BDD",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-020",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE",
+        "SRC-PK-BDD",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-DISCOVERY-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-DISCOVERY-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BDD",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-GIT",
+        "SRC-DEL-RECORD"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FULL-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-GIT",
+        "SRC-DEL-RECORD"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-RELATED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BDD",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-RELATED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BUILD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-QUERY",
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BUILD-FULL-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-TEST-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BDD",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TEST-FULL-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-CI-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "WP-001",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BDD"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "WP-002",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-DEL-GIT",
+        "SRC-DEL-WS",
+        "SRC-DEL-RECORD",
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "WP-003",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE",
+        "SRC-PK-BDD",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    }
+  ],
+  "planning_baseline": {
+    "head_sha": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+    "repo_id": "0c5534020993ce0e527ffefdd0bbbdf8e3e26138d3933defe22de1ed5ea2530c",
+    "status_sha256": "db4a239c052bdc188c90a94711975fea2a49e8b2be6f4931cbd95866bf4b65d1"
+  },
+  "primary_plan": {
+    "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/plan-2/plan.md",
+    "sha256": "1a8d4bac8ee084666593a533ac94aa75eed290299b919eef913c7f6428985638"
+  },
+  "revision_impact": {
+    "changes": [
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "CMD-BDD-DISCOVERY-001",
+        "scope": "global-baseline"
+      },
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "CMD-BDD-FULL-001",
+        "scope": "global-baseline"
+      },
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "CMD-CI-001",
+        "scope": "global-baseline"
+      }
+    ],
+    "revision": "candidate-20260902-delivery-02"
+  },
+  "schema": "ready-plan/v1",
+  "sources": [
+    {
+      "kind": "spec",
+      "location": "docs/work/work-20260902-skill-script-performance-0ae7b62a/requirements.md",
+      "plan_refs": [
+        "BG-001",
+        "BR-001",
+        "FR-001",
+        "FR-002",
+        "FR-003",
+        "FR-004",
+        "NFR-001",
+        "NFR-002",
+        "NFR-003",
+        "TR-001",
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007"
+      ],
+      "revision": "requirements-ready-1",
+      "sha256": "8cf4447b47f2c473949bdd02edc5d0dee0cc613d50dacdc4d55dd67181600013",
+      "source_id": "SRC-SPEC",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "plan_refs": [
+        "TD-001",
+        "TD-002",
+        "MOD-001",
+        "SEAM-001",
+        "SEAM-002"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "a1360dfc6dce2ea9e4ce832f83180a3adc54c2b22a463efe8b500d261e0155a3",
+      "source_id": "SRC-PK-QUERY",
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/knowledge_benchmark.py",
+      "plan_refs": [
+        "TD-004",
+        "MOD-003",
+        "SEAM-005"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "40372435c1d5ea1a11e46fe015e50e283e1081798fc58fb25babec7f4c1f589e",
+      "source_id": "SRC-PK-BENCH",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/compare_portability_reports.py",
+      "plan_refs": [
+        "TD-004",
+        "TEST-020"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "a9f95bf14bbeb3f2937af83349b2cc35d3b9e7a4bda55b764c2a531a4b06290c",
+      "source_id": "SRC-PK-COMPARE",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/project-knowledge/scripts/test_behavior.py",
+      "plan_refs": [
+        "BDD-FWK-001",
+        "BDD-018",
+        "BDD-020"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "efbd0960b77c72559b2b5f5886579d70a11867f4bd45137fb51f5a6a8c483581",
+      "source_id": "SRC-PK-BDD",
+      "wp_refs": [
+        "WP-001",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/_delivery_git.py",
+      "plan_refs": [
+        "TD-003",
+        "MOD-002",
+        "SEAM-004"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "892d14005ffacf99758e257fc6f6d80c99ef1d1ec6b77f33716af91b1ede8c63",
+      "source_id": "SRC-DEL-GIT",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+      "plan_refs": [
+        "TD-003",
+        "SEAM-003",
+        "IMP-002"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "9c4381699e488f0cdbd25a1794c4dcf875b7a80a0583e78e294b7923b25cc35e",
+      "source_id": "SRC-DEL-WS",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "plan_refs": [
+        "TD-003",
+        "TEST-019",
+        "AC-003",
+        "AC-004"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "1a6eeea6d88e5c8ffd63540e3790f4445cdfb2e15591f5e9660629806c7dd458",
+      "source_id": "SRC-DEL-RECORD",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "plan_refs": [
+        "BDD-FWK-002",
+        "BDD-019",
+        "TEST-019"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "86ce5d524608cacb2af1bbec95666505aad868580a5d75dae50991fe3161c122",
+      "source_id": "SRC-DEL-TEST",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/references/behavior-evaluation.md",
+      "plan_refs": [
+        "CON-001",
+        "CON-003",
+        "BDD-019"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "f51dc52732c39e27a6a66e3bd65b644007af4c1f96eb419c480d093a4dea4248",
+      "source_id": "SRC-DEL-CONTRACT",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "platform",
+      "location": ".github/workflows/knowledge-portability.yml",
+      "plan_refs": [
+        "TD-004",
+        "BDD-020",
+        "AC-005",
+        "AC-006",
+        "AC-007"
+      ],
+      "revision": "fc3a4ed45fb3ef70378413214b7983b062016c17",
+      "sha256": "514c1d2e669ff29511129cc64a7a19cd607f3f706620a618b5aa2e0c78024e7a",
+      "source_id": "SRC-CI",
+      "wp_refs": [
+        "WP-003"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "blocked_by": [],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-018",
+        "TEST-018",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "WP-001"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BDD"
+      ],
+      "wp_id": "WP-001"
+    },
+    {
+      "blocked_by": [],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-002",
+        "CMD-BDD-FOCUSED-002",
+        "CMD-BDD-FULL-002",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-RELATED-002",
+        "CMD-BUILD-FULL-002",
+        "CMD-TEST-FULL-002"
+      ],
+      "contract_refs": [
+        "BDD-FWK-002",
+        "BDD-019",
+        "TEST-019",
+        "CMD-BDD-DISCOVERY-002",
+        "CMD-BDD-FOCUSED-002",
+        "CMD-BDD-FULL-002",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-RELATED-002",
+        "CMD-BUILD-FULL-002",
+        "CMD-TEST-FULL-002",
+        "WP-002"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-DEL-GIT",
+        "SRC-DEL-WS",
+        "SRC-DEL-RECORD",
+        "SRC-DEL-TEST",
+        "SRC-DEL-CONTRACT"
+      ],
+      "wp_id": "WP-002"
+    },
+    {
+      "blocked_by": [
+        "WP-001",
+        "WP-002"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-CI-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-020",
+        "TEST-020",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-CI-001",
+        "WP-003"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-QUERY",
+        "SRC-PK-BENCH",
+        "SRC-PK-COMPARE",
+        "SRC-PK-BDD",
+        "SRC-CI"
+      ],
+      "wp_id": "WP-003"
+    }
+  ]
+}

@@ -40,6 +40,7 @@ GROUP_SCENARIOS: dict[str, tuple[str, ...]] = {
     ),
     "promotion": ("BDD-006", "BDD-007", "BDD-013"),
     "delivery": ("BDD-008", "BDD-010", "BDD-011", "BDD-016"),
+    "performance": ("BDD-018", "BDD-020"),
 }
 
 
@@ -434,6 +435,57 @@ def _build_retrieval_fixture(
 
     _write(repo / ".gitignore", "ignored/\n")
     _write(repo / "ignored/secret.md", "Capability token password should never be indexed.\n")
+    _git(repo, "add", ".")
+    return repo
+
+
+def _build_query_performance_fixture(root: Path) -> Path:
+    """Build a stable audit shape that exercises multi-batch sidecar lookup."""
+
+    _remove_fixture(root)
+    repo = root / "query-performance"
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q")
+
+    phrase = "violet cedar ember quartz"
+    source_refs: list[dict[str, object]] = []
+    for index in range(65):
+        source_path = f"evidence/source-{index:03d}.md"
+        source_text = f"{phrase} source {index:03d}.\n"
+        source_refs.append(
+            {
+                "path": source_path,
+                "sha256": _write(repo / source_path, source_text),
+                "locator": {"start_line": 1, "end_line": 1},
+                "excerpt_sha256": _sha256(source_text.rstrip("\n").encode("utf-8")),
+            }
+        )
+
+    content_path = "docs/knowledge/topics/session.md"
+    content_text = (
+        "# Session\n\n"
+        "## session\n\n"
+        f"{phrase} canonical.\n"
+    )
+    sidecar = _page_sidecar(
+        page_id="page-session",
+        content_path=content_path,
+        content_sha256=_write(repo / content_path, content_text),
+        title="Session",
+        lifecycle="current",
+        claim_id="claim-session",
+        source_path=str(source_refs[0]["path"]),
+        source_sha256=str(source_refs[0]["sha256"]),
+        excerpt_sha256=str(source_refs[0]["excerpt_sha256"]),
+    )
+    sidecar["aliases"] = []
+    sidecar["tags"] = ["implementation"]
+    sidecar["claims"][0]["content_anchor"] = "session"
+    sidecar["claims"][0]["source_refs"] = source_refs
+    _write(
+        repo / "docs/knowledge/meta/pages/page-session.json",
+        json.dumps(sidecar, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+    )
     _git(repo, "add", ".")
     return repo
 
@@ -1553,6 +1605,120 @@ def _evaluate_golden(repo: Path, cases: list[tuple[str, str]]) -> dict[str, int]
     }
 
 
+@scenario("BDD-018", "performance")
+def audit_query_preserves_results_with_a_bounded_child_process_budget(
+    fixture_root: Path,
+) -> None:
+    import knowledge_query
+    from knowledge_cli import main
+
+    repo = _build_query_performance_fixture(fixture_root)
+    before = _tree_snapshot(repo)
+    commands: list[list[str]] = []
+    real_run = knowledge_query._run
+
+    def recording_run(command: list[str], **kwargs: object) -> object:
+        commands.append(list(command))
+        return real_run(command, **kwargs)
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    knowledge_query._MATCH_CACHE.clear()
+    with mock.patch("knowledge_query._run", side_effect=recording_run):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            exit_code = main(
+                [
+                    "query",
+                    "--repo",
+                    str(repo),
+                    "--stage",
+                    "implementation",
+                    "--query",
+                    "violet cedar ember quartz",
+                ]
+            )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert stderr.getvalue() == ""
+    context = json.loads(stdout.getvalue())
+    assert context["schema"] == "knowledge-context/v1"
+    assert context["stage"] == "implementation"
+    assert context["query"] == "violet cedar ember quartz"
+    assert context["diagnostics"] == [
+        "eligible:67",
+        "canonical:1",
+        "raw:65",
+        "contested:0",
+    ]
+    assert [
+        (result["authority"], result["path"], result["start_line"])
+        for result in context["results"]
+    ] == [
+        ("canonical", "docs/knowledge/topics/session.md", 5),
+        ("raw", "evidence/source-000.md", 1),
+        ("raw", "evidence/source-001.md", 1),
+        ("raw", "evidence/source-002.md", 1),
+        ("raw", "evidence/source-003.md", 1),
+    ]
+    for result in context["results"]:
+        assert result["lifecycle"] == "current"
+        assert result["source_refs"]
+        for source in result["source_refs"]:
+            raw = (repo / Path(*source["path"].split("/"))).read_bytes()
+            lines = raw.decode("utf-8").replace("\r\n", "\n").splitlines()
+            locator = source["locator"]
+            excerpt = "\n".join(
+                lines[locator["start_line"] - 1 : locator["end_line"]]
+            ).encode("utf-8")
+            assert _sha256(raw) == source["sha256"]
+            assert _sha256(excerpt) == source["excerpt_sha256"]
+    assert _tree_snapshot(repo) == before
+    assert len(commands) <= 10, json.dumps(
+        {
+            "child_process_count": len(commands),
+            "commands": commands,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
+@scenario("BDD-020", "performance")
+def benchmark_reports_fresh_cold_and_compatible_warm_samples(
+    fixture_root: Path,
+) -> None:
+    import knowledge_benchmark
+
+    with (
+        mock.patch.object(knowledge_benchmark, "FILE_COUNT", 250),
+        mock.patch.object(knowledge_benchmark, "PAGE_COUNT", 20),
+        mock.patch.object(
+            knowledge_benchmark,
+            "EXPECTED_FUNCTIONAL_SHA256",
+            "6310a73a73d1beb175615d927b429bce350694a95a131a1c68356a69d9f6ba32",
+        ),
+    ):
+        report = knowledge_benchmark.run_benchmark(
+            fixture_root,
+            file_count=250,
+            page_count=20,
+        )
+
+    durations = report["durations_seconds"]
+    assert report["schema"] == "knowledge-portability-report/v1"
+    assert report["outcome"] == "passed", report
+    assert len(durations["cold_queries"]) == 5
+    assert len(durations["queries"]) == 5
+    assert durations["fixture_setup"] >= 0.0
+    assert all(
+        value <= report["max_operation_seconds"]
+        for value in [*durations["cold_queries"], *durations["queries"]]
+    )
+    assert report["cold_queries_sha256"] == report["warm_queries_sha256"]
+    assert report["functional_sha256"] == report["expected_functional_sha256"]
+    assert not fixture_root.exists()
+
+
 @scenario("BDD-004", "retrieval")
 def ad_hoc_query_is_read_only_and_filters_lifecycle(fixture_root: Path) -> None:
     from knowledge_cli import main
@@ -2235,7 +2401,7 @@ def _run(selected: list[str], fixture_root: Path) -> tuple[int, dict[str, object
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--list-scenarios", action="store_true")
-    parser.add_argument("--group", choices=["retrieval", "governance", "promotion", "delivery"])
+    parser.add_argument("--group", choices=sorted(GROUP_SCENARIOS))
     parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
     args = parser.parse_args(argv)
     selected = (

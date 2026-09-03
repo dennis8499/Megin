@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from knowledge_governance import canonical_sha256
 from knowledge_query import query_repository, sha256_bytes
@@ -37,7 +37,6 @@ EXPECTED_FUNCTIONAL_SHA256 = "bae0d3eee98a4ba39967ca26e3b60fd1d2f5f1d781b7dca8e0
 
 
 def _write(path: Path, value: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(value)
 
 
@@ -144,6 +143,56 @@ def _existing_fixture(root: Path, *, file_count: int, page_count: int) -> Path |
     return repo if tracked.returncode == 0 and count == file_count else None
 
 
+def _fixture_parent_directories(repo: Path, *, source_count: int) -> tuple[Path, ...]:
+    """Return the unique parent plan in ancestor-before-descendant order."""
+
+    directories = {
+        repo / "docs",
+        repo / "docs" / "knowledge",
+        repo / "docs" / "knowledge" / "topics",
+        repo / "docs" / "knowledge" / "meta",
+        repo / "docs" / "knowledge" / "meta" / "pages",
+        repo / "evidence",
+        *(
+            repo / "evidence" / f"{bucket:02d}"
+            for bucket in range(((source_count - 1) // 1000) + 1)
+        ),
+    }
+    return tuple(sorted(directories, key=lambda path: (len(path.parts), path.as_posix())))
+
+
+def _fixture_entries(*, source_count: int, page_count: int) -> Iterator[tuple[str, bytes]]:
+    yield ".gitignore", b".cache/\n"
+    yield ".gitattributes", b"* text=auto eol=lf\n"
+    for index in range(source_count):
+        source, line_number, excerpt = _source_bytes(index)
+        yield f"evidence/{index // 1000:02d}/source-{index:05d}.md", source
+        if index < page_count:
+            content, sidecar = _page_contract(index, source, line_number, excerpt)
+            yield f"docs/knowledge/topics/benchmark-{index:04d}.md", content
+            yield f"docs/knowledge/meta/pages/page-benchmark-{index:04d}.json", sidecar
+
+
+def _fixture_import_stream(*, source_count: int, page_count: int) -> bytes:
+    stream = bytearray(
+        b"commit refs/benchmark/fixture\n"
+        b"committer Knowledge Benchmark <benchmark@example.invalid> 1 +0000\n"
+        b"data 0\n\n"
+        b"deleteall\n"
+    )
+    for relative_path, worktree_bytes in _fixture_entries(
+        source_count=source_count,
+        page_count=page_count,
+    ):
+        index_bytes = worktree_bytes.replace(b"\r\n", b"\n")
+        stream.extend(f"M 100644 inline {relative_path}\n".encode("utf-8"))
+        stream.extend(f"data {len(index_bytes)}\n".encode("ascii"))
+        stream.extend(index_bytes)
+        stream.extend(b"\n")
+    stream.extend(b"done\n")
+    return bytes(stream)
+
+
 def _build_fixture(
     root: Path,
     *,
@@ -151,6 +200,7 @@ def _build_fixture(
     page_count: int,
     reuse_fixture: bool,
 ) -> Path:
+    root = root.resolve(strict=False)
     source_count = file_count - (page_count * 2) - 2
     if source_count < page_count or page_count < len(QUERY_TOKENS):
         raise ValueError("benchmark counts cannot represent the required target pages")
@@ -160,8 +210,9 @@ def _build_fixture(
             raise ValueError("requested benchmark fixture is absent or incomplete")
         return existing
     _safe_remove_fixture(root)
+    root.mkdir()
     repo = root / "portability-benchmark"
-    repo.mkdir(parents=True)
+    repo.mkdir()
     completed = subprocess.run(
         ["git", "init", "-q"],
         cwd=repo,
@@ -172,27 +223,8 @@ def _build_fixture(
     )
     if completed.returncode != 0:
         raise RuntimeError(completed.stderr.decode("utf-8", errors="replace"))
-    _write(repo / ".gitignore", b".cache/\n")
-    _write(repo / ".gitattributes", b"* text=auto eol=lf\n")
-
-    for index in range(source_count):
-        source, line_number, excerpt = _source_bytes(index)
-        _write(
-            repo / "evidence" / f"{index // 1000:02d}" / f"source-{index:05d}.md",
-            source,
-        )
-        if index < page_count:
-            content, sidecar = _page_contract(index, source, line_number, excerpt)
-            _write(repo / "docs" / "knowledge" / "topics" / f"benchmark-{index:04d}.md", content)
-            _write(
-                repo
-                / "docs"
-                / "knowledge"
-                / "meta"
-                / "pages"
-                / f"page-benchmark-{index:04d}.json",
-                sidecar,
-            )
+    for directory in _fixture_parent_directories(repo, source_count=source_count):
+        directory.mkdir()
     subprocess.run(
         ["git", "config", "core.autocrlf", "false"],
         cwd=repo,
@@ -202,7 +234,37 @@ def _build_fixture(
         shell=False,
     )
     subprocess.run(
-        ["git", "add", "--", "."],
+        ["git", "fast-import", "--quiet"],
+        cwd=repo,
+        input=_fixture_import_stream(source_count=source_count, page_count=page_count),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        shell=False,
+    )
+    subprocess.run(
+        ["git", "read-tree", "refs/benchmark/fixture"],
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        shell=False,
+    )
+    subprocess.run(
+        ["git", "checkout-index", "--all", "--force"],
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+        shell=False,
+    )
+    crlf_source, _, _ = _source_bytes(len(QUERY_TOKENS) - 1)
+    _write(
+        repo / "evidence" / "00" / f"source-{len(QUERY_TOKENS) - 1:05d}.md",
+        crlf_source,
+    )
+    subprocess.run(
+        ["git", "update-index", "--refresh"],
         cwd=repo,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -255,6 +317,40 @@ def _normalized_query_result(query: str, report: dict[str, Any]) -> dict[str, An
     }
 
 
+def _cold_query(repo: Path, *, stage: str, query: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            str(Path(__file__).with_name("knowledge_cli.py")),
+            "query",
+            "--repo",
+            str(repo),
+            "--stage",
+            stage,
+            "--query",
+            query,
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+        timeout=30.0,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"cold query failed with exit {completed.returncode}: {detail}")
+    try:
+        report = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cold query returned invalid JSON: {exc}") from exc
+    if not isinstance(report, dict):
+        raise RuntimeError("cold query returned a non-object report")
+    return report
+
+
 def _version(command: list[str]) -> str:
     try:
         completed = subprocess.run(
@@ -293,28 +389,31 @@ def run_benchmark(
     reuse_fixture: bool = False,
     keep_fixture: bool = False,
 ) -> dict[str, Any]:
-    """Build the fixture, warm each path, then return one versioned report."""
+    """Build the fixture, then measure fresh cold and compatible warm paths."""
 
-    repo = _build_fixture(
-        fixture_root,
-        file_count=file_count,
-        page_count=page_count,
-        reuse_fixture=reuse_fixture,
-    )
-    artifact_text = (
-        "# Benchmark requirements\n\n"
-        "Status: Ready\n\n"
-        "Benchmark index refresh is portable.\n"
-    )
-    candidate_arguments = {
-        "stage": "requirements",
-        "work_id": "work-benchmark",
-        "artifact_path": "docs/work/work-benchmark/requirements.md",
-        "artifact_text": artifact_text,
-        "title": "Benchmark Index Refresh",
-        "claim_text": "Benchmark index refresh is portable.",
-    }
+    succeeded = False
     try:
+        repo, fixture_setup_duration = _timed(
+            lambda: _build_fixture(
+                fixture_root,
+                file_count=file_count,
+                page_count=page_count,
+                reuse_fixture=reuse_fixture,
+            )
+        )
+        artifact_text = (
+            "# Benchmark requirements\n\n"
+            "Status: Ready\n\n"
+            "Benchmark index refresh is portable.\n"
+        )
+        candidate_arguments = {
+            "stage": "requirements",
+            "work_id": "work-benchmark",
+            "artifact_path": "docs/work/work-benchmark/requirements.md",
+            "artifact_text": artifact_text,
+            "title": "Benchmark Index Refresh",
+            "claim_text": "Benchmark index refresh is portable.",
+        }
         tracked_paths = subprocess.run(
             ["git", "ls-files", "-z"],
             cwd=repo,
@@ -329,6 +428,26 @@ def run_benchmark(
             and item.endswith(b".json")
             for item in tracked_paths
         )
+        # Keep every reported cold sample in a fresh process while excluding
+        # one-time interpreter, tool, and repository readiness from timing.
+        _cold_query(
+            repo,
+            stage="requirements",
+            query=QUERY_TOKENS[0],
+        )
+        normalized_cold_queries: list[dict[str, Any]] = []
+        cold_query_durations: list[float] = []
+        for query in QUERY_TOKENS:
+            result, duration = _timed(
+                lambda current=query: _cold_query(
+                    repo,
+                    stage="requirements",
+                    query=current,
+                )
+            )
+            normalized_cold_queries.append(_normalized_query_result(query, result))
+            cold_query_durations.append(duration)
+
         for query in QUERY_TOKENS:
             query_repository(str(repo), stage="requirements", query=query)
         build_stage_candidate_draft(str(repo), **candidate_arguments)
@@ -367,18 +486,23 @@ def run_benchmark(
             "persisted_newline": "lf",
         }
         functional_sha256 = canonical_sha256(functional)
+        cold_queries_sha256 = canonical_sha256(normalized_cold_queries)
+        warm_queries_sha256 = canonical_sha256(normalized_queries)
         durations = {
             "queries": query_durations,
+            "cold_queries": cold_query_durations,
             "index_candidate": index_duration,
+            "fixture_setup": fixture_setup_duration,
         }
-        timed_values = [*query_durations, index_duration]
+        timed_values = [*cold_query_durations, *query_durations, index_duration]
         passed = (
-            len(tracked_paths) == FILE_COUNT
-            and tracked_page_count == PAGE_COUNT
+            len(tracked_paths) == file_count
+            and tracked_page_count == page_count
             and functional_sha256 == EXPECTED_FUNCTIONAL_SHA256
+            and cold_queries_sha256 == warm_queries_sha256
             and all(value <= MAX_SECONDS for value in timed_values)
         )
-        return {
+        report = {
             "schema": "knowledge-portability-report/v1",
             "outcome": "passed" if passed else "failed",
             "host": _host(),
@@ -391,10 +515,14 @@ def run_benchmark(
             "durations_seconds": durations,
             "functional_sha256": functional_sha256,
             "expected_functional_sha256": EXPECTED_FUNCTIONAL_SHA256,
+            "cold_queries_sha256": cold_queries_sha256,
+            "warm_queries_sha256": warm_queries_sha256,
             "functional": functional,
         }
+        succeeded = True
+        return report
     finally:
-        if not keep_fixture:
+        if not keep_fixture or not succeeded:
             _safe_remove_fixture(fixture_root)
 
 
@@ -430,5 +558,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

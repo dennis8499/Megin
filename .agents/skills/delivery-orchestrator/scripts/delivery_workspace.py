@@ -73,6 +73,8 @@ from _delivery_git import (  # noqa: E402
     _strict_status,
     destination_and_branch,
     probe_repository,
+    probe_repository_identity,
+    probe_repository_state,
 )
 from _delivery_record import (  # noqa: E402
     _append_event,
@@ -80,6 +82,7 @@ from _delivery_record import (  # noqa: E402
     _contract_validator,
     _current_implementation_snapshot,
     _delivery_run_schema,
+    _lock_epoch,
     _materialize_approved_upstream,
     _new_record,
     _plan_revision,
@@ -92,6 +95,7 @@ from _delivery_record import (  # noqa: E402
     _schema_errors,
     _transition_record_unlocked,
     _validate_historical_ready_contract,
+    _validate_repository_state_evidence,
     _validate_ready_contract,
     _validate_ready_generation,
     load_record,
@@ -487,11 +491,20 @@ def transition_record(
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
     validate_work_id(work_id)
-    probe = probe_repository(repo)
-    run_dir = run_directory(root, probe["repo_id"], work_id)
+    identity = probe_repository_identity(repo)
+    run_dir = run_directory(root, identity.repo_id, work_id)
     if not _record_path(run_dir).is_file():
         raise DeliveryError("delivery record is missing", code="MISSING_RECORD")
-    with _exclusive_lock(run_dir / "record.lock"):
+    lock_path = run_dir / "record.lock"
+    with _exclusive_lock(lock_path):
+        lock_epoch = _lock_epoch(lock_path)
+        probe_evidence = probe_repository_state(repo, lock_epoch=lock_epoch)
+        _validate_repository_state_evidence(
+            identity,
+            probe_evidence,
+            lock_path=lock_path,
+            lock_epoch=lock_epoch,
+        )
         return _transition_record_unlocked(
             repo,
             work_id,
@@ -542,6 +555,8 @@ def transition_record(
             knowledge_receipt_sha256=knowledge_receipt_sha256,
             knowledge_approval_evidence=knowledge_approval_evidence,
             known_secret_values=tuple(known_secret_values),
+            probe_evidence=probe_evidence,
+            lock_epoch=lock_epoch,
         )
 
 

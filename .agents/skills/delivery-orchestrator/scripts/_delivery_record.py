@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 from pathlib import Path
@@ -18,6 +19,8 @@ from typing import Any, Iterable, Sequence
 from urllib.parse import urlparse
 
 from _delivery_git import (
+    RepositoryIdentity,
+    RepositoryStateEvidence,
     _active_filter_drivers,
     _filter_disable_config,
     _git,
@@ -77,6 +80,72 @@ PRELIMINARY_REVIEW_REPORT_RE = re.compile(
 
 
 _KNOWLEDGE_DELIVERY_MODULE: Any | None = None
+
+
+def _lock_epoch(path: Path) -> str:
+    """Fingerprint the exact lock file without trusting a redirected path."""
+    try:
+        before = path.lstat()
+        if path.is_symlink() or not stat.S_ISREG(before.st_mode):
+            raise DeliveryError("delivery record lock is not a regular file", code="LOCK_FAILED")
+        payload = path.read_bytes()
+        after = path.lstat()
+    except DeliveryError:
+        raise
+    except OSError as exc:
+        raise DeliveryError(
+            f"delivery record lock cannot be inspected: {path}",
+            code="LOCK_FAILED",
+        ) from exc
+
+    def signature(value: os.stat_result) -> tuple[int, int, int, int, int]:
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_size,
+            value.st_ctime_ns,
+            value.st_mtime_ns,
+        )
+
+    before_signature = signature(before)
+    if before_signature != signature(after):
+        raise DeliveryError("delivery record lock changed during inspection", code="LOCK_FAILED")
+    return sha256_bytes(
+        canonical_json(
+            {
+                "parent": canonical_path_text(path.parent),
+                "name": path.name,
+                "stat": before_signature,
+            }
+        )
+        + b"\0"
+        + payload
+    )
+
+
+def _validate_repository_state_evidence(
+    identity: RepositoryIdentity,
+    evidence: RepositoryStateEvidence,
+    *,
+    lock_path: Path,
+    lock_epoch: str,
+) -> None:
+    current = evidence.identity
+    if (
+        current.repo_id != identity.repo_id
+        or current.worktree_key != identity.worktree_key
+        or canonical_path_text(current.canonical_worktree)
+        != canonical_path_text(identity.canonical_worktree)
+    ):
+        raise DeliveryError(
+            "repository identity changed while acquiring the delivery lock",
+            code="WORKSPACE_DRIFT",
+        )
+    if _lock_epoch(lock_path) != lock_epoch:
+        raise DeliveryError(
+            "delivery record lock changed before state evidence was consumed",
+            code="LOCK_FAILED",
+        )
 
 
 def _knowledge_delivery_module() -> Any:
@@ -1571,27 +1640,67 @@ def _probe_evidence(probe: dict[str, Any], destination: Path, branch: str, gener
     }
 
 
-def _validate_ready_generation(record: dict[str, Any], probe: dict[str, Any]) -> None:
+def _workspace_probe_for_evidence(
+    generation: dict[str, Any],
+    probe: dict[str, Any],
+    *,
+    evidence: RepositoryStateEvidence | None,
+    lock_epoch: str | None,
+) -> dict[str, Any]:
+    if evidence is not None and evidence.matches(
+        probe,
+        canonical_worktree=generation["canonical_worktree"],
+        lock_epoch=lock_epoch,
+    ):
+        return probe
+    return probe_repository(generation["canonical_worktree"])
+
+
+def _validate_ready_generation(
+    record: dict[str, Any],
+    probe: dict[str, Any],
+    *,
+    evidence: RepositoryStateEvidence | None = None,
+    lock_epoch: str | None = None,
+) -> None:
     generation = record["generations"][-1]
     if generation["status"] != "ready":
         return
-    workspace = probe_repository(generation["canonical_worktree"])
+    workspace = _workspace_probe_for_evidence(
+        generation,
+        probe,
+        evidence=evidence,
+        lock_epoch=lock_epoch,
+    )
     if workspace["repo_id"] != record["repo_id"]:
         raise DeliveryError("delivery worktree repo_id differs from its record", code="WORKSPACE_DRIFT")
     if workspace["is_primary"]:
         raise DeliveryError("delivery record points at the primary worktree", code="WORKSPACE_DRIFT")
     if workspace["branch"] != generation["branch"]:
         raise DeliveryError("delivery branch differs from its record", code="WORKSPACE_DRIFT")
-    ancestry = _git(
-        generation["canonical_worktree"],
-        ["merge-base", "--is-ancestor", generation["base_sha"], "HEAD"],
-        check=False,
-    )
-    if ancestry.returncode != 0:
+    if (
+        evidence is not None
+        and evidence.matches(
+            workspace,
+            canonical_worktree=generation["canonical_worktree"],
+            lock_epoch=lock_epoch,
+        )
+        and evidence.merge_base is not None
+        and evidence.merge_base[0] == generation["base_sha"]
+    ):
+        is_descendant = evidence.merge_base[1]
+    else:
+        ancestry = _git(
+            generation["canonical_worktree"],
+            ["merge-base", "--is-ancestor", generation["base_sha"], "HEAD"],
+            check=False,
+        )
+        is_descendant = ancestry.returncode == 0
+    if not is_descendant:
         raise DeliveryError("delivery HEAD no longer descends from its recorded base", code="WORKSPACE_DRIFT")
     listed = {
         canonical_path_text(str(item["worktree"]))
-        for item in probe["worktrees"]
+        for item in workspace["worktrees"]
         if "worktree" in item
     }
     if canonical_path_text(generation["canonical_worktree"]) not in listed:
@@ -2786,16 +2895,32 @@ def _transition_record_unlocked(
     knowledge_receipt_sha256: str | None = None,
     knowledge_approval_evidence: str | None = None,
     known_secret_values: tuple[str, ...] = (),
+    probe_evidence: RepositoryStateEvidence | None = None,
+    lock_epoch: str | None = None,
 ) -> dict[str, Any]:
     root = _validate_registry_root(root or default_registry_root())
     validate_work_id(work_id)
-    probe = probe_repository(repo)
+    if (
+        probe_evidence is not None
+        and probe_evidence.lock_epoch == lock_epoch
+        and canonical_path_text(repo)
+        == canonical_path_text(probe_evidence.identity.requested_path)
+    ):
+        probe = probe_evidence.as_probe()
+    else:
+        probe = probe_repository(repo)
+        probe_evidence = None
     path = _record_path(run_directory(root, probe["repo_id"], work_id))
     record = load_record(path)
     if record["status"] == "complete":
         raise DeliveryError("Complete delivery records are frozen", code="COMPLETE_FROZEN")
     if record["generations"][-1]["status"] == "ready":
-        _validate_ready_generation(record, probe)
+        _validate_ready_generation(
+            record,
+            probe,
+            evidence=probe_evidence,
+            lock_epoch=lock_epoch,
+        )
     if record["generations"][-1]["status"] != "ready" and status != "blocked":
         raise DeliveryError("current generation is not ready", code="WORKSPACE_NOT_READY")
     current_phase = record["phase"]

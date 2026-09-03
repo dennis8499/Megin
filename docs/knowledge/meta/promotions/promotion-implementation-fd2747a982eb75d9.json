@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "knowledge-owner",
+    "evidence": "conversation:implementation-knowledge-work-20260902-skill-script-performance-0ae7b62a-candidate-1"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-fd2747a982eb75d9/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "415d1e774fe668118d88547cf323c9249db3637c351f8cf119fada1d0c51dd03",
+  "promotion_id": "promotion-implementation-fd2747a982eb75d9",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260902-skill-script-performance-0ae7b62a"
+}

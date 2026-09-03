@@ -1,0 +1,184 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_git.py",
+      "sha256": "6848e86161ce5ced2156abb682692a4de36368fcb5d9e0e0f7d40994f23993f5",
+      "summary": "重用單次 Git repository 探測與狀態證據，減少重複子程序並保留 freshness 驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "sha256": "aa2d9b223ef760109ed39fc230556bf552ae86fb01b851d7c9b304aff9a8fcf8",
+      "summary": "重用單次 Git repository 探測與狀態證據，減少重複子程序並保留 freshness 驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+      "sha256": "e48dd7b8f7417dba7cacfb6e44c85b7e99ff5bb0a4bbcb0eb09999e229610ac7",
+      "summary": "重用單次 Git repository 探測與狀態證據，減少重複子程序並保留 freshness 驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py",
+      "sha256": "a4106d22702d2d42b558fe899925b0d2984ae2bfffd739928e75f0e6d791df0c",
+      "summary": "重用單次 Git repository 探測與狀態證據，減少重複子程序並保留 freshness 驗證。"
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "sha256": "8b873fb70bebecb7f70dc4dba1898110e85f6c825cf3c65c6afaa72c69604496",
+      "summary": "重用單次 Git repository 探測與狀態證據，減少重複子程序並保留 freshness 驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/compare_portability_reports.py",
+      "sha256": "ad9f673f63cf613c8a4e8fd135e440914fa6116c26fb44b65182765fd81e8af1",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_benchmark.py",
+      "sha256": "89db943c0841b4d046802c8c61779996aeb7bc43b02cf67bee2dc23d335bbc48",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "sha256": "265d8e789fa692b7bdff1b6bfc49b9e4e584e949322c4efc77a1600e2c4b350e",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_behavior.py",
+      "sha256": "bcdde03f8bb758e3be02ad076c31241c7902406b740cd0b8c10f7bff83478341",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_query.py",
+      "sha256": "af2f3396b1b76b111156f6984233d1b0e97a9b2c2952b76b944c915860eec680",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_workflow.py",
+      "sha256": "d69a4e415260e83d8a97104bfe8d64186cb9f9b1731676c3298204cad7286689",
+      "summary": "加入單次 inventory 快照、staged／dirty 混合查詢、快速大型 fixture 與 cold／warm 可攜性驗證。"
+    },
+    {
+      "path": ".github/workflows/knowledge-portability.yml",
+      "sha256": "791f0667274f71b84d4a3c250d77cacd1b3006ece889f88c53bc511b8c2725f0",
+      "summary": "讓 CI 驗證五次 cold／warm 樣本、跨平台等價與全量功能套件。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd016-warm-query-tail/assessment-1.json",
+      "sha256": "61c4a0d6afa29c97d16b064ee5662536e9a462782b929c5207e4c3e572cb44fa",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd016-warm-query-tail/assessment-1.md",
+      "sha256": "eab9a1a25244a186c4a55d3932484d22d7535a838bed22ccf84728426876ca52",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.json",
+      "sha256": "fabcde0eb1b01575d00bc11ceb550aa2c109a8605de30a4057c6b111b29bdd23",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.md",
+      "sha256": "286634449bbe9ab17451aa42d9757b3ebab9cbc6ad78af6f231d06ea6cd6929a",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd020-review-query-tail/assessment-1.json",
+      "sha256": "f1f99bf9af1f93fd0ef3eab40afb8e91ab6c8b1e816421a6e503cd469634e6d9",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/bugs/bug-bdd020-review-query-tail/assessment-1.md",
+      "sha256": "15e7377a5253e6f709e9cde3141328ddf42753cf2f8c42097188fc7bc312a0b2",
+      "summary": "保存實作途中效能異常的可重現、根因分析與 disposition 證據。"
+    },
+    {
+      "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/requirements.md",
+      "sha256": "8cf4447b47f2c473949bdd02edc5d0dee0cc613d50dacdc4d55dd67181600013",
+      "summary": "保存使用者核准的需求與 Ready 技術計畫。"
+    },
+    {
+      "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/plan-2/plan.md",
+      "sha256": "1a8d4bac8ee084666593a533ac94aa75eed290299b919eef913c7f6428985638",
+      "summary": "保存使用者核准的需求與 Ready 技術計畫。"
+    },
+    {
+      "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/plan-2/handoff.json",
+      "sha256": "8fb809c6b98c63d4aa287a2e7e52d08f72c3c30367eda8c423f1cc041bd7c47c",
+      "summary": "保存使用者核准的需求與 Ready 技術計畫。"
+    }
+  ],
+  "created_at": "2026-09-03T05:52:56.154902Z",
+  "implementation_run_id": "2ea43ef4a7ce7fd8b9f1cc9a1a9f40c51346dc2ca8b05aa8c45d719d9e0565bf",
+  "knowledge_decision": "change",
+  "known_deviations": [],
+  "markdown": {
+    "path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/implementation/outcome.md",
+    "sha256": "99598422741c2654902517ec499335a0806dac02d58d069325dc4bcfaccbb079"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-round-2"
+    ],
+    "report_ref": "reviews/preliminary-round-2/report.json",
+    "report_sha256": "a2610de00732b72ce71f025c273ace93a405645e71187775ec0b896472d29b99",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "本次交付將 Project Knowledge 查詢改為單次 staged／dirty inventory 與混合索引搜尋，重用 Delivery Git 探測，並以快速大型 fixture、五次 cold／warm 樣本與跨平台 parity gate 驗證，50k 檔案基準全部低於 2 秒。",
+  "verification": [
+    {
+      "command_id": "CMD-CI-001",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/001-CMD-CI-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/002-CMD-BUILD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-002",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/003-CMD-BUILD-FULL-002.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/004-CMD-BDD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/005-CMD-TEST-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BDD-FULL-002",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/006-CMD-BDD-FULL-002.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-002",
+      "evidence_refs": [
+        "reviews/preliminary-round-2/outputs/007-CMD-TEST-FULL-002.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260902-skill-script-performance-0ae7b62a",
+  "work_kind": "standard"
+}

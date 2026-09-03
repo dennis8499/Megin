@@ -39,7 +39,7 @@ jobs:
           fi
           git --version
           rg --version
-      - name: Benchmark and portability oracle
+      - name: Benchmark cold and warm queries with portability oracle
         shell: bash
         run: >-
           python -X utf8 -B
@@ -79,9 +79,8 @@ jobs:
           pattern: knowledge-portability-*
           path: reports
           merge-multiple: true
-      - name: Require equivalent Windows and Linux reports
+      - name: Require equivalent cold and warm Windows and Linux reports
         run: >-
           python -X utf8 -B
           .agents/skills/project-knowledge/scripts/compare_portability_reports.py
           --root reports
-

@@ -1,0 +1,107 @@
+{
+  "schema": "bug-assessment/v1",
+  "bug_id": "bug-bdd016-warm-query-tail",
+  "revision": 1,
+  "markdown": {
+    "path": "docs/bugs/bug-bdd016-warm-query-tail/assessment-1.md",
+    "sha256": "eab9a1a25244a186c4a55d3932484d22d7535a838bed22ccf84728426876ca52"
+  },
+  "source": {
+    "relation": "current-scope",
+    "work_id": "work-20260902-skill-script-performance-0ae7b62a",
+    "reported_by": "implementation-writer",
+    "evidence_refs": [
+      "commands/sequence/0036-CMD-BDD-FULL-001-WP-001-FINAL.json",
+      "evidence/WP-001-bdd016-diagnosis.json"
+    ]
+  },
+  "observed_behavior": "BDD-016 intermittently exceeds the 2.0-second warm-query ceiling on the fixed 50,000-file and 5,000-page workload while preserving the expected functional hash.",
+  "expected_behavior": "Every BDD-016 warm query and index-candidate operation completes within 2.0 seconds with the fixed functional result.",
+  "impact": "The intermittent performance tail fails full BDD verification and blocks WP-001 completion; result correctness is unaffected.",
+  "verdict": "confirmed",
+  "severity": "medium",
+  "reproduction": {
+    "status": "intermittent",
+    "symptom_oracle": "The symptom exists when any BDD-016 durations_seconds.queries value exceeds 2.0 while functional_sha256 still equals expected_functional_sha256.",
+    "steps": [
+      "Run the full project-knowledge BDD suite against the fixed .knowledge-test-tmp fixture.",
+      "Inspect BDD-016 query timings for any value above 2.0 seconds.",
+      "On the same 50k/5k workload, compare warmed baseline queries with a probe that only reuses the already captured pre full fingerprint."
+    ],
+    "sample": "One full BDD run failed 1 of 5 warm queries at 2.2362605 seconds; the controlled probe recorded 5 profile samples and 10 baseline/intervention pairs.",
+    "command_refs": [
+      "commands/sequence/0036-CMD-BDD-FULL-001-WP-001-FINAL.json",
+      "commands/sequence/0037-DIAG-BDD016-WP-001.json"
+    ],
+    "evidence_refs": [
+      "commands/sequence/0036-CMD-BDD-FULL-001-WP-001-FINAL.stdout.txt",
+      "evidence/WP-001-bdd016-diagnosis.json"
+    ]
+  },
+  "root_cause": {
+    "status": "confirmed",
+    "confidence": "high",
+    "summary": "Each warm query regenerated and parsed a 4.17 MB, 50,000-record staged inventory before independently scanning dirty state after the query. The controlled probe reduced paired median latency by 49.6% with identical output; the focused regression then failed before bounded snapshot reuse, passed after it, and both full BDD and the full owner suite passed.",
+    "evidence_refs": [
+      "evidence/WP-001-bdd016-diagnosis.json",
+      "commands/sequence/0038-CMD-TDD-FOCUSED-001-TEST-018-WARM-SNAPSHOT-RED.json",
+      "commands/sequence/0039-CMD-TDD-FOCUSED-001-TEST-018-WARM-SNAPSHOT-GREEN.json",
+      "commands/sequence/0049-CMD-BDD-FULL-001-WP-001-WARM-SNAPSHOT-FINAL.json",
+      "commands/sequence/0051-CMD-TEST-FULL-001-WP-001-WARM-SNAPSHOT-FINAL.json"
+    ]
+  },
+  "hypotheses": [
+    {
+      "hypothesis_id": "H-001",
+      "rank": 1,
+      "statement": "Repeating the full staged-inventory scan for every warm query consumes enough latency headroom to cause the 2-second tail breach.",
+      "variable": "Replace only _match_cache_fingerprint with its already captured stable value during the controlled probe.",
+      "prediction": "Latency drops materially below the ceiling and functional output remains identical.",
+      "falsifier": "Latency does not materially improve or functional output changes.",
+      "outcome": "supported",
+      "evidence_refs": [
+        "evidence/WP-001-bdd016-diagnosis.json"
+      ]
+    },
+    {
+      "hypothesis_id": "H-002",
+      "rank": 2,
+      "statement": "Result assembly or citation validation is the dominant warm-query bottleneck.",
+      "variable": "Keep result assembly and citation validation unchanged while bypassing only the pre full scan.",
+      "prediction": "If dominant, intervention latency remains near baseline.",
+      "falsifier": "Intervention latency falls by a large fraction while results remain identical.",
+      "outcome": "falsified",
+      "evidence_refs": [
+        "evidence/WP-001-bdd016-diagnosis.json"
+      ]
+    },
+    {
+      "hypothesis_id": "H-003",
+      "rank": 3,
+      "statement": "The index-candidate operation causes the BDD-016 failure.",
+      "variable": "Compare the failed report's index-candidate and query timing fields.",
+      "prediction": "The index-candidate duration exceeds 2.0 seconds.",
+      "falsifier": "The index candidate remains below 2.0 seconds while only a query exceeds the ceiling.",
+      "outcome": "falsified",
+      "evidence_refs": [
+        "commands/sequence/0036-CMD-BDD-FULL-001-WP-001-FINAL.stdout.txt"
+      ]
+    }
+  ],
+  "active_hypothesis_id": null,
+  "risk": {
+    "security_privacy_or_data_risk": false,
+    "redacted_summary": null,
+    "secure_evidence_refs": [],
+    "human_reviewer": null
+  },
+  "disposition": "current-run",
+  "evidence_refs": [
+    "evidence/WP-001-bug-diagnosis-knowledge-context.json",
+    "commands/sequence/0036-CMD-BDD-FULL-001-WP-001-FINAL.json",
+    "commands/sequence/0037-DIAG-BDD016-WP-001.json",
+    "evidence/WP-001-bdd016-diagnosis.json"
+  ],
+  "next_action": "Implementation writer records WP-001 completion evidence and materializes this create-only assessment before fresh review.",
+  "created_at": "2026-09-02T11:47:45.1394494Z"
+}

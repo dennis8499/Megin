@@ -4,9 +4,11 @@
 import os
 import subprocess
 import tempfile
+from dataclasses import replace
 from unittest import mock
 
 from _delivery_test_support import *  # noqa: F403
+import _delivery_git as delivery_git
 import _delivery_record as delivery_record
 
 
@@ -291,6 +293,99 @@ def persist_preliminary_outcome(
 
 
 class DeliveryTransitionTests(DeliveryFixture):
+    def test_ready_transition_reuses_fresh_probe_within_budget(self) -> None:
+        primary = self.make_repo("fresh-evidence-project")
+        work_id = "fresh-evidence-work"
+        delivery = Path(self.start(primary, work_id)["worktree"])
+        record = self.record(delivery, work_id)
+        generation = record["generations"][-1]
+        lock_epoch = "lock-epoch-a"
+        evidence = delivery_git.probe_repository_state(
+            delivery,
+            lock_epoch=lock_epoch,
+        )
+        probe = evidence.as_probe()
+
+        with mock.patch.object(
+            delivery_record,
+            "probe_repository",
+            return_value=probe,
+        ) as fresh_probe:
+            reused = delivery_record._workspace_probe_for_evidence(
+                generation,
+                probe,
+                evidence=evidence,
+                lock_epoch=lock_epoch,
+            )
+        self.assertIs(probe, reused)
+        fresh_probe.assert_not_called()
+
+        drifted_evidence = (
+            replace(evidence, lock_epoch="lock-epoch-b"),
+            replace(
+                evidence,
+                identity=replace(
+                    evidence.identity,
+                    canonical_worktree=str(primary),
+                ),
+            ),
+            replace(
+                evidence,
+                identity=replace(evidence.identity, head_sha="0" * 40),
+            ),
+            replace(
+                evidence,
+                identity=replace(evidence.identity, repo_id="0" * 64),
+            ),
+        )
+        for drifted in drifted_evidence:
+            with self.subTest(drifted=drifted):
+                with mock.patch.object(
+                    delivery_record,
+                    "probe_repository",
+                    return_value=probe,
+                ) as fresh_probe:
+                    refreshed = delivery_record._workspace_probe_for_evidence(
+                        generation,
+                        probe,
+                        evidence=drifted,
+                        lock_epoch=lock_epoch,
+                    )
+                self.assertIs(probe, refreshed)
+                fresh_probe.assert_called_once_with(generation["canonical_worktree"])
+
+        commands: list[list[str]] = []
+        real_git = delivery_git._git
+
+        def recording_git(
+            repo: str | Path,
+            arguments: list[str],
+            *,
+            check: bool = True,
+            input_bytes: bytes | None = None,
+        ) -> object:
+            commands.append(list(arguments))
+            return real_git(repo, arguments, check=check, input_bytes=input_bytes)
+
+        with (
+            mock.patch.object(delivery_git, "_git", side_effect=recording_git),
+            mock.patch.object(delivery_record, "_git", side_effect=recording_git),
+            mock.patch.object(workspace, "_git", side_effect=recording_git),
+        ):
+            transitioned = self.transition(
+                delivery,
+                work_id,
+                "requirements",
+                "active",
+                "fresh_evidence_transition",
+            )
+        self.assertEqual("requirements", transitioned["phase"])
+        self.assertLessEqual(
+            len(commands),
+            8,
+            json.dumps(commands, ensure_ascii=False, sort_keys=True),
+        )
+
     def test_new_records_require_knowledge_while_legacy_records_remain_valid(self) -> None:
         required_primary = self.make_repo("required-project")
         required_delivery = Path(

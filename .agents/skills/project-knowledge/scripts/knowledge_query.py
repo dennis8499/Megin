@@ -27,7 +27,14 @@ INELIGIBLE_SEGMENTS = {
     "build",
 }
 INELIGIBLE_LIFECYCLES = {"stale", "contested", "superseded"}
-_MATCH_CACHE: dict[str, tuple[str, dict[tuple[str, tuple[str, ...]], tuple[Match, ...]]]] = {}
+MAX_FIXED_PATTERN_BYTES = 8 * 1024 * 1024
+INDEX_SEARCH_MIN_TRACKED_PATHS = 10_000
+INDEX_SEARCH_MAX_DIRTY_PATHS = 256
+INDEX_SEARCH_MAX_DIRTY_BYTES = 24 * 1024
+SEMANTIC_ATTRIBUTE_PATTERN = re.compile(
+    rb"(^|[ \t])(?:filter(?:=|[ \t]|$)|ident(?:[ \t]|$)|working-tree-encoding(?:=|[ \t]|$))",
+    flags=re.IGNORECASE | re.MULTILINE,
+)
 
 
 class KnowledgeError(RuntimeError):
@@ -52,6 +59,54 @@ class Match:
     path: str
     line_number: int
     line_text: str
+
+
+SearchCacheKey = tuple[str, tuple[str, ...], tuple[str, ...]]
+IndexFingerprint = tuple[int, int, int, int, int, int]
+
+
+class MatchCacheFingerprint(str):
+    """String-compatible cache key with the dirty-byte token captured beside it."""
+
+    dirty_fingerprint: str
+    dirty_paths: tuple[str, ...]
+    attribute_paths: tuple[str, ...]
+    tracked_count: int
+
+    def __new__(
+        cls,
+        value: str,
+        dirty_fingerprint: str,
+        dirty_paths: tuple[str, ...],
+        attribute_paths: tuple[str, ...],
+        tracked_count: int,
+    ) -> MatchCacheFingerprint:
+        instance = str.__new__(cls, value)
+        instance.dirty_fingerprint = dirty_fingerprint
+        instance.dirty_paths = dirty_paths
+        instance.attribute_paths = attribute_paths
+        instance.tracked_count = tracked_count
+        return instance
+
+
+@dataclass(frozen=True)
+class MatchCacheSnapshot:
+    fingerprint: str
+    dirty_fingerprint: str
+    index_path: Path
+    index_fingerprint: IndexFingerprint
+    dirty_paths: tuple[str, ...]
+    attribute_paths: tuple[str, ...]
+    tracked_count: int
+
+
+@dataclass
+class MatchCacheEntry:
+    snapshot: MatchCacheSnapshot
+    matches: dict[SearchCacheKey, tuple[Match, ...]]
+
+
+_MATCH_CACHE: dict[str, MatchCacheEntry] = {}
 
 
 PageSnapshot = tuple[str, dict[str, Any], str]
@@ -85,6 +140,7 @@ def _run(
     cwd: Path,
     accepted: set[int] = {0},
     code: str,
+    input_bytes: bytes | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     try:
         completed = subprocess.run(
@@ -92,6 +148,7 @@ def _run(
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            input=input_bytes,
             check=False,
             shell=False,
         )
@@ -271,7 +328,138 @@ def _regular_file_fingerprint(metadata: os.stat_result) -> tuple[int, int, int, 
     )
 
 
-def _match_cache_fingerprint(repo: Path) -> str | None:
+def _merge_nul_path_streams(*streams: bytes) -> bytes:
+    records = sorted(
+        {
+            value
+            for stream in streams
+            for value in stream.split(b"\0")
+            if value
+        }
+    )
+    return b"\0".join(records) + (b"\0" if records else b"")
+
+
+def _staged_inventory_metadata(
+    staged: bytes,
+) -> tuple[int, tuple[str, ...]] | None:
+    staged_records = [record for record in staged.split(b"\0") if record]
+    attribute_paths: list[str] = []
+    seen_paths: set[bytes] = set()
+    for record in staged_records:
+        if not record.startswith(b"H "):
+            return None
+        tab = record.find(b"\t")
+        if tab <= 2 or tab == len(record) - 1:
+            return None
+        raw_path = record[tab + 1 :]
+        if raw_path in seen_paths:
+            return None
+        seen_paths.add(raw_path)
+        try:
+            relative = normalized_path(raw_path.decode("utf-8"))
+        except (UnicodeDecodeError, KnowledgeError):
+            return None
+        if relative == ".gitattributes" or relative.endswith("/.gitattributes"):
+            attribute_paths.append(relative)
+    return len(staged_records), tuple(sorted(attribute_paths))
+
+
+def _match_cache_dirty_inventory(repo: Path) -> bytes:
+    tracked_dirty = _run(
+        [
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "diff-files",
+            "--name-only",
+            "-z",
+            "--",
+        ],
+        cwd=repo,
+        code="GIT_UNAVAILABLE",
+    ).stdout
+    untracked = _run(
+        [
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+        ],
+        cwd=repo,
+        code="GIT_UNAVAILABLE",
+    ).stdout
+    return _merge_nul_path_streams(tracked_dirty, untracked)
+
+
+def _update_dirty_digests(
+    repo: Path,
+    dirty: bytes,
+    digests: Sequence[Any],
+) -> bool:
+    for raw_path in sorted({value for value in dirty.split(b"\0") if value}):
+        try:
+            relative = normalized_path(raw_path.decode("utf-8"))
+        except (UnicodeDecodeError, KnowledgeError):
+            return False
+        lexical = repo / Path(*relative.split("/"))
+        for digest in digests:
+            digest.update(len(raw_path).to_bytes(8, "big"))
+            digest.update(raw_path)
+        if _redirected(lexical, repo):
+            return False
+        try:
+            before = lexical.lstat()
+        except FileNotFoundError:
+            for digest in digests:
+                digest.update(b"missing")
+            continue
+        except OSError:
+            return False
+        if _metadata_is_redirect(before) or not stat.S_ISREG(before.st_mode):
+            return False
+        try:
+            raw = lexical.read_bytes()
+            after = lexical.lstat()
+        except OSError:
+            return False
+        if (
+            _metadata_is_redirect(after)
+            or not stat.S_ISREG(after.st_mode)
+            or _regular_file_fingerprint(after) != _regular_file_fingerprint(before)
+        ):
+            return False
+        raw_digest = hashlib.sha256(raw).digest()
+        for digest in digests:
+            digest.update(raw_digest)
+    return True
+
+
+def _dirty_fingerprint(repo: Path, dirty: bytes) -> str | None:
+    digest = hashlib.sha256()
+    digest.update(b"dirty")
+    digest.update(len(dirty).to_bytes(8, "big"))
+    digest.update(dirty)
+    if not _update_dirty_digests(repo, dirty, (digest,)):
+        return None
+    return digest.hexdigest()
+
+
+def _normalized_dirty_paths(dirty: bytes) -> tuple[str, ...] | None:
+    paths: list[str] = []
+    for raw_path in sorted({value for value in dirty.split(b"\0") if value}):
+        try:
+            paths.append(normalized_path(raw_path.decode("utf-8")))
+        except (UnicodeDecodeError, KnowledgeError):
+            return None
+    return tuple(paths)
+
+
+def _match_cache_fingerprint(repo: Path) -> MatchCacheFingerprint | None:
     staged = _run(
         [
             "git",
@@ -281,106 +469,266 @@ def _match_cache_fingerprint(repo: Path) -> str | None:
             "--stage",
             "-v",
             "-z",
+            "--",
         ],
         cwd=repo,
         code="GIT_UNAVAILABLE",
     ).stdout
-    if any(record and not record.startswith(b"H ") for record in staged.split(b"\0")):
+    staged_metadata = _staged_inventory_metadata(staged)
+    if staged_metadata is None:
         return None
-    dirty = _run(
-        [
-            "git",
-            "-c",
-            "core.quotepath=false",
-            "ls-files",
-            "--modified",
-            "--deleted",
-            "--others",
-            "--exclude-standard",
-            "-z",
-        ],
-        cwd=repo,
-        code="GIT_UNAVAILABLE",
-    ).stdout
+    tracked_count, attribute_paths = staged_metadata
+    dirty = _match_cache_dirty_inventory(repo)
+    dirty_paths = _normalized_dirty_paths(dirty)
+    if dirty_paths is None:
+        return None
     digest = hashlib.sha256()
     for label, value in ((b"staged", staged), (b"dirty", dirty)):
         digest.update(label)
         digest.update(len(value).to_bytes(8, "big"))
         digest.update(value)
-    for raw_path in sorted({value for value in dirty.split(b"\0") if value}):
-        try:
-            relative = normalized_path(raw_path.decode("utf-8"))
-        except (UnicodeDecodeError, KnowledgeError):
-            return None
-        lexical = repo / Path(*relative.split("/"))
-        digest.update(len(raw_path).to_bytes(8, "big"))
-        digest.update(raw_path)
-        if _redirected(lexical, repo):
-            return None
-        try:
-            before = lexical.lstat()
-        except FileNotFoundError:
-            digest.update(b"missing")
-            continue
-        except OSError:
-            return None
-        if _metadata_is_redirect(before) or not stat.S_ISREG(before.st_mode):
-            return None
-        try:
-            raw = lexical.read_bytes()
-            after = lexical.lstat()
-        except OSError:
-            return None
-        if (
-            _metadata_is_redirect(after)
-            or not stat.S_ISREG(after.st_mode)
-            or _regular_file_fingerprint(after) != _regular_file_fingerprint(before)
-        ):
-            return None
-        digest.update(hashlib.sha256(raw).digest())
-    return digest.hexdigest()
-
-
-def _rg_matches(
-    repo: Path,
-    pattern: str,
-    *,
-    roots: Sequence[str] = (".",),
-) -> list[Match]:
-    repo_key = str(repo)
-    cache_key = (pattern, tuple(roots))
-    fingerprint = _match_cache_fingerprint(repo)
-    cached = _MATCH_CACHE.get(repo_key)
-    if fingerprint is not None and cached is not None and cached[0] == fingerprint:
-        cached_matches = cached[1].get(cache_key)
-        if cached_matches is not None:
-            return list(cached_matches)
-    threads = min(16, max(4, os.cpu_count() or 4))
-    completed = _run(
-        [
-            "rg",
-            "--threads",
-            str(threads),
-            "--no-heading",
-            "--line-number",
-            "--with-filename",
-            "--null",
-            "--ignore-case",
-            "--hidden",
-            "--color",
-            "never",
-            "--glob",
-            "!.git/**",
-            "--regexp",
-            pattern,
-            *roots,
-        ],
-        cwd=repo,
-        accepted={0, 1},
-        code="RG_UNAVAILABLE",
+    dirty_digest = hashlib.sha256()
+    dirty_digest.update(b"dirty")
+    dirty_digest.update(len(dirty).to_bytes(8, "big"))
+    dirty_digest.update(dirty)
+    if not _update_dirty_digests(repo, dirty, (digest, dirty_digest)):
+        return None
+    return MatchCacheFingerprint(
+        digest.hexdigest(),
+        dirty_digest.hexdigest(),
+        dirty_paths,
+        attribute_paths,
+        tracked_count,
     )
+
+
+def _match_cache_dirty_fingerprint(repo: Path) -> str | None:
+    dirty = _match_cache_dirty_inventory(repo)
+    return _dirty_fingerprint(repo, dirty)
+
+
+def _match_cache_index_fingerprint(index_path: Path) -> IndexFingerprint | None:
+    try:
+        metadata = index_path.lstat()
+    except OSError:
+        return None
+    if _metadata_is_redirect(metadata) or not stat.S_ISREG(metadata.st_mode):
+        return None
+    return _regular_file_fingerprint(metadata)
+
+
+def _match_cache_index_snapshot(repo: Path) -> tuple[Path, IndexFingerprint] | None:
+    git_metadata = repo / ".git"
+    try:
+        git_metadata_stat = git_metadata.lstat()
+    except OSError:
+        git_metadata_stat = None
+    if (
+        git_metadata_stat is not None
+        and stat.S_ISDIR(git_metadata_stat.st_mode)
+        and not _metadata_is_redirect(git_metadata_stat)
+    ):
+        index_path = git_metadata / "index"
+    else:
+        raw_path = _run(
+            [
+                "git",
+                "-c",
+                "core.quotepath=false",
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-path",
+                "index",
+            ],
+            cwd=repo,
+            code="GIT_UNAVAILABLE",
+        ).stdout
+        try:
+            path_text = raw_path.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            return None
+        if not path_text or "\0" in path_text or "\r" in path_text or "\n" in path_text:
+            return None
+        index_path = Path(path_text)
+        if not index_path.is_absolute():
+            index_path = repo / index_path
+    fingerprint = _match_cache_index_fingerprint(index_path)
+    if fingerprint is None:
+        return None
+    return index_path, fingerprint
+
+
+def _capture_match_cache_snapshot(
+    repo: Path,
+    cached: MatchCacheSnapshot | None,
+) -> MatchCacheSnapshot | None:
+    """Reuse a verified staged snapshot while independently checking dirty bytes."""
+
+    if cached is not None:
+        before_index = _match_cache_index_fingerprint(cached.index_path)
+        if before_index == cached.index_fingerprint:
+            dirty_fingerprint = _match_cache_dirty_fingerprint(repo)
+            after_index = _match_cache_index_fingerprint(cached.index_path)
+            if (
+                after_index == cached.index_fingerprint
+                and dirty_fingerprint == cached.dirty_fingerprint
+            ):
+                return cached
+
+    index_snapshot = _match_cache_index_snapshot(repo)
+    captured = _match_cache_fingerprint(repo)
+    if not isinstance(captured, MatchCacheFingerprint) or index_snapshot is None:
+        return None
+    index_path, index_fingerprint = index_snapshot
+    if _match_cache_index_fingerprint(index_path) != index_fingerprint:
+        return None
+    return MatchCacheSnapshot(
+        fingerprint=str(captured),
+        dirty_fingerprint=captured.dirty_fingerprint,
+        index_path=index_path,
+        index_fingerprint=index_fingerprint,
+        dirty_paths=captured.dirty_paths,
+        attribute_paths=captured.attribute_paths,
+        tracked_count=captured.tracked_count,
+    )
+
+
+def _attribute_file_allows_index_search(path: Path, repo: Path | None = None) -> bool:
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    if (
+        _metadata_is_redirect(before)
+        or not stat.S_ISREG(before.st_mode)
+        or (repo is not None and _redirected(path, repo))
+        or before.st_size > 1024 * 1024
+    ):
+        return False
+    try:
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError:
+        return False
+    return (
+        _regular_file_fingerprint(before) == _regular_file_fingerprint(after)
+        and b"\0" not in raw
+        and SEMANTIC_ATTRIBUTE_PATTERN.search(raw) is None
+    )
+
+
+def _index_search_is_safe(repo: Path, snapshot: MatchCacheSnapshot) -> bool:
+    if any(
+        path == ".gitattributes" or path.endswith("/.gitattributes")
+        for path in snapshot.dirty_paths
+    ):
+        return False
+    git_metadata = repo / ".git"
+    try:
+        git_metadata_stat = git_metadata.lstat()
+    except OSError:
+        return False
+    if not stat.S_ISDIR(git_metadata_stat.st_mode) or _metadata_is_redirect(git_metadata_stat):
+        return False
+    try:
+        configured_attributes = _run(
+            ["git", "config", "--path", "--get", "core.attributesFile"],
+            cwd=repo,
+            accepted={0, 1},
+            code="GIT_UNAVAILABLE",
+        ).stdout
+        if configured_attributes.strip():
+            return False
+    except KnowledgeError:
+        return False
+    for relative in snapshot.attribute_paths:
+        if not _attribute_file_allows_index_search(
+            repo / Path(*relative.split("/")),
+            repo,
+        ):
+            return False
+    return _attribute_file_allows_index_search(
+        snapshot.index_path.parent / "info" / "attributes"
+    )
+
+
+class QuerySearchSession:
+    """Invocation-local search cache guarded by one pre/post repository fingerprint."""
+
+    def __init__(self, repo: Path) -> None:
+        self.repo = repo
+        self.repo_key = str(repo)
+        cached = _MATCH_CACHE.get(self.repo_key)
+        self._snapshot = _capture_match_cache_snapshot(
+            repo,
+            cached.snapshot if cached is not None else None,
+        )
+        self.fingerprint = (
+            self._snapshot.fingerprint if self._snapshot is not None else None
+        )
+        self.dirty_paths = (
+            self._snapshot.dirty_paths if self._snapshot is not None else ()
+        )
+        dirty_path_bytes = sum(len(path.encode("utf-8")) + 1 for path in self.dirty_paths)
+        self.index_search_enabled = bool(
+            self._snapshot is not None
+            and self._snapshot.tracked_count >= INDEX_SEARCH_MIN_TRACKED_PATHS
+            and len(self.dirty_paths) <= INDEX_SEARCH_MAX_DIRTY_PATHS
+            and dirty_path_bytes <= INDEX_SEARCH_MAX_DIRTY_BYTES
+            and _index_search_is_safe(repo, self._snapshot)
+        )
+        self._matches = (
+            dict(cached.matches)
+            if self.fingerprint is not None
+            and cached is not None
+            and cached.snapshot.fingerprint == self.fingerprint
+            else {}
+        )
+        self._pending: dict[SearchCacheKey, tuple[Match, ...]] = {}
+        self._validated = False
+
+    def lookup(self, key: SearchCacheKey) -> tuple[Match, ...] | None:
+        if key in self._pending:
+            return self._pending[key]
+        return self._matches.get(key)
+
+    def remember(self, key: SearchCacheKey, matches: list[Match]) -> None:
+        if self.fingerprint is not None:
+            self._pending[key] = tuple(matches)
+
+    def validate(self) -> None:
+        if self._validated:
+            return
+        if self.fingerprint is not None and self._snapshot is not None:
+            index_unchanged = (
+                _match_cache_index_fingerprint(self._snapshot.index_path)
+                == self._snapshot.index_fingerprint
+            )
+            after_dirty = _match_cache_dirty_fingerprint(self.repo)
+            if (
+                not index_unchanged
+                or after_dirty != self._snapshot.dirty_fingerprint
+            ):
+                raise KnowledgeError(
+                    "SOURCE_DRIFT",
+                    "repository bytes changed during search",
+                    exit_code=3,
+                    recoverable=True,
+                )
+            if len(_MATCH_CACHE) >= 8 and self.repo_key not in _MATCH_CACHE:
+                _MATCH_CACHE.pop(next(iter(_MATCH_CACHE)))
+            self._matches.update(self._pending)
+            _MATCH_CACHE[self.repo_key] = MatchCacheEntry(
+                snapshot=self._snapshot,
+                matches=self._matches,
+            )
+        self._validated = True
+
+
+def _parse_rg_matches(output: bytes) -> list[Match]:
     matches: list[Match] = []
-    output = completed.stdout
     cursor = 0
     while cursor < len(output):
         path_end = output.find(b"\0", cursor)
@@ -417,21 +765,282 @@ def _rg_matches(
         matches.append(Match(path=path, line_number=line_number, line_text=line_text))
         cursor = record_end + 1
     matches.sort(key=lambda item: (item.path.encode("utf-8"), item.line_number))
-    if fingerprint is not None:
-        after_fingerprint = _match_cache_fingerprint(repo)
-        if after_fingerprint != fingerprint:
+    return matches
+
+
+def _parse_git_grep_matches(output: bytes) -> list[Match]:
+    matches: list[Match] = []
+    cursor = 0
+    while cursor < len(output):
+        path_end = output.find(b"\0", cursor)
+        number_end = output.find(b"\0", path_end + 1)
+        record_end = output.find(b"\n", number_end + 1)
+        if path_end < cursor or number_end <= path_end + 1 or record_end < 0:
             raise KnowledgeError(
-                "SOURCE_DRIFT",
-                "repository bytes changed during search",
-                exit_code=3,
-                recoverable=True,
+                "GIT_OUTPUT_INVALID",
+                "git grep emitted an invalid NUL-delimited record",
+                exit_code=4,
             )
-        if cached is None or cached[0] != fingerprint:
-            if len(_MATCH_CACHE) >= 8 and repo_key not in _MATCH_CACHE:
-                _MATCH_CACHE.pop(next(iter(_MATCH_CACHE)))
-            cached = (fingerprint, {})
-            _MATCH_CACHE[repo_key] = cached
-        cached[1][cache_key] = tuple(matches)
+        try:
+            path = normalized_path(output[cursor:path_end].decode("utf-8"))
+            line_number = int(output[path_end + 1 : number_end].decode("ascii"))
+            line_text = output[number_end + 1 : record_end].decode("utf-8").rstrip("\r")
+        except (UnicodeDecodeError, ValueError, KnowledgeError) as exc:
+            raise KnowledgeError(
+                "GIT_OUTPUT_INVALID",
+                "git grep emitted an invalid UTF-8 match record",
+                exit_code=4,
+            ) from exc
+        matches.append(Match(path=path, line_number=line_number, line_text=line_text))
+        cursor = record_end + 1
+    matches.sort(key=lambda item: (item.path.encode("utf-8"), item.line_number))
+    return matches
+
+
+def _rg_matches(
+    repo: Path,
+    pattern: str,
+    *,
+    roots: Sequence[str] = (".",),
+    session: QuerySearchSession | None = None,
+) -> list[Match]:
+    owned_session = session is None
+    active_session = session or QuerySearchSession(repo)
+    cache_key: SearchCacheKey = ("regex", (pattern,), tuple(roots))
+    cached_matches = active_session.lookup(cache_key)
+    if cached_matches is not None:
+        matches = list(cached_matches)
+        if owned_session:
+            active_session.validate()
+        return matches
+    threads = min(16, max(4, os.cpu_count() or 4))
+    completed = _run(
+        [
+            "rg",
+            "--threads",
+            str(threads),
+            "--no-heading",
+            "--line-number",
+            "--with-filename",
+            "--null",
+            "--ignore-case",
+            "--hidden",
+            "--color",
+            "never",
+            "--glob",
+            "!.git/**",
+            "--regexp",
+            pattern,
+            *roots,
+        ],
+        cwd=repo,
+        accepted={0, 1},
+        code="RG_UNAVAILABLE",
+    )
+    matches = _parse_rg_matches(completed.stdout)
+    active_session.remember(cache_key, matches)
+    if owned_session:
+        active_session.validate()
+    return matches
+
+
+def _path_is_under_roots(path: str, roots: Sequence[str]) -> bool:
+    for root in roots:
+        if root == ".":
+            return True
+        try:
+            normalized_root = normalized_path(root).rstrip("/")
+        except KnowledgeError:
+            continue
+        if path == normalized_root or path.startswith(normalized_root + "/"):
+            return True
+    return False
+
+
+def _dirty_overlay_paths(
+    repo: Path,
+    dirty_paths: Sequence[str],
+    roots: Sequence[str],
+) -> tuple[str, ...]:
+    candidates = tuple(
+        path
+        for path in dirty_paths
+        if _path_is_under_roots(path, roots)
+        and not any(part in INELIGIBLE_SEGMENTS for part in path.split("/"))
+    )
+    if not candidates:
+        return ()
+    eligible = _eligible_paths(repo, candidates)
+    return tuple(
+        sorted(
+            (path for path in candidates if path in eligible),
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+
+
+def _git_index_fixed_matches(
+    repo: Path,
+    encoded_patterns: Sequence[bytes],
+    *,
+    roots: Sequence[str],
+) -> list[Match]:
+    threads = min(16, max(4, os.cpu_count() or 4))
+    completed = _run(
+        [
+            "git",
+            "-c",
+            "core.quotepath=false",
+            "grep",
+            "--cached",
+            "--ignore-case",
+            "--line-number",
+            "--full-name",
+            "--null",
+            "--fixed-strings",
+            "-I",
+            "--threads",
+            str(threads),
+            "--no-color",
+            "-m",
+            "1",
+            "-f",
+            "-",
+            "--",
+            *roots,
+        ],
+        cwd=repo,
+        accepted={0, 1},
+        code="GIT_UNAVAILABLE",
+        input_bytes=b"\n".join(encoded_patterns) + b"\n",
+    )
+    return _parse_git_grep_matches(completed.stdout)
+
+
+def _rg_fixed_worktree_matches(
+    repo: Path,
+    encoded_patterns: Sequence[bytes],
+    *,
+    roots: Sequence[str],
+) -> list[Match]:
+    threads = min(16, max(4, os.cpu_count() or 4))
+    completed = _run(
+        [
+            "rg",
+            "--threads",
+            str(threads),
+            "--no-heading",
+            "--line-number",
+            "--with-filename",
+            "--null",
+            "--ignore-case",
+            "--hidden",
+            "--color",
+            "never",
+            "--glob",
+            "!.git/**",
+            "--fixed-strings",
+            "--file",
+            "-",
+            "--max-count",
+            "1",
+            "--",
+            *roots,
+        ],
+        cwd=repo,
+        accepted={0, 1},
+        code="RG_UNAVAILABLE",
+        input_bytes=b"\n".join(encoded_patterns) + b"\n",
+    )
+    return _parse_rg_matches(completed.stdout)
+
+
+def _index_and_dirty_fixed_matches(
+    repo: Path,
+    encoded_patterns: Sequence[bytes],
+    *,
+    roots: Sequence[str],
+    session: QuerySearchSession,
+) -> list[Match]:
+    dirty_paths = set(session.dirty_paths)
+    matches = [
+        match
+        for match in _git_index_fixed_matches(repo, encoded_patterns, roots=roots)
+        if match.path not in dirty_paths
+    ]
+    overlay_paths = _dirty_overlay_paths(repo, session.dirty_paths, roots)
+    if overlay_paths:
+        matches.extend(
+            _rg_fixed_worktree_matches(
+                repo,
+                encoded_patterns,
+                roots=overlay_paths,
+            )
+        )
+    unique = {
+        (match.path, match.line_number, match.line_text): match
+        for match in matches
+    }
+    return sorted(
+        unique.values(),
+        key=lambda item: (item.path.encode("utf-8"), item.line_number),
+    )
+
+
+def _rg_fixed_matches(
+    repo: Path,
+    patterns: Iterable[str],
+    *,
+    roots: Sequence[str],
+    session: QuerySearchSession | None = None,
+) -> list[Match]:
+    normalized_patterns = tuple(
+        sorted(
+            {value for value in patterns if isinstance(value, str) and value},
+            key=lambda value: value.encode("utf-8"),
+        )
+    )
+    if not normalized_patterns:
+        return []
+    encoded_patterns = [value.encode("utf-8") for value in normalized_patterns]
+    payload_size = sum(len(value) + 1 for value in encoded_patterns)
+    safe_stdin = payload_size <= MAX_FIXED_PATTERN_BYTES and all(
+        not any(marker in value for marker in (b"\0", b"\r", b"\n"))
+        for value in encoded_patterns
+    )
+    if not safe_stdin:
+        matches: list[Match] = []
+        for offset in range(0, len(normalized_patterns), 64):
+            batch = normalized_patterns[offset : offset + 64]
+            pattern = "(?:" + ")|(?:".join(re.escape(value) for value in batch) + ")"
+            matches.extend(_rg_matches(repo, pattern, roots=roots, session=session))
+        return matches
+
+    owned_session = session is None
+    active_session = session or QuerySearchSession(repo)
+    cache_key: SearchCacheKey = ("fixed", normalized_patterns, tuple(roots))
+    cached_matches = active_session.lookup(cache_key)
+    if cached_matches is not None:
+        matches = list(cached_matches)
+        if owned_session:
+            active_session.validate()
+        return matches
+    if active_session.index_search_enabled:
+        matches = _index_and_dirty_fixed_matches(
+            repo,
+            encoded_patterns,
+            roots=roots,
+            session=active_session,
+        )
+    else:
+        matches = _rg_fixed_worktree_matches(
+            repo,
+            encoded_patterns,
+            roots=roots,
+        )
+    active_session.remember(cache_key, matches)
+    if owned_session:
+        active_session.validate()
     return matches
 
 
@@ -645,7 +1254,12 @@ def _page_registry(
     return pages
 
 
-def _sidecar_reference_paths(repo: Path, values: Iterable[str]) -> set[str]:
+def _sidecar_reference_paths(
+    repo: Path,
+    values: Iterable[str],
+    *,
+    session: QuerySearchSession | None = None,
+) -> set[str]:
     """Find page contracts that name matched paths or contradiction targets."""
 
     root = repo / "docs" / "knowledge" / "meta" / "pages"
@@ -656,22 +1270,22 @@ def _sidecar_reference_paths(repo: Path, values: Iterable[str]) -> set[str]:
         key=lambda value: value.encode("utf-8"),
     )
     paths: set[str] = set()
-    for offset in range(0, len(normalized_values), 64):
-        batch = normalized_values[offset : offset + 64]
-        pattern = "(?:" + ")|(?:".join(re.escape(value) for value in batch) + ")"
-        for match in _rg_matches(
-            repo,
-            pattern,
-            roots=("docs/knowledge/meta/pages",),
-        ):
-            if match.path.startswith("docs/knowledge/meta/pages/") and match.path.endswith(".json"):
-                paths.add(match.path)
+    for match in _rg_fixed_matches(
+        repo,
+        normalized_values,
+        roots=("docs/knowledge/meta/pages",),
+        session=session,
+    ):
+        if match.path.startswith("docs/knowledge/meta/pages/") and match.path.endswith(".json"):
+            paths.add(match.path)
     return paths
 
 
 def _query_pages_and_eligibility(
     repo: Path,
     matches: list[Match],
+    *,
+    session: QuerySearchSession,
 ) -> tuple[set[str], list[PageSnapshot]]:
     """Verify only query-relevant page contracts and their contradiction closure."""
 
@@ -706,7 +1320,11 @@ def _query_pages_and_eligibility(
         if isinstance(value, str)
     }
     unresolved_matches = matched_paths - direct_sidecars - covered_paths
-    referenced_sidecars = _sidecar_reference_paths(repo, unresolved_matches)
+    referenced_sidecars = _sidecar_reference_paths(
+        repo,
+        unresolved_matches,
+        session=session,
+    )
     if referenced_sidecars:
         referenced_eligible = _eligible_paths(
             repo,
@@ -724,7 +1342,11 @@ def _query_pages_and_eligibility(
         for target in claim.get("contradicts", [])
         if isinstance(target, str) and target
     }
-    target_sidecars = _sidecar_reference_paths(repo, target_claim_ids) - sidecar_paths
+    target_sidecars = _sidecar_reference_paths(
+        repo,
+        target_claim_ids,
+        session=session,
+    ) - sidecar_paths
     if target_sidecars:
         target_eligible = _eligible_paths(
             repo,
@@ -1021,8 +1643,17 @@ def query_repository(repo_value: str, *, stage: str, query: str) -> dict[str, An
     if not repo.is_dir():
         raise KnowledgeError("REPOSITORY_MISSING", "repository root does not exist", exit_code=4)
     pattern = _query_pattern(query, terms)
-    matches = _rg_matches(repo, pattern)
-    eligible, pages = _query_pages_and_eligibility(repo, matches)
+    session = QuerySearchSession(repo)
+    if session.index_search_enabled:
+        matches = _rg_fixed_matches(
+            repo,
+            [query.casefold().strip(), *terms],
+            roots=(".",),
+            session=session,
+        )
+    else:
+        matches = _rg_matches(repo, pattern, session=session)
+    eligible, pages = _query_pages_and_eligibility(repo, matches, session=session)
     blocked_claims, blocked_sources = _conflict_registry(pages)
     canonical = _canonical_results(
         repo,
@@ -1058,6 +1689,7 @@ def query_repository(repo_value: str, *, stage: str, query: str) -> dict[str, An
     )
     selected_results = results[:5]
     _validate_result_snapshot(repo, eligible, pages, selected_results)
+    session.validate()
     context = {
         "schema": "knowledge-context/v1",
         "stage": stage,
@@ -1072,5 +1704,3 @@ def query_repository(repo_value: str, *, stage: str, query: str) -> dict[str, An
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
     return context
-
-

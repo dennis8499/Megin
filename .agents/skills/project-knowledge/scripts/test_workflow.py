@@ -975,8 +975,13 @@ class StageHookContractTests(unittest.TestCase):
         self.assertEqual("CANDIDATE_INVALID", raised.exception.code)
 
     def test_windows_linux_reports_require_one_functional_oracle(self) -> None:
-        functional = {"schema": "test-functional/v1", "paths": ["a/b"]}
+        functional = {
+            "schema": "test-functional/v1",
+            "paths": ["a/b"],
+            "queries": [],
+        }
         digest = canonical_sha256(functional)
+        query_digest = canonical_sha256(functional["queries"])
         original = compare_portability_reports.EXPECTED_FUNCTIONAL_SHA256
         compare_portability_reports.EXPECTED_FUNCTIONAL_SHA256 = digest
         try:
@@ -992,9 +997,13 @@ class StageHookContractTests(unittest.TestCase):
                     "tracked_fixture": True,
                     "functional": functional,
                     "functional_sha256": digest,
+                    "warm_queries_sha256": query_digest,
+                    "cold_queries_sha256": query_digest,
                     "durations_seconds": {
                         "queries": [0.1, 0.2, 0.3, 0.4, 0.5],
+                        "cold_queries": [0.1, 0.2, 0.3, 0.4, 0.5],
                         "index_candidate": 0.6,
+                        "fixture_setup": 1.0,
                     },
                 }
                 for os_name in ("windows", "linux")
@@ -1006,6 +1015,8 @@ class StageHookContractTests(unittest.TestCase):
         self.assertEqual(["linux", "windows"], comparison["oses"])
 
     def test_portability_comparison_fails_on_missing_or_slow_platform(self) -> None:
+        functional = {"queries": []}
+        query_digest = canonical_sha256(functional["queries"])
         report = {
             "schema": "knowledge-portability-report/v1",
             "outcome": "passed",
@@ -1015,11 +1026,15 @@ class StageHookContractTests(unittest.TestCase):
             "source_file_count": 39_998,
             "total_fixture_files": 50_000,
             "tracked_fixture": False,
-            "functional": {},
-            "functional_sha256": canonical_sha256({}),
+            "functional": functional,
+            "functional_sha256": canonical_sha256(functional),
+            "warm_queries_sha256": query_digest,
+            "cold_queries_sha256": query_digest,
             "durations_seconds": {
                 "queries": [2.001, 0.2, 0.3, 0.4, 0.5],
+                "cold_queries": [0.1, 0.2, 0.3, 0.4, 0.5],
                 "index_candidate": 0.6,
+                "fixture_setup": 1.0,
             },
         }
         comparison = compare_portability_reports.compare_reports([report])
