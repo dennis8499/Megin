@@ -2,7 +2,7 @@
 
 # Preflight 與 Ledger 契約
 
-本文件是共同 Ready binding、workspace capability、run identity、Ledger與baseline的唯一權威。任何產品／測試寫入前完整讀取；Preflight唯一允許的寫入是host-temp Ledger。Orchestrated delivery、resume/revision與greenfield各由條件reference擴充。
+本文件是共同 Ready binding、workspace capability、run identity、Ledger與baseline的唯一權威。任何 Ledger、產品或測試寫入前，必須已有 `implementation/active` stage authorization；Preflight唯一允許的產品外寫入是host-temp Ledger。Orchestrated delivery、resume/revision與greenfield各由條件reference擴充。
 
 ## Ready input
 
@@ -25,9 +25,11 @@
 1. Host能建立fresh、沒有實作歷史、唯讀、不得委派且能執行必要命令的Reviewer。
 2. repo_id由canonical git common-dir推導；canonical_worktree精確匹配linked、non-primary worktree；HEAD attached，branch不是repository default或primary branch。
 3. initial_base_sha = HEAD = handoff planning_baseline head_sha，repo_id相同。
-4. 首次run的porcelain只含manifest列出且hash相同的Ready artifacts；standalone沒有其他dirty path。只有載入且通過 [Orchestrated Delivery Gate](orchestrated-delivery.md)才有requirements例外。
+4. 首次run的porcelain只含manifest列出且hash相同的Ready artifacts，以及通過 [Orchestrated Delivery Gate](orchestrated-delivery.md)後精確核准的requirements input；沒有 valid Delivery authorization 時不建立 run。歷史 standalone Ledger 與 Ready artifacts 只讀、不遷移、不刪除，也不授權續寫。
 5. Git、runtime、compiler、runner、package manager與commands工具可用；Proposed dependency只驗證核准安裝前提。
 6. Network與external side effects具有本次scope授權；未授權command不執行。
+
+Terminal consumer只接受下列兩個exact ordered `capability_evidence_refs`形狀：legacy為`evidence/capability.json`、`evidence/capability/raw-reviewer.json`、`evidence/capability/raw-git-workspace.json`、`evidence/capability/raw-toolchain.json`；governed形狀只可在legacy尾端再加`evidence/capability/raw-delivery-authorization.json`。前者保留既有三項capability checks的原bytes，後者精確新增`delivery_authorization: passed`；除此以外的額外check、raw ref、改序或替代路徑都fail closed，且不遷移歷史Ledger。
 
 Workspace、能力、工具或未記錄dirty state失敗為Blocked。嚴禁stash、reset、clean、覆寫、建立／切換／刪除worktree。
 
@@ -37,7 +39,7 @@ BUG Ready只額外允許`bug_context.assessment`精確列出的JSON／Markdown d
 
 Ledger root固定在host canonical temp provider的 implementation-execution，不接受repository scratch root。worktree_key是canonical_worktree UTF-8 bytes的SHA-256。
 
-新run在全部read-only checks通過後，以create-only binding directory取得排他權，立即保存 repo_id、canonical_worktree、worktree_key、branch、initial_base_sha與run_id。既有directory只可由 [Resume 與 Revision](resume-and-revision.md)驗證；不完整、不可讀或mismatch不接管。
+新run在階段授權與全部read-only checks通過後，以create-only binding directory取得排他權，立即保存 repo_id、canonical_worktree、worktree_key、branch、initial_base_sha與run_id。既有directory只可由 [Resume 與 Revision](resume-and-revision.md)驗證，且續寫前仍重驗階段授權；不完整、不可讀或mismatch不接管。
 
 run_id是 repo_id、worktree_key、initial_base_sha、canonical handoff path與Candidate revision的canonical JSON SHA-256。Run directory固定為 host-temp/runs/run_id。任何binding／run初始化失敗停止，不宣稱取得workspace。
 

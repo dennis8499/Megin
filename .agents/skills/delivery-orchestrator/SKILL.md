@@ -1,19 +1,20 @@
 ---
 name: delivery-orchestrator
-description: 交付新的軟體行為或架構變更：建立或續接 Work ID 專用 Git worktree，並路由需求探索、技術規劃、實作執行與 fresh review。適用於新功能、已完成唯讀分診的修錯、實質重構及介面／資料／依賴變更；純解說、診斷、審查、plan-only、格式與微小文字修改不適用。
+description: 交付軟體變更的統一入口：建立或續接 Work ID 專用 Git worktree，依目前 phase 路由需求探索、技術規劃、實作執行與 fresh review。適用於新功能、已完成唯讀分診的修錯、實質重構及介面／資料／依賴變更；純解說、診斷、審查、plan-only、格式與微小文字修改不適用。
 ---
 
 <!-- authority: delivery-entrypoint -->
 
 # Delivery Orchestrator
 
-以穩定 work_id 保存 workspace identity、兩次人工核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state 與 routing。
+本 Skill 是唯一 mutating SDLC 入口，以穩定 work_id 保存 workspace identity、兩次人工核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state、phase authorization 與 routing。
 
 ## 呼叫邊界
 
 | 請求 | 路由 |
 |---|---|
 | 新功能、已有 `confirmed`／`likely` assessment 的修錯、實質重構、介面／資料／依賴行為變更 | 本 Skill |
+| 使用者直接點名 Requirements／Planning／Implementation，且工作會形成階段成果或其他寫入 | 先進本 Skill，再依 current phase 授權唯一 child |
 | 疑似 BUG 但尚無 assessment | 先用 `bug-diagnosis` 唯讀分診；此時不建立 worktree |
 | `not-a-bug` | 期望行為改變時走 standard requirements，否則結束且不建立 run |
 | 純解說、診斷、唯讀審查、plan-only | 對應一般／階段工作流 |
@@ -29,6 +30,7 @@ description: 交付新的軟體行為或架構變更：建立或續接 Work ID �
 - BUG run 使用 optional `work_kind: bug` overlay；critical／high 不繞過 gate。缺 `work_kind` 的舊 record 等同 standard work。
 - Runtime record 在 host temp；repository artifacts 只存相對路徑，秘密只存 digest、byte count 或遮蔽事件。
 - ID、path、branch、registry 與 generation continuity 必須可證明；collision／drift 保留現場並停止。
+- Child 名稱、prompt、Ready artifact 或 caller flag 不授予寫入權；只有 [階段授權](references/stage-authorization.md) 的 current record 判定有效。
 
 ## 1. BUG 開案前分診
 
@@ -46,14 +48,14 @@ New work／generation 再讀取 [Workspace 建立](references/workspace-creation
 
 ## 3. 路由 phase
 
-Workspace ready 後讀取 [階段路由](references/stage-routing.md)，只載入目前 child：
+Workspace ready 後完整讀取 [階段授權](references/stage-authorization.md)與 [階段路由](references/stage-routing.md)。先用 `authorize --repo <current-worktree> --phase <current-phase> --work-id <work-id>` 驗證 exact active phase，再只載入目前 child：
 
 - requirements → requirements-discovery
 - planning → technical-planning
 - implementation → implementation-execution
 - knowledge → 展示 reviewed Candidate，等待獨立 knowledge promotion 核准；產品修改則回 implementation
 
-Child 先持久化結果；orchestrator 再以一次 atomic transition 保存 refs／state。
+只有 `outcome: authorized` 才 dispatch；其他結果保持零 child mutation並由本 Skill 修復或建立 context。取得授權後 Child 先持久化自身結果；orchestrator 再以一次 atomic transition 保存 refs／state。Child 不直接執行 delivery transition。
 
 Required knowledge overlay下，Requirements與Plan各自以原核准evidence同時綁定Ready knowledge receipt；planning receipt的`formal_paths`必須精確等於owner-validated完整Ready-plan bundle，`no-change`也不能省略。Implementation先實體保存preliminary fresh report／raw outputs，repo-side Outcome以current run ID、report path／hash與逐command evidence綁定；封存Candidate後由另一位final fresh Reviewer核對含Outcome的product snapshot及完整knowledge pre-tree／expected post-tree snapshot，再進knowledge phase，不能直達delivery Complete。Final finding修正使用下一個create-only Outcome revision，不覆寫舊版。舊record缺`knowledge_gate`時維持legacy routing。
 

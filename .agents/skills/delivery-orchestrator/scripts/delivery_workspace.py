@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Safely create, locate, and advance delivery-orchestrator workspaces.
+"""Safely create, locate, authorize, and advance delivery workspaces.
 
-This public facade preserves the probe/start/locate/transition CLI and success
-JSON contract. Private modules own runtime, Git, and record semantics.
+This public facade preserves the probe/start/locate/authorize/transition CLI.
+Private modules own runtime, Git, record, and stage-authorization semantics.
 """
 
 from __future__ import annotations
@@ -100,6 +100,11 @@ from _delivery_record import (  # noqa: E402
     _validate_ready_generation,
     load_record,
     validate_record,
+)
+from _delivery_authorization import (  # noqa: E402
+    RESTRICTED_PHASES,
+    authorize_stage,
+    locate_workspace,
 )
 
 
@@ -396,47 +401,6 @@ def start_workspace(
             raise DeliveryError(f"workspace creation failed: {exc}", code="WORKSPACE_CREATE_FAILED") from exc
 
 
-def locate_workspace(repo: str | Path, *, root: Path | None = None, work_id: str | None = None) -> dict[str, Any]:
-    root = _validate_registry_root(root or default_registry_root())
-    probe = probe_repository(repo)
-    works_root = root / "repos" / probe["repo_id"] / "works"
-    if work_id is not None:
-        validate_work_id(work_id)
-        candidates = [works_root / work_id]
-    elif works_root.is_dir():
-        candidates = sorted((path for path in works_root.iterdir() if path.is_dir()), key=lambda path: path.name)
-    else:
-        candidates = []
-
-    records: list[tuple[dict[str, Any], Path]] = []
-    for candidate in candidates:
-        path = _record_path(candidate)
-        if not path.is_file():
-            if work_id is not None:
-                raise DeliveryError("work_id registry is missing run.json", code="INVALID_RECORD")
-            continue
-        record = load_record(path)
-        if record["repo_id"] == probe["repo_id"]:
-            records.append((record, path))
-
-    if work_id is None:
-        records = [(record, path) for record, path in records if record["status"] != "complete"]
-    if not records:
-        raise DeliveryError("no matching active delivery record", code="NOT_FOUND")
-    if len(records) > 1:
-        ids = [record["work_id"] for record, _ in records]
-        raise DeliveryError(
-            "multiple active delivery records require explicit selection",
-            code="AMBIGUOUS_WORK",
-            details={"work_ids": ids},
-        )
-    record, path = records[0]
-    if record["generations"][-1]["status"] == "ready":
-        _validate_ready_generation(record, probe)
-        _approved_upstream_materialization(record)
-    return _result(record, path, outcome="located")
-
-
 def transition_record(
     repo: str | Path,
     work_id: str,
@@ -609,6 +573,15 @@ def _parser() -> argparse.ArgumentParser:
     locate.add_argument("--work-id")
     locate.add_argument("--registry-root")
 
+    authorize = subparsers.add_parser(
+        "authorize",
+        help="Read-only authorization for a governed child phase",
+    )
+    authorize.add_argument("--repo", required=True)
+    authorize.add_argument("--phase", choices=sorted(RESTRICTED_PHASES), required=True)
+    authorize.add_argument("--work-id")
+    authorize.add_argument("--registry-root")
+
     transition = subparsers.add_parser("transition", help="Atomically append a delivery phase event")
     transition.add_argument("--repo", required=True)
     transition.add_argument("--work-id", required=True)
@@ -680,6 +653,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "locate":
             result = locate_workspace(
                 args.repo,
+                root=registry_root(args.registry_root),
+                work_id=args.work_id,
+            )
+        elif args.command == "authorize":
+            result = authorize_stage(
+                args.repo,
+                args.phase,
                 root=registry_root(args.registry_root),
                 work_id=args.work_id,
             )

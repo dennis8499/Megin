@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import contextlib
 import json
+import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -19,10 +21,107 @@ from test_delivery_transitions import (
     DeliveryTerminalContractTests,
     DeliveryTransitionTests,
 )
-from test_delivery_worktree import DeliveryWorktreeTests
+from test_delivery_worktree import DeliveryWorktreeTests, UnifiedEntryAuthorizationTests
 
 
 class DeliveryPerformanceTests(support.DeliveryFixture):
+    def test_50k_repository_probe_transition_and_authorize_stay_under_two_seconds(self) -> None:
+        primary = self.make_repo("performance-50k-project")
+        blob = subprocess.run(
+            ["git", "-C", str(primary), "hash-object", "-w", "--stdin"],
+            input=b"fixture\n",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            shell=False,
+        ).stdout.decode("ascii").strip()
+        index_entries = b"".join(
+            (
+                f"100644 {blob}\tfixture/{index // 100:03d}/path-{index:05d}.txt\n"
+            ).encode("ascii")
+            for index in range(49_999)
+        )
+        subprocess.run(
+            ["git", "-C", str(primary), "update-index", "--add", "--index-info"],
+            input=index_entries,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            shell=False,
+        )
+        support.git(primary, "commit", "-m", "50k performance fixture")
+        support.git(primary, "checkout-index", "--all", "--force")
+        support.git(primary, "update-index", "--refresh")
+        tracked = [
+            item
+            for item in support.git(primary, "ls-files", "-z").stdout.split(b"\0")
+            if item
+        ]
+        self.assertEqual(50_000, len(tracked))
+
+        probe_started = time.perf_counter()
+        probe = support.workspace.probe_repository(primary)
+        probe_elapsed = time.perf_counter() - probe_started
+        self.assertTrue(probe["strict_clean"])
+
+        work_id = "performance-50k-transition"
+        delivery = Path(self.start(primary, work_id)["worktree"])
+        transition_started = time.perf_counter()
+        transitioned = self.transition(
+            delivery,
+            work_id,
+            "requirements",
+            "active",
+            "requirements_started",
+        )
+        transition_elapsed = time.perf_counter() - transition_started
+        authorization_started = time.perf_counter()
+        authorization = support.workspace.authorize_stage(
+            delivery,
+            "requirements",
+            root=self.registry,
+            work_id=work_id,
+        )
+        authorization_elapsed = time.perf_counter() - authorization_started
+
+        self.assertEqual("requirements", transitioned["phase"])
+        self.assertEqual("active", transitioned["status"])
+        self.assertEqual("authorized", authorization["outcome"])
+        required_measurements = {
+            "probe_seconds": probe_elapsed,
+            "transition_seconds": transition_elapsed,
+        }
+        print(
+            json.dumps(
+                {
+                    "authorization_observation_seconds": round(
+                        authorization_elapsed, 6
+                    ),
+                    "file_count": len(tracked),
+                    **{
+                        name: round(duration, 6)
+                        for name, duration in required_measurements.items()
+                    },
+                },
+                sort_keys=True,
+            )
+        )
+        self.assertEqual(
+            {},
+            {
+                name: round(duration, 6)
+                for name, duration in required_measurements.items()
+                if duration >= 2.0
+            },
+            json.dumps(
+                {
+                    **required_measurements,
+                    "authorization_observation_seconds": authorization_elapsed,
+                },
+                sort_keys=True,
+            ),
+        )
+
     def test_full_probe_and_ready_transition_stay_within_git_budgets(self) -> None:
         primary = self.make_repo("performance-project")
         commands: list[dict[str, object]] = []
@@ -154,6 +253,7 @@ TEST_CASES = (
     DeliveryBugOverlayTests,
     DeliveryTerminalContractTests,
     DeliveryWorktreeTests,
+    UnifiedEntryAuthorizationTests,
     DeliveryPerformanceTests,
 )
 
@@ -177,10 +277,16 @@ def _inventory() -> dict[str, object]:
             for test_id in _test_ids(loader.loadTestsFromTestCase(case))
         }
     )
+    bindings = [
+        {"bdd_id": bdd_id, "test": f"{case.__name__}.{method}"}
+        for case in TEST_CASES
+        for bdd_id, method in getattr(case, "BDD_BINDINGS", {}).items()
+    ]
     return {
         "schema": "delivery-test-inventory/v1",
         "discovered": len(tests),
         "tests": tests,
+        "bdd_bindings": sorted(bindings, key=lambda item: item["bdd_id"]),
     }
 
 

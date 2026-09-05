@@ -781,13 +781,28 @@ def _validate_authorities(skills_root: Path, errors: list[str]) -> None:
 
 def _validate_structural_pointers(skills_root: Path, errors: list[str]) -> None:
     required_fragments = {
+        "technical-planning/SKILL.md": [
+            ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+            "authorize --repo . --phase planning",
+            "outcome: authorized",
+            "planning/active",
+            "routing_required",
+            "第一次寫入或展示 Candidate 前",
+            "維持零 Plan／Knowledge Candidate 寫入",
+            "Plan-only 解說、研究、審查、治理驗證與隔離測試",
+        ],
         "technical-planning/references/behavior-evaluation.md": [
             ".agents/skills/technical-planning/scripts/validate_contracts.py",
             ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+            "exact `planning/active` context",
+            "routing_required",
+            "Plan-only 維持唯讀",
         ],
         "technical-planning/agents/openai.yaml": [
             "allow_implicit_invocation: true",
             "$technical-planning",
+            "$delivery-orchestrator",
+            "planning 階段授權",
         ],
     }
     for relative, fragments in required_fragments.items():
@@ -798,7 +813,23 @@ def _validate_structural_pointers(skills_root: Path, errors: list[str]) -> None:
         text = path.read_text(encoding="utf-8")
         for fragment in fragments:
             if fragment not in text:
-                errors.append(f"{relative}: missing structural pointer {fragment}")
+                label = (
+                    "stage authorization guard"
+                    if relative.endswith(("SKILL.md", "openai.yaml"))
+                    else "structural pointer"
+                )
+                errors.append(f"{relative}: missing {label} {fragment}")
+
+    skill_path = skills_root / "technical-planning/SKILL.md"
+    if skill_path.is_file():
+        skill = skill_path.read_text(encoding="utf-8")
+        if (
+            "## 0. 驗證 routed context" in skill
+            and "## 1. 鎖定來源與證據" in skill
+            and skill.index("## 0. 驗證 routed context")
+            > skill.index("## 1. 鎖定來源與證據")
+        ):
+            errors.append("stage authorization guard must precede planning")
 
 
 def validate_all(skills_root: Path) -> list[str]:

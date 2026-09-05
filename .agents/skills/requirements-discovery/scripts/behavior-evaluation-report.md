@@ -44,3 +44,12 @@ The integrated fresh review found no remaining Requirements boundary issue and r
 - Owner validator, skill quick validation and **8/8** owner tests pass. Report-excluding corpus: **9 files, 38,239 bytes, SHA-256 `6dd72d0973203b1f612210d1966e2e8b9e6e138c2f06d74087f82863219dea8d`**.
 - The integrated author run passed **91/91** tests and preserves Requirements as the sole WHAT authority, assessment as diagnosis evidence, Plan as the sole HOW authority, and exactly the existing two human approvals.
 - The final fresh Reviewer found no Requirements implementation issue. Its sole blocking observation concerned the stale header in the new diagnosis behavior report; that report-only inconsistency is corrected in the same snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger.
+
+## 2026-09-04 — Delivery-routed Requirements entry
+
+- Work ID: `work-20260903-unified-skill-entry-198002a2`; base HEAD: `ef4747d89d83ef7fcd4136d7da30126c49b5c6c9`.
+- EVAL-REQ-001: **Pass** on the corrected observable fixture. Exact `requirements/active` authorizes the guarded Candidate branch; no record and mismatched contexts return `routing_required` before repository or host-temp writes.
+- EVAL-REQ-002..008 remain governed by the previously closed Requirements behavior. The current diff adds the authorization-first entry and routing description before step 1; frontier, 13-area coverage, one-question turns, risk branch, four-state publication, document shape, and early-stop bodies are unchanged.
+- Owner validator and quick validation pass; Requirements mutations are **9/9 Pass**. Cross-owner discovery reports 65 tests with BDD-001..009 uniquely bound.
+
+The first fresh integrated evaluation was **FAIL** because the entry case lacked an observable guarded-write fixture. After that fixture and its mutation guard were added, a different fresh, read-only evaluator returned **PASS** for the current entry boundary and the complete Delivery flow. It did not read this report, made no writes or delegation, and retained the failed round as evidence.

@@ -1,7 +1,7 @@
 interface:
   display_name: "需求探索"
-  short_description: "探索需求，以證據與一次一題收斂可驗收規格"
-  default_prompt: "使用 $requirements-discovery，以證據先行、一次一題的 frontier 訪談探索這項需求，直到形成可確認的需求分析。"
+  short_description: "探索經統一交付入口路由的可驗收需求"
+  default_prompt: "使用 $delivery-orchestrator 統一入口路由 $requirements-discovery；取得 requirements 階段授權後，以證據先行、一次一題的 frontier 訪談形成可確認需求。"
 
 policy:
   allow_implicit_invocation: true

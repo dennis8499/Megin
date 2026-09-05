@@ -1,7 +1,7 @@
 interface:
   display_name: "Delivery Orchestrator"
-  short_description: "交付軟體變更，隔離 workspace 並路由雙核准流程"
-  default_prompt: "使用 $delivery-orchestrator，為這項軟體變更建立或續接隔離 delivery workspace，並完成需求、規劃、實作與 fresh review。"
+  short_description: "交付軟體變更的統一入口與人工 Gate 流程"
+  default_prompt: "使用 $delivery-orchestrator 作為唯一 mutating SDLC 入口，建立或續接隔離 workspace，依 phase 自動路由需求、規劃、實作與 fresh review，並保留人工 Gate。"
 
 policy:
   allow_implicit_invocation: true

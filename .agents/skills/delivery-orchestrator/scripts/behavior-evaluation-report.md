@@ -245,3 +245,27 @@ Before this report-only append, the corrected Delivery corpus excluding this rep
 The second fresh, independent, read-only Reviewer returned **`APPROVED` with no findings** in `host-temp:reviews/delivery-bundle-correction-review.json`. It did not use this report as an oracle. Its current-source evaluation passed EVAL-DEL-001 through EVAL-DEL-010 and recorded **134 successful case executions**: Delivery mutations 21, Delivery workspace 50, related owner tests 34, Project Knowledge workflow 16, and focused regressions 13. The focused manifest matrix rejected missing, empty/incomplete, and imprecise receipts while accepting exact Requirements and Planning manifests; the identity probe rejected the same reviewer and accepted different reviewers; a true Windows junction ancestor and a read-time swap were rejected while an ordinary path and a POSIX-stat object without Windows-only metadata remained ordinary. macOS was intentionally excluded by the approved platform scope.
 
 The Reviewer observed identical HEAD, status inventory and diff inventory before and after review, an empty staged diff, no residual target fixture, and a passing `git diff --check`. It made no product or Git write, delegation, stage, commit, push, merge, cleanup, deployment, or worktree deletion. The historical failed review remains evidence of the original gaps; the `APPROVED` verdict applies only to the corrected snapshot described above.
+
+## 2026-09-04 — Unified governed entry
+
+- Work ID: `work-20260903-unified-skill-entry-198002a2`; base HEAD: `ef4747d89d83ef7fcd4136d7da30126c49b5c6c9`.
+- The new `delivery-stage-authorization/v1` seam authorizes only an exact active Requirements, Planning, or Implementation phase in the record's canonical worktree. Direct child naming creates no independent mutation authority.
+- Requirements and Plan human Gates, automatic Requirements Ready → Planning and Plan Ready → Implementation routing, Knowledge approval, read-only exceptions, and historical standalone bytes remain intact.
+
+The first fresh evaluator returned **FAIL**. It found that BDD-003..005／008 used mostly contract-presence assertions and that the performance class lacked the required 50,000-file, sub-two-second oracle. That result is retained at `evidence/behavior-evaluation-round-1.md` in the implementation Ledger.
+
+The corrected snapshot adds guarded Candidate／Ledger／product write attempts with repository, registry, host-temp, external sentinel, and historical Ledger checks. It also builds exactly 50,000 tracked files and asserts both probe and transition are below two seconds. Owner validation now mutation-guards those observability and performance assertions.
+
+The second fresh, independent, read-only evaluator did not read this report and returned **PASS with no blocking findings**:
+
+- EVAL-DEL-001..010: Pass.
+- Quick validation 4/4; owner validators 4/4; owner mutation/unit tests 62/62.
+- BDD discovery: 65 tests and one binding for each BDD-001..009.
+- Unified focused BDD: 11/11; Delivery full fixture: 65/65.
+- 50,000-file fixture: probe 0.456459s, transition 0.550804s; authorization observation 0.939808s.
+
+Attestation: `fresh=true`, `read_only=true`, `implementation_conversation_received=false`, `delegation_used=false`, `write_actions=false`. The first failed snapshot and its correction evidence remain append-only.
+
+A later fresh preliminary implementation review found two additional blocking integration defects: an explicit requested Work ID could load a differently identified registry record, and the full suite recursively ran the 50,000-file performance class a second time. The correction binds requested ID, registry directory and validated record identity before authorization, adds a three-phase zero-write regression plus validator mutation guard, and removes only the duplicate nested performance invocation while retaining the canonical real 50,000-file gate. The identity regression, mutation guard and 11-case unified-entry suite all pass; the subsequent full verification and fresh review are recorded in the implementation Ledger rather than treated as evidence supplied by this report.
+
+A further fresh preliminary review returned `CHANGES_REQUIRED` because terminal validation rejected extra capability checks but still accepted arbitrary additional persisted raw refs. The consumer now uses exact ordered allowlists for the canonical legacy three-raw-ref form and the governed Delivery-authorized four-raw-ref form, with negative tests for extra refs in both. Its first integrated BDD rerun then correctly exposed that the Delivery terminal test helper still emitted the deprecated synthetic `capability-output.txt` shape. That fixture now emits the real canonical legacy refs; all four affected terminal-flow tests pass. The original failed full command and the fixture correction remain preserved in the Recovery 4 Ledger; fresh full verification and re-review are pending, and pending is not a Pass.

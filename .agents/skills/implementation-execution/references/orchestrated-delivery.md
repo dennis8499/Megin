@@ -2,9 +2,11 @@
 
 # Orchestrated Delivery Gate
 
-只在caller明示提供host-temp delivery-run/v1時載入。Standalone execution維持manifest-only dirty規則。
+所有 mutating execution 都先依 `.agents/skills/delivery-orchestrator/references/stage-authorization.md` 取得 exact `implementation/active` 授權，再載入本 Gate 驗證完整 host-temp `delivery-run/v1`。只有 Ready plan 或 caller 自行提供 record 都不成立；缺失或錯誤 context 回 `routing_required`／typed error，且在 execution run、Ledger 或產品寫入前停止。
 
-首次run只有全部條件成立，才把一個requirements檔視為額外唯讀upstream input：
+歷史 standalone Ledger 與 Ready artifacts 只保留唯讀、原 bytes、原路徑；不遷移、不刪除，也不恢復 standalone mutation path。若要繼續修改，Delivery Orchestrator 必須先建立或續接合法 delivery context，再依原 Ready source binding 驗證。
+
+首次或續接 run 只有全部條件成立，才取得 execution mutation 權並把一個 requirements 檔視為額外唯讀 upstream input：
 
 1. Record通過 [delivery-run/v1 schema](../../delivery-orchestrator/references/delivery-run.schema.json)，位於host temp，phase/status精確為implementation/active。
 2. repo_id、current generation canonical_worktree／worktree_key／branch／base與execution probes、binding及planning baseline全部相同；generation為ready。

@@ -92,3 +92,12 @@ The final read-only review returned implementation `APPROVED` and BUG contract `
 - Owner validator, skill quick validation and **7/7** Ready／BUG-plan tests pass. Report-excluding corpus: **13 files, 129,659 bytes, SHA-256 `3eeea5c78ef1ba076108698aaa0df8051c262685dab20b12e284993056ecd183`**.
 - The integrated author run passed **91/91** tests. `bug_context`, `kind: bug` and `bug-reproduction` remain conditional; legacy standard Ready records remain valid, while `0`／`01` assessment revisions and incomplete partial safeguards fail closed.
 - The final fresh Reviewer found no Planning implementation issue. Its sole blocking observation concerned the stale diagnosis behavior-report header, corrected in the same report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger.
+
+## 2026-09-04 — Delivery-routed Planning entry
+
+- Work ID: `work-20260903-unified-skill-entry-198002a2`; base HEAD: `ef4747d89d83ef7fcd4136d7da30126c49b5c6c9`.
+- EVAL-006: **Pass** on the corrected observable fixture. Only exact `planning/active` reaches guarded Plan／Knowledge Candidate writes; wrong phase returns `routing_required` with unchanged worktree, registry, host-temp and external sentinel. Plan-only work stays read-only.
+- EVAL-001..005／007／008 retain their previously closed semantics. The current producer change is confined to routing metadata and the new authorization-first step before evidence collection; design, Ready bundle, research／conflict, Candidate publication, handoff, and BUG plan behavior remain unchanged.
+- Owner validator and quick validation pass; Planning mutations are **9/9 Pass**. Cross-owner discovery reports 65 tests with BDD-001..009 uniquely bound.
+
+The first fresh integrated evaluation rejected the static-only entry proof. After guarded write-attempt and zero-write assertions were added, a different fresh, read-only evaluator returned **PASS** for the current Planning boundary and complete Delivery flow. It did not read this report and made no writes or delegation.

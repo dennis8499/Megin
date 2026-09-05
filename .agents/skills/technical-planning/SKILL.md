@@ -1,6 +1,6 @@
 ---
 name: technical-planning
-description: 將已釐清的開發規格與專案證據轉成可核准的 Ready 技術計畫；在 Candidate 前攔截需求缺口、衝突與證據不足。用於實作前規劃；需求探索、直接實作與程式碼審查不適用。
+description: 規劃由 Delivery Orchestrator 路由的已釐清開發規格，產生可核准的 Ready 技術計畫；在 Candidate 前攔截需求缺口、衝突與證據不足。需求探索、直接實作與程式碼審查不適用。
 ---
 
 <!-- authority: planning-entrypoint -->
@@ -11,10 +11,21 @@ description: 將已釐清的開發規格與專案證據轉成可核准的 Ready 
 
 ## 邊界
 
+- 形成 Candidate 或規劃 artifacts 的工作由 `delivery-orchestrator` 路由；plan-only 解說、研究與唯讀審查可不建立 delivery run。
 - 規劃活動限於唯讀查證、對話中的 Candidate，以及核准後的規劃 artifacts。產品程式碼與外部狀態維持原狀。
 - 來源規格決定行為；治理、ADR、現有公開契約與平台能力限制方案。明確限制優先，其餘選擇沿用有證據的專案慣例。
 - 使用者核准完整 Candidate 與全部精確路徑後，唯一允許的寫入是[交付協定](references/delivery-protocol.md)所述的規劃 artifact set。
 - 使用使用者的主要語言；秘密只描述取得機制或位置，不重現值。
+
+## 0. 驗證 routed context
+
+完整讀取 `.agents/skills/delivery-orchestrator/references/stage-authorization.md`。這次工作一旦會形成或保存 Candidate、Plan、handoff、knowledge draft 或其他 repository／host-temp／外部狀態，必須在第一次寫入或展示 Candidate 前執行：
+
+`python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspace.py authorize --repo . --phase planning [--work-id <work-id>]`
+
+只有 `outcome: authorized` 且 record 精確為 `planning/active` 才進入步驟 1。`routing_required` 或 typed error 時維持零 Plan／Knowledge Candidate 寫入，將 work ID／安全 reason 交還 `delivery-orchestrator`；不得用使用者直接點名、Ready requirements、prompt、路徑或自行建立的 artifact 代替授權。Plan-only 解說、研究、審查、治理驗證與隔離測試可停留在唯讀分支，但不能產生 Planning 階段成果。
+
+完成條件：mutating run 有 current Delivery authorization；唯讀例外沒有 Candidate、Plan、handoff 或狀態 mutation。
 
 ## 1. 鎖定來源與證據
 

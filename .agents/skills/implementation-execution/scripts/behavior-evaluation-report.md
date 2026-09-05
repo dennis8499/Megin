@@ -81,3 +81,18 @@ Final fresh re-review: **implementation `APPROVED`; BUG verification contract `P
 - Persisted verification raw bytes are scanned before parse, duplicate keys fail closed without reproducing the known-value marker, terminal refs must be physical and indexed, and implementation approval remains separate from `verified | partial | failed`.
 - Partial terminal wording uses canonical inconclusive summaries and scans `findings[].message` plus `key_inputs.required_outcome`; the exact English／Traditional-Chinese overclaim fixtures fail. The integrated author run passed **91/91** tests.
 - The final fresh Reviewer passed Implementation **14/14**, Delivery mutations **20/20**, BUG overlay **14/14** and terminal **8/8**, and found no execution-code issue. Its only blocker was the stale diagnosis report header, corrected in this report-only snapshot. The subsequent report-only attestation will be persisted in the formal implementation Ledger.
+
+## 2026-09-04 — Delivery-only implementation mutation authority
+
+- Work ID: `work-20260903-unified-skill-entry-198002a2`; base HEAD: `ef4747d89d83ef7fcd4136d7da30126c49b5c6c9`.
+- EVAL-009: **Pass** on the corrected observable fixture. Ready-only input and historical standalone Ledger bytes do not authorize a new run, Ledger, evidence, fixture, product diff, or external mutation; exact `implementation/active` does.
+- EVAL-001..008／010 retain their previously closed execution semantics. The current change inserts the Delivery authorization gate before Preflight, makes the orchestrated contract mandatory, and removes the new standalone writer; BDD／TDD, snapshot, review, breaker, resume, greenfield, safety, and BUG execution contracts remain owned by their existing references.
+- Owner validator and quick validation pass; Implementation mutations are **20/20 Pass**. Cross-owner discovery reports 65 tests with BDD-001..009 uniquely bound.
+
+The first fresh integrated evaluation was **FAIL** because Ready-only／standalone zero-write was asserted mainly through text. The corrected fixture now attempts both product and host Ledger writes and proves rejection plus historical Ledger digest preservation. A different fresh, read-only evaluator returned **PASS** for this boundary and the full 65-case Delivery fixture; it did not read this report and made no writes or delegation.
+
+### Terminal capability raw-ref fail-closed correction
+
+A later fresh preliminary review returned **CHANGES_REQUIRED** after proving that the terminal consumer derived its expected raw refs from caller-controlled `capability_evidence_refs`. Exact legacy and Delivery-authorized check maps passed, but either form could append an arbitrary persisted raw ref and still compare equal.
+
+The corrected consumer now accepts only the exact ordered legacy record plus its three canonical raw refs, or that same sequence with `raw-delivery-authorization.json` appended. New negative fixtures cover an additional raw ref in both forms; the original historical legacy form, the governed four-check form, and rejection of an additional check remain covered. The valid TDD red failed with `legacy capability accepted an arbitrary additional raw ref`; targeted green passed, followed by the complete Implementation owner suite at **20/20 Pass**. Fresh re-review remains pending; pending is not a Pass.

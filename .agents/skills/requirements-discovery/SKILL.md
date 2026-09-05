@@ -1,6 +1,6 @@
 ---
 name: requirements-discovery
-description: 探索仍待釐清的產品或軟體需求：以證據先行、一次一題的 frontier 訪談收斂範圍、規則、風險與驗收，產出可進入技術規劃的可追溯需求分析。適用於需求梳理與規格前訪談；已有核准規格的純實作、知識解說與純故障診斷不適用。
+description: 探索由 Delivery Orchestrator 路由且仍待釐清的產品或軟體需求：以證據先行、一次一題的 frontier 訪談收斂範圍、規則、風險與驗收。適用於需求梳理與規格前訪談；已有核准規格的純實作、知識解說與純故障診斷不適用。
 ---
 
 <!-- authority: requirements-entrypoint -->
@@ -13,10 +13,10 @@ description: 探索仍待釐清的產品或軟體需求：以證據先行、一�
 
 | 請求結果 | 路由 |
 |---|---|
-| 需求仍有範圍、規則、風險或驗收未知 | 呼叫本 Skill |
+| 需求仍有範圍、規則、風險或驗收未知，且要形成階段成果 | 先由 `delivery-orchestrator` 路由本 Skill |
 | 已有核准規格，只需實作 | 交給 Implementation |
 | 疑似 BUG 的純故障診斷 | 先使用 `bug-diagnosis`；本 Skill 不猜根因或修法 |
-| 知識解說 | 使用對應的一般工作流 |
+| 知識解說或純唯讀需求審查 | 使用對應的一般／唯讀工作流，不產生階段成果 |
 
 完成條件：請求已唯一落在一列；進入探索時只產生事實證據、問題與候選文件，不開始產品實作。
 
@@ -27,6 +27,16 @@ description: 探索仍待釐清的產品或軟體需求：以證據先行、一�
 - 使用者回答只確認當輪決策。Candidate 展示、路徑確認與寫入授權由交付協定管理。
 - 每份文件涵蓋一個可獨立規劃、驗收或發布的成果。
 - 使用者主要語言用於訪談與成文；穩定識別碼保持 ASCII。
+
+## 0. 驗證 routed context
+
+完整讀取 `.agents/skills/delivery-orchestrator/references/stage-authorization.md`。這次工作一旦會保存訪談狀態、Candidate、正式需求、knowledge draft 或其他 repository／host-temp／外部狀態，必須在第一次寫入前執行：
+
+`python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspace.py authorize --repo . --phase requirements [--work-id <work-id>]`
+
+只有 `outcome: authorized` 且 record 精確為 `requirements/active` 才進入步驟 1。`routing_required` 或 typed error 時維持零寫入，將 work ID／安全 reason 交還 `delivery-orchestrator`；不得用使用者直接點名、prompt、路徑或自行建立的 artifact 代替授權。純解說、診斷、審查、治理驗證與隔離測試可停留在唯讀分支，但不能產生 Requirements 階段成果。
+
+完成條件：mutating run 有 current Delivery authorization；唯讀例外沒有 Candidate、正式 artifact 或狀態 mutation。
 
 ## 1. 查明可取得事實
 

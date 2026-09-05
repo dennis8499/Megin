@@ -119,6 +119,21 @@ def validate_all(skill_root: Path | None = None) -> list[str]:
     for required in ("完成條件：", "影響程度 × 不確定性 × 不可逆性", "已確認", "未知", "矛盾", "不適用"):
         if required not in skill:
             errors.append(f"entrypoint missing exploration invariant: {required}")
+    authorization_fragments = (
+        ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+        "authorize --repo . --phase requirements",
+        "outcome: authorized",
+        "requirements/active",
+        "routing_required",
+        "第一次寫入前",
+        "維持零寫入",
+        "純解說、診斷、審查、治理驗證與隔離測試",
+    )
+    for required in authorization_fragments:
+        if required not in skill:
+            errors.append(f"stage authorization guard missing: {required}")
+    if skill.index("## 0. 驗證 routed context") > skill.index("## 1. 查明可取得事實"):
+        errors.append("stage authorization guard must precede requirements discovery")
 
     quality = _text(root, "references/quality-contract.md")
     for version in ("ISO/IEC/IEEE 29148:2018", "2025，Av.2.0"):
@@ -175,6 +190,8 @@ def validate_all(skill_root: Path | None = None) -> list[str]:
         errors.append("openai.yaml must preserve implicit invocation")
     if "$requirements-discovery" not in yaml:
         errors.append("openai.yaml default prompt must name the skill")
+    if "$delivery-orchestrator" not in yaml or "requirements 階段授權" not in yaml:
+        errors.append("openai.yaml must route mutating discovery through Delivery")
     if 'short_description: "探索' not in yaml:
         errors.append("openai.yaml short description must lead with 探索")
 
@@ -182,6 +199,9 @@ def validate_all(skill_root: Path | None = None) -> list[str]:
     for index in range(1, 9):
         if f"EVAL-REQ-{index:03d}" not in behavior:
             errors.append(f"behavior contract missing EVAL-REQ-{index:03d}")
+    for required in ("exact `requirements/active` context", "routing_required", "host-temp"):
+        if required not in behavior:
+            errors.append(f"behavior contract missing routed-entry oracle: {required}")
     return errors
 
 

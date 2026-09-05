@@ -284,6 +284,60 @@ class ImplementationContractTests(unittest.TestCase):
     def test_repository_contracts_pass(self) -> None:
         self.assertEqual([], validator.validate_all(SKILLS_ROOT))
 
+    def test_stage_authorization_guard_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied = Path(temp_dir) / "skills"
+            shutil.copytree(
+                SKILLS_ROOT / "technical-planning",
+                copied / "technical-planning",
+            )
+            shutil.copytree(
+                SKILLS_ROOT / "implementation-execution",
+                copied / "implementation-execution",
+            )
+            skill_path = copied / "implementation-execution/SKILL.md"
+            text = skill_path.read_text(encoding="utf-8")
+            self.assertIn("--phase implementation", text)
+            skill_path.write_text(
+                text.replace("--phase implementation", "--phase planning", 1),
+                encoding="utf-8",
+                newline="\n",
+            )
+            errors = validator.validate_all(copied)
+            self.assertTrue(
+                any("stage authorization guard" in error for error in errors),
+                errors,
+            )
+
+    def test_standalone_mutation_permission_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied = Path(temp_dir) / "skills"
+            shutil.copytree(
+                SKILLS_ROOT / "technical-planning",
+                copied / "technical-planning",
+            )
+            shutil.copytree(
+                SKILLS_ROOT / "implementation-execution",
+                copied / "implementation-execution",
+            )
+            gate_path = copied / "implementation-execution/references/orchestrated-delivery.md"
+            text = gate_path.read_text(encoding="utf-8")
+            self.assertIn("歷史 standalone Ledger 與 Ready artifacts 只保留唯讀", text)
+            gate_path.write_text(
+                text.replace(
+                    "歷史 standalone Ledger 與 Ready artifacts 只保留唯讀",
+                    "歷史 standalone Ledger 與 Ready artifacts 可繼續寫入",
+                    1,
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
+            errors = validator.validate_all(copied)
+            self.assertTrue(
+                any("standalone mutation path" in error for error in errors),
+                errors,
+            )
+
     def test_review_outcomes_and_advisory_are_representable(self) -> None:
         key_inputs = {
             "category": "quality",
@@ -618,7 +672,9 @@ class ImplementationContractTests(unittest.TestCase):
             "handoff_path": "docs/plans/example/handoff.json",
             "capability_evidence_refs": [
                 "evidence/capability.json",
-                "evidence/capability-output.txt",
+                "evidence/capability/raw-reviewer.json",
+                "evidence/capability/raw-git-workspace.json",
+                "evidence/capability/raw-toolchain.json",
             ],
             "baseline_evidence_refs": [
                 "evidence/baseline.json",
@@ -651,6 +707,124 @@ class ImplementationContractTests(unittest.TestCase):
                     evidence_root=evidence_root,
                     ready=ready,
                 ),
+            )
+
+            capability_path = evidence_root / "evidence/capability.json"
+            legacy_capability_text = capability_path.read_text(encoding="utf-8")
+            arbitrary_raw_ref = "evidence/capability/raw-caller-assertion.json"
+            arbitrary_raw_path = evidence_root.joinpath(
+                *arbitrary_raw_ref.split("/")
+            )
+            arbitrary_raw_path.parent.mkdir(parents=True, exist_ok=True)
+            arbitrary_raw_path.write_text(
+                '{"caller_assertion":"passed"}\n',
+                encoding="utf-8",
+                newline="\n",
+            )
+            legacy_extra_ref_ledger = copy.deepcopy(ledger)
+            legacy_extra_ref_ledger["capability_evidence_refs"].append(
+                arbitrary_raw_ref
+            )
+            legacy_extra_ref_capability = json.loads(legacy_capability_text)
+            legacy_extra_ref_capability["evidence_refs"].append(arbitrary_raw_ref)
+            capability_path.write_text(
+                json.dumps(legacy_extra_ref_capability, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            self.assertTrue(
+                any(
+                    "capability evidence is not canonical" in error
+                    for error in validator.validate_execution_record_semantics(
+                        legacy_extra_ref_ledger,
+                        evidence_root=evidence_root,
+                        ready=ready,
+                    )
+                ),
+                "legacy capability accepted an arbitrary additional raw ref",
+            )
+            capability_path.write_text(
+                legacy_capability_text,
+                encoding="utf-8",
+                newline="\n",
+            )
+            delivery_authorization_ref = (
+                "evidence/capability/raw-delivery-authorization.json"
+            )
+            delivery_ledger = copy.deepcopy(ledger)
+            delivery_ledger["capability_evidence_refs"].append(
+                delivery_authorization_ref
+            )
+            delivery_capability = json.loads(legacy_capability_text)
+            delivery_capability["checks"]["delivery_authorization"] = "passed"
+            delivery_capability["evidence_refs"].append(delivery_authorization_ref)
+            capability_path.write_text(
+                json.dumps(delivery_capability, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            delivery_authorization_path = evidence_root.joinpath(
+                *delivery_authorization_ref.split("/")
+            )
+            delivery_authorization_path.parent.mkdir(parents=True, exist_ok=True)
+            delivery_authorization_path.write_text(
+                '{"outcome":"authorized"}\n',
+                encoding="utf-8",
+                newline="\n",
+            )
+            self.assertEqual(
+                [],
+                validator.validate_execution_record_semantics(
+                    delivery_ledger,
+                    evidence_root=evidence_root,
+                    ready=ready,
+                ),
+            )
+
+            delivery_extra_ref_ledger = copy.deepcopy(delivery_ledger)
+            delivery_extra_ref_ledger["capability_evidence_refs"].append(
+                arbitrary_raw_ref
+            )
+            delivery_extra_ref_capability = copy.deepcopy(delivery_capability)
+            delivery_extra_ref_capability["evidence_refs"].append(arbitrary_raw_ref)
+            capability_path.write_text(
+                json.dumps(delivery_extra_ref_capability, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            self.assertTrue(
+                any(
+                    "capability evidence is not canonical" in error
+                    for error in validator.validate_execution_record_semantics(
+                        delivery_extra_ref_ledger,
+                        evidence_root=evidence_root,
+                        ready=ready,
+                    )
+                ),
+                "governed capability accepted an arbitrary additional raw ref",
+            )
+
+            arbitrary_capability = copy.deepcopy(delivery_capability)
+            arbitrary_capability["checks"]["caller_assertion"] = "passed"
+            capability_path.write_text(
+                json.dumps(arbitrary_capability, sort_keys=True),
+                encoding="utf-8",
+                newline="\n",
+            )
+            self.assertTrue(
+                any(
+                    "capability evidence is not canonical" in error
+                    for error in validator.validate_execution_record_semantics(
+                        delivery_ledger,
+                        evidence_root=evidence_root,
+                        ready=ready,
+                    )
+                )
+            )
+            capability_path.write_text(
+                legacy_capability_text,
+                encoding="utf-8",
+                newline="\n",
             )
             self.assertTrue(
                 any(
@@ -770,7 +944,6 @@ class ImplementationContractTests(unittest.TestCase):
                 )
             )
 
-            capability_path = evidence_root / "evidence/capability.json"
             capability_text = capability_path.read_text(encoding="utf-8")
             capability_path.unlink()
             self.assertTrue(

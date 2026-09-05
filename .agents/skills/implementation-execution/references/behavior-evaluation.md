@@ -81,9 +81,9 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 
 ## EVAL-009 — Delivery-orchestrated requirements dirty gate
 
-在同一 linked worktree 依序提供合法 `delivery-run/v1`，以及錯誤 schema／Work ID／generation workspace／branch／base、缺 requirements approval evidence、requirements path 或 SHA drift、current handoff drift、缺少或重複 `kind: spec` source、plan approval evidence drift與額外產品 dirty path。另以相同 Ready plan 不提供 delivery record，驗證 standalone 行為。
+在同一 linked worktree 依序提供合法 `delivery-run/v1`，以及錯誤 schema／Work ID／generation workspace／branch／base、缺 requirements approval evidence、requirements path 或 SHA drift、current handoff drift、缺少或重複 `kind: spec` source、plan approval evidence drift與額外產品 dirty path。另以相同 Ready plan 不提供 delivery record，並提供既有 standalone Ledger。
 
-**Pass：** 只有完整合法 record 讓精確 current requirements 成為額外唯讀 upstream input；它在 baseline、執行與 review snapshots 中 hash 不變。任一 binding 錯誤或額外 dirty path 均在零產品變更下 `Blocked`。沒有 delivery record 時維持原 manifest-only whitelist，不用 branch／path／Work ID 猜測例外。
+**Pass：** 只有 exact `implementation/active` authorization 與完整合法 record 讓 execution run／Ledger／產品寫入開始，並讓精確 current requirements 成為額外唯讀 upstream input；它在 baseline、執行與 review snapshots 中 hash 不變。任一 binding 錯誤或額外 dirty path 均在零產品變更下 `Blocked`。沒有 delivery record 時回 `routing_required`，repository、host-temp 與外部 sentinel 零寫入；歷史 standalone Ledger 只讀且 bytes 不變，不用 branch／path／Work ID 猜測例外。
 
 ## EVAL-010 — BUG verified／partial／failed 與途中分流
 

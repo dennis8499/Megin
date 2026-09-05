@@ -39,11 +39,13 @@ REQUIRED_FILES = {
     "references/workspace-and-run.md",
     "references/workspace-creation.md",
     "references/stage-routing.md",
+    "references/stage-authorization.md",
     "references/delivery-run.schema.json",
     "references/behavior-evaluation.md",
     "scripts/_delivery_runtime.py",
     "scripts/_delivery_git.py",
     "scripts/_delivery_record.py",
+    "scripts/_delivery_authorization.py",
     "scripts/delivery_workspace.py",
     "scripts/_delivery_test_support.py",
     "scripts/test_delivery_worktree.py",
@@ -60,6 +62,7 @@ AUTHORITY_OWNERS = {
     "delivery-run": "references/workspace-and-run.md",
     "delivery-workspace-creation": "references/workspace-creation.md",
     "delivery-routing": "references/stage-routing.md",
+    "delivery-stage-authorization": "references/stage-authorization.md",
 }
 LINK_RE = re.compile(r"!?(?<!\\)\[[^\]]*\]\(([^)]+)\)")
 AUTHORITY_RE = re.compile(r"<!--\s*authority:\s*([a-z0-9-]+)\s*-->")
@@ -93,7 +96,12 @@ def _load_module(path: Path, name: str) -> Any:
     script_dir = str(path.parent)
     sys.path.insert(0, script_dir)
     try:
-        for private in ("_delivery_runtime", "_delivery_git", "_delivery_record"):
+        for private in (
+            "_delivery_runtime",
+            "_delivery_git",
+            "_delivery_record",
+            "_delivery_authorization",
+        ):
             sys.modules.pop(private, None)
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
@@ -225,6 +233,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         scripts / "_delivery_runtime.py",
         scripts / "_delivery_git.py",
         scripts / "_delivery_record.py",
+        scripts / "_delivery_authorization.py",
     ]
     sources = {path.name: path.read_text(encoding="utf-8") for path in runtime_paths}
     aggregate = "\n".join(sources.values())
@@ -353,6 +362,63 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     if record_source.count("raw_json_bytes=verification_bytes") < 2:
         errors.append("record authority does not forward raw BUG verification bytes to both consumers")
 
+    authorization_source = sources["_delivery_authorization.py"]
+    for fragment in (
+        'AUTHORIZATION_SCHEMA = "delivery-stage-authorization/v1"',
+        'RESTRICTED_PHASES = frozenset({"requirements", "planning", "implementation"})',
+        "_locate_from_probe(probe, registry, work_id)",
+        'if record["work_id"] != candidate.name:',
+        'if exc.code == "NOT_FOUND":',
+        'canonical_path_text(probe["canonical_worktree"]) != canonical_path_text(',
+        'if located["status"] != "active":',
+        'if located["phase"] != expected_phase:',
+        '"route_to": "delivery-orchestrator"',
+    ):
+        if fragment not in authorization_source:
+            errors.append(
+                f"authorization authority missing semantic primitive {fragment!r}"
+            )
+    authorization_tree = trees["_delivery_authorization.py"]
+    forbidden_authorization_calls = {
+        "_atomic_create_json",
+        "_atomic_write_json",
+        "_exclusive_lock",
+        "_git",
+        "_transition_record_unlocked",
+        "transition_record",
+    }
+    observed_authorization_calls = {
+        node.func.id
+        for node in ast.walk(authorization_tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    unsafe_authorization_calls = sorted(
+        forbidden_authorization_calls & observed_authorization_calls
+    )
+    if unsafe_authorization_calls:
+        errors.append(
+            "authorization authority invokes mutation primitive: "
+            f"{unsafe_authorization_calls}"
+        )
+
+    authorization_contract = (
+        bundle / "references/stage-authorization.md"
+    ).read_text(encoding="utf-8")
+    for fragment in (
+        "Child call protocol",
+        "outcome: authorized",
+        "outcome: routing_required",
+        "no_active_delivery",
+        "wrong_worktree",
+        "inactive_status",
+        "wrong_phase",
+        "Delivery Orchestrator 單獨持有",
+    ):
+        if fragment not in authorization_contract:
+            errors.append(
+                f"stage authorization contract omits semantic {fragment!r}"
+            )
+
     creation = (bundle / "references/workspace-creation.md").read_text(encoding="utf-8")
     if "recorded-base blob並核對manifest SHA" not in creation:
         errors.append("workspace creation contract omits pre-mutation recorded-base byte verification")
@@ -374,7 +440,6 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     }
     expected_defs = {
         "start_workspace",
-        "locate_workspace",
         "transition_record",
         "probe_command",
         "_parser",
@@ -407,12 +472,16 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         None,
     )
     commands = set(action.choices) if action is not None else set()
-    if commands != {"probe", "start", "locate", "transition"}:
+    if commands != {"probe", "start", "locate", "authorize", "transition"}:
         errors.append(f"public CLI commands drifted: {sorted(commands)}")
     if helper.probe_repository.__module__ != "_delivery_git":
         errors.append("probe_repository is not owned by _delivery_git")
     if helper.validate_record.__module__ != "_delivery_record":
         errors.append("validate_record is not owned by _delivery_record")
+    if helper.locate_workspace.__module__ != "_delivery_authorization":
+        errors.append("locate_workspace is not owned by _delivery_authorization")
+    if helper.authorize_stage.__module__ != "_delivery_authorization":
+        errors.append("authorize_stage is not owned by _delivery_authorization")
 
     completed = subprocess.CompletedProcess(
         ["git"],
@@ -439,6 +508,124 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
     )
     if ordinary.code != "NOT_A_REPOSITORY":
         errors.append("ordinary Git failure lost its compatible fallback code")
+
+
+def _validate_unified_routing(root: Path, errors: list[str]) -> None:
+    required: dict[str, tuple[str, ...]] = {
+        "delivery-orchestrator/SKILL.md": (
+            "唯一 mutating SDLC 入口",
+            "使用者直接點名 Requirements／Planning／Implementation",
+            "references/stage-authorization.md",
+            "只有 `outcome: authorized` 才 dispatch",
+            "Child 不直接執行 delivery transition",
+        ),
+        "delivery-orchestrator/references/stage-routing.md": (
+            "先授權再 dispatch",
+            "requirements/active",
+            "planning/active",
+            "implementation/active",
+            "不形成第二條 standalone mutation path",
+            "Plan Ready 的人工 Gate 通過後自動 dispatch Implementation",
+            "Delivery transition 仍由 Orchestrator 單獨持有",
+        ),
+        "delivery-orchestrator/references/stage-authorization.md": (
+            "requested work ID、registry candidate directory 與 validated record",
+            "完全一致",
+            "INVALID_RECORD",
+        ),
+        "delivery-orchestrator/references/behavior-evaluation.md": (
+            "另直接點名 Requirements、Planning、Implementation",
+            "其他回 `routing_required`",
+            "歷史 standalone Ledger 只讀且 bytes 不變",
+        ),
+        "delivery-orchestrator/agents/openai.yaml": (
+            "唯一 mutating SDLC 入口",
+            "allow_implicit_invocation: true",
+        ),
+        "requirements-discovery/SKILL.md": (
+            ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+            "authorize --repo . --phase requirements",
+            "requirements/active",
+            "routing_required",
+            "維持零寫入",
+        ),
+        "requirements-discovery/agents/openai.yaml": (
+            "$delivery-orchestrator",
+            "$requirements-discovery",
+            "requirements 階段授權",
+            "allow_implicit_invocation: true",
+        ),
+        "technical-planning/SKILL.md": (
+            ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+            "authorize --repo . --phase planning",
+            "planning/active",
+            "routing_required",
+            "維持零 Plan／Knowledge Candidate 寫入",
+        ),
+        "technical-planning/agents/openai.yaml": (
+            "$delivery-orchestrator",
+            "$technical-planning",
+            "planning 階段授權",
+            "allow_implicit_invocation: true",
+        ),
+        "implementation-execution/SKILL.md": (
+            ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+            "authorize --repo . --phase implementation",
+            "implementation/active",
+            "routing_required",
+            "歷史 standalone Ledger 與 Ready artifacts 僅供唯讀檢查",
+        ),
+        "implementation-execution/agents/openai.yaml": (
+            "$delivery-orchestrator",
+            "$implementation-execution",
+            "implementation 階段授權",
+            "allow_implicit_invocation: true",
+        ),
+        "delivery-orchestrator/scripts/test_delivery_workspace.py": (
+            "--list-tests",
+            '"bdd_bindings"',
+            "UnifiedEntryAuthorizationTests",
+            "test_50k_repository_probe_transition_and_authorize_stay_under_two_seconds",
+            "self.assertEqual(50_000, len(tracked))",
+            "if duration >= 2.0",
+        ),
+        "delivery-orchestrator/scripts/test_delivery_worktree.py": (
+            *(f'"BDD-{index:03d}":' for index in range(1, 10)),
+            "def _attempt_stage_writes(",
+            'if authorization["outcome"] != "authorized":',
+            "test_explicit_work_id_cannot_alias_a_different_record_across_phases",
+            '"INVALID_RECORD"',
+            "self.assertFalse(rejected_repo_target.exists())",
+            "self.assertFalse(candidate_target.exists())",
+            "self.assertEqual(historical_sha, digest(historical_ledger))",
+        ),
+    }
+    for relative, fragments in required.items():
+        path = root / relative
+        if not path.is_file():
+            errors.append(f"unified child routing contract missing file: {relative}")
+            continue
+        value = path.read_text(encoding="utf-8")
+        for fragment in fragments:
+            if fragment not in value:
+                errors.append(
+                    "unified child routing contract missing "
+                    f"{relative}: {fragment}"
+                )
+
+    implementation_contract = (
+        root / "implementation-execution/references/orchestrated-delivery.md"
+    )
+    if implementation_contract.is_file():
+        value = implementation_contract.read_text(encoding="utf-8")
+        for forbidden in (
+            "Standalone execution維持manifest-only dirty規則",
+            "只在caller明示提供host-temp delivery-run/v1時載入",
+        ):
+            if forbidden in value:
+                errors.append(
+                    f"unified child routing contract retains standalone writer: {forbidden}"
+                )
 
 
 def validate_all(skills_root: Path | None = None) -> list[str]:
@@ -506,6 +693,8 @@ def validate_all(skills_root: Path | None = None) -> list[str]:
         path = implementation / relative
         if not path.is_file() or "delivery-run/v1" not in path.read_text(encoding="utf-8"):
             errors.append(f"implementation delivery integration missing: {relative}")
+
+    _validate_unified_routing(root, errors)
 
     try:
         helper = _load_module(

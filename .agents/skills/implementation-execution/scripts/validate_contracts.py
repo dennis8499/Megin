@@ -414,17 +414,34 @@ def validate_terminal_evidence(
             if capability_path is not None
             else None
         )
+        legacy_raw_refs = [
+            "evidence/capability/raw-reviewer.json",
+            "evidence/capability/raw-git-workspace.json",
+            "evidence/capability/raw-toolchain.json",
+        ]
+        governed_raw_refs = [
+            *legacy_raw_refs,
+            "evidence/capability/raw-delivery-authorization.json",
+        ]
+        raw_capability_refs = capability_refs[1:]
+        expected_checks = {
+            "fresh_reviewer": "passed",
+            "git_workspace": "passed",
+            "toolchain": "passed",
+        }
+        if raw_capability_refs == governed_raw_refs:
+            expected_checks["delivery_authorization"] = "passed"
+        capability_refs_are_canonical = (
+            capability_refs[0] == "evidence/capability.json"
+            and raw_capability_refs in (legacy_raw_refs, governed_raw_refs)
+        )
         expected_capability = {
             "schema": "implementation-capability/v1",
             "run_id": ledger.get("run_id"),
-            "checks": {
-                "fresh_reviewer": "passed",
-                "git_workspace": "passed",
-                "toolchain": "passed",
-            },
-            "evidence_refs": capability_refs[1:],
+            "checks": expected_checks,
+            "evidence_refs": raw_capability_refs,
         }
-        if capability != expected_capability or not capability_refs[1:]:
+        if not capability_refs_are_canonical or capability != expected_capability:
             errors.append("terminal: capability evidence is not canonical or has no raw evidence")
 
     baseline_refs = ledger.get("baseline_evidence_refs", [])
@@ -1640,6 +1657,8 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
     for fragment in (
         "allow_implicit_invocation: true",
         "$implementation-execution",
+        "$delivery-orchestrator",
+        "implementation 階段授權",
         'short_description: "執行',
     ):
         if fragment not in yaml:
@@ -1650,17 +1669,30 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
             "references/orchestrated-delivery.md",
             "references/resume-and-revision.md",
             "references/greenfield-bootstrap.md",
+            ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+            "authorize --repo . --phase implementation",
+            "outcome: authorized",
+            "implementation/active",
+            "routing_required",
+            "execution run、binding、Ledger、evidence、fixture、產品 diff 或外部狀態前",
+            "歷史 standalone Ledger 與 Ready artifacts 僅供唯讀檢查",
         ],
         "references/preflight-and-ledger.md": [
             "../../technical-planning/references/ready-plan-contract.md",
             "../../technical-planning/references/ready-plan.schema.json",
             "orchestrated-delivery.md",
             "resume-and-revision.md",
+            "任何 Ledger、產品或測試寫入前",
+            "沒有 valid Delivery authorization 時不建立 run",
+            "歷史 standalone Ledger 與 Ready artifacts 只讀、不遷移、不刪除，也不授權續寫",
         ],
         "references/bdd-tdd-loop.md": ["greenfield-bootstrap.md"],
         "references/behavior-evaluation.md": [
             ".agents/skills/implementation-execution/scripts/validate_contracts.py",
             ".agents/skills/implementation-execution/scripts/test_validate_contracts.py",
+            "exact `implementation/active` authorization",
+            "沒有 delivery record 時回 `routing_required`",
+            "歷史 standalone Ledger 只讀且 bytes 不變",
         ],
     }
     for relative, fragments in required_pointers.items():
@@ -1668,6 +1700,23 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         for fragment in fragments:
             if fragment not in text:
                 errors.append(f"{relative}: missing branch pointer {fragment}")
+
+    authorization_fragments = (
+        ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+        "authorize --repo . --phase implementation",
+        "outcome: authorized",
+        "implementation/active",
+        "routing_required",
+    )
+    for fragment in authorization_fragments:
+        if fragment not in skill:
+            errors.append(f"stage authorization guard missing: {fragment}")
+    if (
+        "## 0. 取得階段授權" in skill
+        and "## 1. Preflight" in skill
+        and skill.index("## 0. 取得階段授權") > skill.index("## 1. Preflight")
+    ):
+        errors.append("stage authorization guard must precede Preflight")
 
     preflight = (bundle / "references/preflight-and-ledger.md").read_text(encoding="utf-8")
     if "current Ready requirements revision" in preflight:
@@ -1696,6 +1745,23 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
     orchestrated = (bundle / "references/orchestrated-delivery.md").read_text(encoding="utf-8")
     if "已遮蔽的approval evidence refs非空" not in orchestrated:
         errors.append("orchestrated delivery gate does not require redacted approval evidence refs")
+    for fragment in (
+        "所有 mutating execution",
+        "execution run、Ledger 或產品寫入前停止",
+        "歷史 standalone Ledger 與 Ready artifacts 只保留唯讀",
+        "不恢復 standalone mutation path",
+    ):
+        if fragment not in orchestrated:
+            errors.append(f"standalone mutation path guard missing: {fragment}")
+    behavior = (bundle / "references/behavior-evaluation.md").read_text(encoding="utf-8")
+    for forbidden in (
+        "只在caller明示提供host-temp delivery-run/v1時載入",
+        "Standalone execution維持manifest-only dirty規則",
+        "standalone沒有其他dirty path",
+        "沒有 delivery record 時維持原 manifest-only whitelist",
+    ):
+        if forbidden in "\n".join((skill, preflight, orchestrated, behavior)):
+            errors.append(f"standalone mutation path remains enabled: {forbidden}")
     loop = (bundle / "references/bdd-tdd-loop.md").read_text(encoding="utf-8")
     if "deterministic Unimplemented" in loop:
         errors.append("BDD/TDD loop duplicates greenfield bootstrap details")
@@ -1737,7 +1803,6 @@ def _validate_runtime_ownership(skills_root: Path, errors: list[str]) -> None:
         if fragment not in delivery:
             errors.append(f"delivery authority missing terminal persistence semantic {fragment}")
 
-    behavior = (bundle / "references/behavior-evaluation.md").read_text(encoding="utf-8")
     for index in range(1, 11):
         if f"EVAL-{index:03d}" not in behavior:
             errors.append(f"behavior contract missing EVAL-{index:03d}")

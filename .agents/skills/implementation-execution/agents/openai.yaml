@@ -1,7 +1,7 @@
 interface:
   display_name: "實作執行"
-  short_description: "執行 Ready 計畫，完成 BDD／TDD、驗證與 fresh review"
-  default_prompt: "使用 $implementation-execution，依指定的 ready-plan/v1 執行工作包、全量驗證並取得 fresh 唯讀 review。"
+  short_description: "執行經統一交付入口授權的 Ready 計畫"
+  default_prompt: "使用 $delivery-orchestrator 統一入口路由 $implementation-execution；取得 implementation 階段授權後，依 ready-plan/v1 執行工作包、全量驗證與 fresh 唯讀 review。"
 
 policy:
   allow_implicit_invocation: true

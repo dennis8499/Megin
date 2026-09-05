@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260903-unified-skill-entry-198002a2-planning",
+      "content_anchor": "planning-claim",
+      "contradicts": [],
+      "evidence_class": "planned",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "ef15a4ba3f5e3e16956268e14dc1335a6c9052e09f61c5a3bebfa3329d966f1b",
+          "locator": {
+            "end_line": 54,
+            "start_line": 54
+          },
+          "path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md",
+          "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/decisions/work-20260903-unified-skill-entry-198002a2-planning.md",
+  "content_sha256": "32f9f981e9455ef89dfca382e997240af8db9d9d04d358ebaeee93817703d09f",
+  "lifecycle": "current",
+  "page_id": "page-work-20260903-unified-skill-entry-198002a2-planning",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "planning"
+  ],
+  "title": "統一 Skill 入口與流程授權技術規劃"
+}

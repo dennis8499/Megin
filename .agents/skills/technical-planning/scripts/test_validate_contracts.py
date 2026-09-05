@@ -103,6 +103,27 @@ class ReadyPlanContractTests(unittest.TestCase):
     def test_repository_contracts_pass(self) -> None:
         self.assertEqual([], validator.validate_all(SKILLS_ROOT))
 
+    def test_stage_authorization_guard_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied = Path(temp_dir) / "skills"
+            shutil.copytree(
+                SKILLS_ROOT / "technical-planning",
+                copied / "technical-planning",
+            )
+            skill_path = copied / "technical-planning/SKILL.md"
+            text = skill_path.read_text(encoding="utf-8")
+            self.assertIn("--phase planning", text)
+            skill_path.write_text(
+                text.replace("--phase planning", "--phase requirements", 1),
+                encoding="utf-8",
+                newline="\n",
+            )
+            errors = validator.validate_all(copied)
+            self.assertTrue(
+                any("stage authorization guard" in error for error in errors),
+                errors,
+            )
+
     def test_ready_instance_and_cross_references(self) -> None:
         example = ready_example()
         self.assertEqual([], validator.validate_instance(example, self.ready_schema))

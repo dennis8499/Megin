@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260903-unified-skill-entry-198002a2-requirements",
+      "content_anchor": "requirements-claim",
+      "contradicts": [],
+      "evidence_class": "required",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "0b1433f658a3d853a04fa98210b989e160efc6fb3ac939062b2227f16f1dde58",
+          "locator": {
+            "end_line": 99,
+            "start_line": 99
+          },
+          "path": "docs/work/work-20260903-unified-skill-entry-198002a2/requirements.md",
+          "sha256": "c727e388ea9b63c5ee1ccaad423247b6ae4765cf20ecf7cd215c1fef2bec8b20"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260903-unified-skill-entry-198002a2-requirements.md",
+  "content_sha256": "91d562f2100134d0a7003af8f3a1c0c612718030b0b355bef50e73286fb5fc5c",
+  "lifecycle": "current",
+  "page_id": "page-work-20260903-unified-skill-entry-198002a2-requirements",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "requirements"
+  ],
+  "title": "統一 Skill 入口與流程授權"
+}

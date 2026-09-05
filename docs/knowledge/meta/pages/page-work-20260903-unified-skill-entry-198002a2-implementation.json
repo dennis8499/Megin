@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260903-unified-skill-entry-198002a2-implementation",
+      "content_anchor": "implementation-outcome",
+      "contradicts": [],
+      "evidence_class": "observed",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "886284c7022fa43393f24a57aad2de0de377a9a7eb6e1174e7c65590bad23f70",
+          "locator": {
+            "end_line": 7,
+            "start_line": 7
+          },
+          "path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-3.md",
+          "sha256": "0fce1d0af4e2c19174d104ed8ae71142403a5eef31eb8b1bba92836553ef4992"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260903-unified-skill-entry-198002a2-implementation.md",
+  "content_sha256": "3f7235abc116050b3cd654ecacd3f4ab6760175a3890e4533613c8bb4b9c2a8a",
+  "lifecycle": "current",
+  "page_id": "page-work-20260903-unified-skill-entry-198002a2-implementation",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "implementation"
+  ],
+  "title": "Implementation Outcome"
+}

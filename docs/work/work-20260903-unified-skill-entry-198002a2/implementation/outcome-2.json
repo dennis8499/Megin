@@ -1,0 +1,225 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/delivery-orchestrator/SKILL.md",
+      "sha256": "a74c620b02472da7d24b224fca6e93598a4219b28ce57720ac159c0b857e8e0e",
+      "summary": "Makes Delivery authorization the first gate for governed mutation."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/agents/openai.yaml",
+      "sha256": "e9211fbdc2fc93bcbd9a2e5542f0387b899764087edc9f8f8ef76acca1705567",
+      "summary": "Aligns public discovery and policy text with the unified Delivery entry."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/behavior-evaluation.md",
+      "sha256": "a00c9e181ca5f253eb91c2f52cc03ae6caf88ead815a33b450efb44c043e401e",
+      "summary": "Defines observable routed, rejected, identity-mismatch, and compatibility cases."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/stage-authorization.md",
+      "sha256": "d5328ca60a0cde3d11a2483c4f57e53981634fc969aba05a19a054e38bdc51c8",
+      "summary": "Defines the sole phase-authorization, identity, and child-routing contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/stage-routing.md",
+      "sha256": "5329219b391f035cfe8a80c7ad1ce4d8a98babd49dd38e1ae2c08d8939a1ecf1",
+      "summary": "Routes governed writes through the exact active Delivery phase."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_authorization.py",
+      "sha256": "77950d8ab41a7c0215f94f10c420a2f2be6cfa6ca229dc27418d6373d1f619a0",
+      "summary": "Adds centralized read-only exact-phase authorization with Work ID identity binding."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/behavior-evaluation-report.md",
+      "sha256": "f8f76ba4e688f79b1711c272fc2f001d08870aa50982016fb16fb5b721d5a420",
+      "summary": "Records failed evaluations, corrective evidence, and passing reevaluations."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+      "sha256": "919d0d88a28c1134e5d015aa442a770c5da17e2c900f5f5847557369c238a8ab",
+      "summary": "Exposes the authorize facade and delegates read-only workspace lookup."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "sha256": "cbfed2a5ddd46679d79e4083624ae960465fbcd9ec438f018ab0c5f13f714de0",
+      "summary": "Runs the canonical Delivery suite and one real 50,000-file performance gate."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_worktree.py",
+      "sha256": "32091f97f21c3d489a7e174f46507aeb6ea813ba8465e8916f53761b8ec423c0",
+      "summary": "Exercises routed writes, identity mismatch, zero-write rejection, and compatibility."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py",
+      "sha256": "86e4720cf4276967ea7e6e080774cbb7883a1fa4bf6462d206ccc110fb811500",
+      "summary": "Adds mutation tests for unified-entry, identity, and observability contracts."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/validate_contracts.py",
+      "sha256": "930d43a5aa73f82d7b1a5aca825a491cdabab5919cf78e36ef8aece38430cf82",
+      "summary": "Validates centralized authorization, child routing, identity, and regression guardrails."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/SKILL.md",
+      "sha256": "eeec2cf76d7a87440bb6456382f650473689e3627dc6765920735ea0884d4b6c",
+      "summary": "Makes Delivery authorization the first gate for governed mutation."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/agents/openai.yaml",
+      "sha256": "72fc9fb3140d759da5800b1a0cdfebf21bb43c0d0a8009adfe249816246e9697",
+      "summary": "Aligns public discovery and policy text with the unified Delivery entry."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/behavior-evaluation.md",
+      "sha256": "a186066dbccb4fe5f0e67892c5d26543ed87d9fa36d5ec26bef34831ec22d29e",
+      "summary": "Defines observable routed, rejected, identity-mismatch, and compatibility cases."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/orchestrated-delivery.md",
+      "sha256": "335799296f081e831b76880a58b8d51af403e9d2a5cf5270638c956712362f1e",
+      "summary": "Routes governed writes through the exact active Delivery phase."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/preflight-and-ledger.md",
+      "sha256": "759e57819dcdc9f4ea0ec5a3cc2600ed14f89ef560163d36b8e377e3f58f6f9c",
+      "summary": "Removes standalone Implementation mutation and preserves historical ledgers read-only."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/behavior-evaluation-report.md",
+      "sha256": "865101e9f8d26ae5d4f2dbe495ed927d2ae8a8fd11b9a866177d62ad5091167d",
+      "summary": "Records failed evaluations, corrective evidence, and passing reevaluations."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/test_validate_contracts.py",
+      "sha256": "11393fb948ce5837bcfe3004b7b4c109dea37f2a991221b38012f151145b0236",
+      "summary": "Adds mutation tests for unified-entry, identity, and observability contracts."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/validate_contracts.py",
+      "sha256": "c3f552bf3313bd3840b6463ed741417b9a29878cc764ed62cf5912d87e6f5dec",
+      "summary": "Validates centralized authorization, child routing, identity, and regression guardrails."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/SKILL.md",
+      "sha256": "5a4588174415a9c7885f320985a96bb82ae214786e54aec6a6c02234e28d6fc2",
+      "summary": "Makes Delivery authorization the first gate for governed mutation."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/agents/openai.yaml",
+      "sha256": "182b17d38a4b60afa7ac55ac97166d7d53e659688315c2141718f66b45e43d4c",
+      "summary": "Aligns public discovery and policy text with the unified Delivery entry."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/references/behavior-evaluation.md",
+      "sha256": "9fb56c4bbdf9789ad1d56e5db3571a1684687207c31dbfc80c90e407f9fdcc45",
+      "summary": "Defines observable routed, rejected, identity-mismatch, and compatibility cases."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/scripts/behavior-evaluation-report.md",
+      "sha256": "f3fa0763d55ed1ac1eb331da26bb672fe20dbc3f24b8c53cef8acaa1ea3c1c4c",
+      "summary": "Records failed evaluations, corrective evidence, and passing reevaluations."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/scripts/test_validate_contracts.py",
+      "sha256": "aa530a6b5add6722af988b94705b6e5f3e4903fb9d5bf39b00d30965f1516bee",
+      "summary": "Adds mutation tests for unified-entry, identity, and observability contracts."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/scripts/validate_contracts.py",
+      "sha256": "543427d97d59e543422934edf6a4bec976722153da30be1fe0a9dc01a67a3fb0",
+      "summary": "Validates centralized authorization, child routing, identity, and regression guardrails."
+    },
+    {
+      "path": ".agents/skills/technical-planning/SKILL.md",
+      "sha256": "0e6f892680a69490a3503d4a7a32940c3fd72be540295dd8d4c6eba35bcad183",
+      "summary": "Makes Delivery authorization the first gate for governed mutation."
+    },
+    {
+      "path": ".agents/skills/technical-planning/agents/openai.yaml",
+      "sha256": "d8a54fc24a6d88fc9b56e1f9b6e20f3b3cf924e7c8d6f0a8090a3f92c73943b1",
+      "summary": "Aligns public discovery and policy text with the unified Delivery entry."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/behavior-evaluation.md",
+      "sha256": "6605434b756f4a9f04a4c9ae78a411868e6b1f613b42d854ce5bf34a679e2f5a",
+      "summary": "Defines observable routed, rejected, identity-mismatch, and compatibility cases."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/behavior-evaluation-report.md",
+      "sha256": "cab57688ac8c086e8b70c772d8408af4d221bfd4852cfcae7abea4b265e97749",
+      "summary": "Records failed evaluations, corrective evidence, and passing reevaluations."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+      "sha256": "945a222c7d6148f46389082a63008282fff26e8177011083f25b545d6ba63310",
+      "summary": "Adds mutation tests for unified-entry, identity, and observability contracts."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/validate_contracts.py",
+      "sha256": "0f73301276bbdcc11b253641290de089de0ce6ee7150c0f80f02c6ea7f16c187",
+      "summary": "Validates centralized authorization, child routing, identity, and regression guardrails."
+    }
+  ],
+  "created_at": "2026-09-04T11:34:08.358545Z",
+  "implementation_run_id": "71affc70599cea7d678e77e6ef07088f855b5a8e8b1498c4bd09abc19b177ad9",
+  "knowledge_decision": "change",
+  "known_deviations": [],
+  "markdown": {
+    "path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-2.md",
+    "sha256": "ded664a37ae98768b627065e852141d4c03e797a1370f295ce68de3bc00772fa"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:unified-entry-postfix-preliminary-1"
+    ],
+    "report_ref": "reviews/round-1/report.json",
+    "report_sha256": "d7954fd5e86ee61fd72cbe0bdd59c31f4aa99d35461a471dcfd2d005aaa5a06e",
+    "verdict": "APPROVED"
+  },
+  "revision": 2,
+  "schema": "implementation-outcome/v1",
+  "summary": "Unified governed SDLC entry now makes Delivery the sole mutating workflow entry; Requirements, Planning, and Implementation require an exact active phase plus matching requested, registry, and record Work ID identity, while human gates, automatic routing, read-only exceptions, and historical artifacts remain intact.",
+  "verification": [
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-BDD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-BUILD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-TEST-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-GOVERNANCE-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-PERFORMANCE-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-PERFORMANCE-001.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260903-unified-skill-entry-198002a2",
+  "work_kind": "standard"
+}

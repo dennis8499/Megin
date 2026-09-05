@@ -92,6 +92,108 @@ class DeliveryContractMutationTests(unittest.TestCase):
         )
         self.assert_failure("public CLI commands drifted")
 
+    def test_authorization_owner_and_fail_closed_contract_is_required(self) -> None:
+        self.mutate(
+            "scripts/_delivery_authorization.py",
+            'if located["status"] != "active":',
+            "if False:",
+        )
+        self.assert_failure("authorization authority missing semantic primitive")
+
+    def test_authorization_identity_binding_mutation_is_rejected(self) -> None:
+        self.mutate(
+            "scripts/_delivery_authorization.py",
+            'if record["work_id"] != candidate.name:',
+            "if False:",
+        )
+        self.assert_failure("authorization authority missing semantic primitive")
+
+    def test_unified_child_routing_contract_is_required(self) -> None:
+        variants = (
+            (
+                "delivery-orchestrator/SKILL.md",
+                "唯一 mutating SDLC 入口",
+                "可選 mutating SDLC 入口",
+            ),
+            (
+                "requirements-discovery/SKILL.md",
+                "authorize --repo . --phase requirements",
+                "authorize --repo . --phase planning",
+            ),
+            (
+                "technical-planning/SKILL.md",
+                "authorize --repo . --phase planning",
+                "authorize --repo . --phase requirements",
+            ),
+            (
+                "implementation-execution/SKILL.md",
+                "authorize --repo . --phase implementation",
+                "authorize --repo . --phase planning",
+            ),
+            (
+                "delivery-orchestrator/references/stage-routing.md",
+                "先授權再 dispatch",
+                "直接 dispatch",
+            ),
+        )
+        for relative, old, new in variants:
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory(
+                prefix="delivery-routing-variant-"
+            ) as temporary:
+                copied = Path(temporary) / "skills"
+                shutil.copytree(self.skills, copied)
+                path = copied / Path(*relative.split("/"))
+                text = path.read_text(encoding="utf-8")
+                self.assertIn(old, text)
+                path.write_text(
+                    text.replace(old, new, 1),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                errors = validator.validate_all(copied)
+                self.assertTrue(
+                    any("unified child routing contract" in error for error in errors),
+                    errors,
+                )
+
+    def test_observable_routing_and_50k_performance_guards_are_required(self) -> None:
+        variants = (
+            (
+                "delivery-orchestrator/scripts/test_delivery_worktree.py",
+                'if authorization["outcome"] != "authorized":',
+                'if authorization["outcome"] == "authorized":',
+            ),
+            (
+                "delivery-orchestrator/scripts/test_delivery_workspace.py",
+                "self.assertEqual(50_000, len(tracked))",
+                "self.assertEqual(5_000, len(tracked))",
+            ),
+            (
+                "delivery-orchestrator/scripts/test_delivery_workspace.py",
+                "if duration >= 2.0",
+                "if duration >= 20.0",
+            ),
+        )
+        for relative, old, new in variants:
+            with self.subTest(relative=relative, old=old), tempfile.TemporaryDirectory(
+                prefix="delivery-observable-variant-"
+            ) as temporary:
+                copied = Path(temporary) / "skills"
+                shutil.copytree(self.skills, copied)
+                path = copied / Path(*relative.split("/"))
+                text = path.read_text(encoding="utf-8")
+                self.assertIn(old, text)
+                path.write_text(
+                    text.replace(old, new, 1),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                errors = validator.validate_all(copied)
+                self.assertTrue(
+                    any("unified child routing contract" in error for error in errors),
+                    errors,
+                )
+
     def test_trust_marker_mutation_is_rejected(self) -> None:
         self.mutate(
             "scripts/_delivery_git.py",

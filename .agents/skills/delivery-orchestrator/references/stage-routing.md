@@ -4,6 +4,14 @@
 
 本文件只把 child 的持久化狀態映射為 delivery transition；Candidate、Ready、BDD／TDD、review與品質規則仍由對應 child Skill唯一擁有。
 
+## 先授權再 dispatch
+
+每次進入 Requirements、Planning 或 Implementation 前，Orchestrator 都依 [階段授權](stage-authorization.md)對 current work ID 與 canonical worktree 呼叫 `authorize`。只有 exact `requirements/active`、`planning/active` 或 `implementation/active` 的 `outcome: authorized` 可 dispatch 對應 child；`routing_required`／typed error 先由 Orchestrator 建立、續接或修復 context，child 保持零寫入。
+
+使用者直接點名 child 時也套用相同判定，不形成第二條 standalone mutation path。純解說、診斷、唯讀審查、plan-only、治理驗證、Project Knowledge 明示治理流程及隔離測試維持其唯讀／既有 Gate 例外；一旦要形成 Requirements／Plan／Implementation 階段成果，就回到本授權流程。
+
+Requirements Ready 的人工 Gate 通過後自動 dispatch Planning；Plan Ready 的人工 Gate 通過後自動 dispatch Implementation，不再詢問額外的「是否開始實作」。Child 只回傳自身持久化結果，Delivery transition 仍由 Orchestrator 單獨持有。
+
 | Current phase | Child 持久化結果 | Delivery transition |
 |---|---|---|
 | `workspace` | generation `ready` | `requirements/active` |

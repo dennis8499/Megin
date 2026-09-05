@@ -56,6 +56,14 @@ class RequirementsContractTests(unittest.TestCase):
         self.mutate("SKILL.md", "(references/quality-contract.md)", "(references/missing-quality.md)")
         self.assert_failure("broken local link")
 
+    def test_stage_authorization_guard_is_required(self) -> None:
+        self.mutate(
+            "SKILL.md",
+            "--phase requirements",
+            "--phase planning",
+        )
+        self.assert_failure("stage authorization guard")
+
     def test_coverage_mutation_is_rejected(self) -> None:
         self.mutate(
             "SKILL.md",

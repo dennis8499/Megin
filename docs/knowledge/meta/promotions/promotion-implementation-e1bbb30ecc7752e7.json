@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "user",
+    "evidence": "conversation:knowledge-work-20260903-unified-skill-entry-198002a2-candidate-3"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-e1bbb30ecc7752e7/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "43fa8a05fc9232b2c0e823d3d85a459236976005225991a4384d9b24f75b82c6",
+  "promotion_id": "promotion-implementation-e1bbb30ecc7752e7",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260903-unified-skill-entry-198002a2"
+}

@@ -1,6 +1,6 @@
 ---
 name: implementation-execution
-description: 執行已核准的 ready-plan/v1：依 WP 進行 outside-in BDD／inner TDD、全量驗證與 fresh 唯讀 review。適用於開始或續跑 Ready 計畫；規劃、需求探索、未核准計畫與單純審查不適用。
+description: 執行由 Delivery Orchestrator 路由且已核准的 ready-plan/v1：依 WP 進行 outside-in BDD／inner TDD、全量驗證與 fresh 唯讀 review。適用於開始或續跑 governed implementation；規劃、需求探索、未核准計畫與單純審查不適用。
 ---
 
 <!-- authority: implementation-entrypoint -->
@@ -13,13 +13,14 @@ description: 執行已核准的 ready-plan/v1：依 WP 進行 outside-in BDD／i
 
 | 輸入 | 路由 |
 |---|---|
-| Ready ready-plan/v1 且不含 `bug_context`，開始或續跑標準實作 | 本 Skill |
-| Ready plan 含 `bug_context` 與已核准 assessment，執行 BUG 修復 | 本 Skill 的 BUG overlay |
+| Exact `implementation/active` `delivery-run/v1` 與 Ready ready-plan/v1，開始或續跑標準實作 | 本 Skill |
+| Exact `implementation/active` BUG `delivery-run/v1`、Ready plan 與已核准 assessment | 本 Skill 的 BUG overlay |
+| Ready plan 或歷史 standalone Ledger，但沒有 exact active delivery | 交給 Delivery Orchestrator 建立或續接 context；只可唯讀檢查舊 bytes |
 | 未核准／無版本 plan，或需要規劃 | Technical Planning |
 | 需求仍待探索 | Requirements Discovery |
 | 只要求唯讀審查 | Review workflow |
 
-完成條件：輸入唯一落在一列；只有前兩列可在 Preflight 通過後取得產品寫入權，第二列另受 BUG overlay 約束。
+完成條件：輸入唯一落在一列；只有前兩列可在階段授權與 Preflight 都通過後取得產品寫入權，第二列另受 BUG overlay 約束。
 
 ## 不變量
 
@@ -29,11 +30,20 @@ description: 執行已核准的 ready-plan/v1：依 WP 進行 outside-in BDD／i
 - Fresh Reviewer capability 不可用時為 Blocked；Reviewer 只核准固定 snapshot，Complete 後 run 凍結。
 - BUG assessment 只是診斷 evidence；Requirements 仍唯一擁有 WHAT，Ready plan 仍唯一擁有 HOW。不得在實作期改寫它們來合理化 patch。
 
+## 0. 取得階段授權
+
+完整讀取 `.agents/skills/delivery-orchestrator/references/stage-authorization.md`。在建立或續寫 execution run、binding、Ledger、evidence、fixture、產品 diff 或外部狀態前執行：
+
+`python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspace.py authorize --repo . --phase implementation [--work-id <work-id>]`
+
+只有 `outcome: authorized` 且 record 精確為 `implementation/active` 才進入 Preflight。`routing_required` 或 typed error 時維持 repository、host-temp 與外部狀態零寫入，交還 `delivery-orchestrator`。Ready plan、使用者直接點名、prompt、路徑或既有 standalone Ledger 都不能代替授權；歷史 standalone Ledger 與 Ready artifacts 僅供唯讀檢查。
+
+完成條件：任何 execution mutation 前已有 current Delivery authorization；唯讀 review／治理／測試例外沒有 run、Ledger 或產品 mutation。
+
 ## 1. Preflight
 
-完整讀取 [Preflight 與 Ledger](references/preflight-and-ledger.md)。再依實際分支載入：
+完整讀取 [Preflight 與 Ledger](references/preflight-and-ledger.md)及必要的 [Orchestrated Delivery](references/orchestrated-delivery.md)。再依實際分支載入：
 
-- 有 delivery-run/v1 → [Orchestrated Delivery](references/orchestrated-delivery.md)
 - 既有 binding 或 Ready/source revision → [Resume 與 Revision](references/resume-and-revision.md)
 - 第一個 public seam／entrypoint 不存在 → [Greenfield Bootstrap](references/greenfield-bootstrap.md)
 

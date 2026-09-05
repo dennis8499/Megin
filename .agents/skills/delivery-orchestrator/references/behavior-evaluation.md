@@ -54,15 +54,15 @@
 
 ## EVAL-DEL-006 — Invocation boundary
 
-使用乾淨 session 分別提出新功能、bug fix、實質重構、純解說、診斷、審查、plan-only、格式與微小文字修改。
+使用乾淨 session 分別提出新功能、bug fix、實質重構、純解說、診斷、審查、plan-only、格式與微小文字修改；另直接點名 Requirements、Planning、Implementation，分別提供無 record、錯 phase／worktree／status、明示 work ID 與載入 record identity 不一致，以及 exact active context。
 
-**Pass：** 前三類自動發現 orchestrator；後六類不建立 registry、branch或worktree，並由適用的一般／階段工作流處理。
+**Pass：** 前三類與會形成階段成果的直接 child 請求都先進唯一 Orchestrator；只有 requested work ID、registry directory 與 validated record identity 完全一致的 exact active context 才 dispatch 對應 child，identity mismatch 必須以 `INVALID_RECORD` fail closed，其他回 `routing_required`，且兩者皆維持 repository／registry／branch／worktree／host-temp／external sentinel 零寫入。後六類不建立 registry、branch或worktree，並由適用的一般／唯讀／治理工作流處理。
 
 ## EVAL-DEL-007 — Orchestrated execution dirty gate
 
 在 delivery worktree 放入 Ready requirements、Ready bundle及一個產品 dirty path，分別提供完整 record、未知 schema 欄位、錯誤 work ID、錯誤 workspace、缺 approval evidence、requirements hash drift、額外 `kind: spec` source與合法 record。
 
-**Pass：** 只有合法 record 讓 requirements 成為額外唯讀 upstream input；產品 path及所有 record／hash錯誤仍 Blocked。Standalone `implementation-execution` 的既有 Ready-artifact whitelist 行為不變。
+**Pass：** 只有合法 `implementation/active` record 讓 requirements 成為額外唯讀 upstream input並允許建立 execution run；產品 path及所有 record／hash錯誤仍 Blocked。沒有 record 或只有 Ready artifact 時回 `routing_required` 且不建立 Ledger／產品 diff；歷史 standalone Ledger 只讀且 bytes 不變。
 
 ## EVAL-DEL-008 — Secrets 與 Git terminal boundary
 

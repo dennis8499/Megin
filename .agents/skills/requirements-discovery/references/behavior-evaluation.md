@@ -11,9 +11,9 @@
 
 ## EVAL-REQ-001 — Invocation boundary
 
-分別提出未釐清功能、規格前訪談、已有 Ready 規格的純實作、知識解說與純故障診斷。
+分別提出未釐清功能、規格前訪談、已有 Ready 規格的純實作、知識解說與純故障診斷；另直接點名 Requirements，分別提供無 Delivery record、錯 phase／worktree／status，以及 exact `requirements/active` context。
 
-**Pass：** 前兩者進探索；已有Ready規格進Implementation、知識解說走一般流程、純故障診斷進`bug-diagnosis`，沒有未核准需求或assessment artifact寫入。
+**Pass：** 前兩者由 Delivery Orchestrator 路由；只有 exact active context 可產生 Requirements 階段成果。其他直接點名回 `routing_required` 且 repository、host-temp 與外部 sentinel 零寫入；已有Ready規格進Implementation、知識解說走一般流程、純故障診斷進`bug-diagnosis`，沒有未核准需求或assessment artifact寫入。
 
 ## EVAL-REQ-002 — Evidence-first frontier
 

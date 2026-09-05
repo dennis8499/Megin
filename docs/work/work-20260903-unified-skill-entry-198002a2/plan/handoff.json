@@ -1,0 +1,1628 @@
+{
+  "approval": {
+    "actor": "user",
+    "confirmed_at": "2026-09-03T22:01:05+08:00",
+    "evidence": "conversation:plan-work-20260903-unified-skill-entry-198002a2-candidate-1",
+    "status": "Ready"
+  },
+  "artifacts": [
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md",
+      "role": "primary",
+      "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/handoff.json",
+      "role": "handoff",
+      "sha256": null
+    }
+  ],
+  "candidate": {
+    "payload_sha256": "d4189e86ca58bb04dec491f4aee9039beab4a1a97437375e09cfd81013f6ba3d",
+    "revision": "candidate-20260903-unified-entry-01"
+  },
+  "commands": [
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Baseline unittest runner help has no --list-tests option.",
+          "probe": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py --help",
+          "source_ref": "SRC-ORCH-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py --list-tests",
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "completeness_criteria": [
+        "No test body runs; inventory count is nonzero and includes BDD-001 through BDD-009 bindings."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-discovery",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and output is a deterministic unique list containing every Delivery authorization scenario."
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "No unified-entry behavior class exists at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"UnifiedEntryAuthorizationTests\" .agents/skills/delivery-orchestrator/scripts",
+          "source_ref": "SRC-ORCH-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py UnifiedEntryAuthorizationTests",
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; BDD-001 through BDD-009 authorization, routing, Gate, exception, compatibility, and zero-write oracles pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "command_id": "CMD-BDD-FULL-001",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "bdd-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; all Delivery worktree, transition, safety, terminal, performance, and unified-entry behavior tests pass."
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Authorization unit test is absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_authorize_stage_is_read_only_and_fail_closed\" .agents/skills/delivery-orchestrator/scripts/test_delivery_worktree.py",
+          "source_ref": "SRC-ORCH-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_worktree.py DeliveryWorktreeTests.test_authorize_stage_is_read_only_and_fail_closed",
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; every named assertion passes."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Requirements authorization mutation test is absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_stage_authorization_guard_is_required\" .agents/skills/requirements-discovery/scripts/test_validate_contracts.py",
+          "source_ref": "SRC-REQ-VALIDATOR"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/requirements-discovery/scripts/test_validate_contracts.py RequirementsContractTests.test_stage_authorization_guard_is_required",
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; every named assertion passes."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Planning authorization mutation test is absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_stage_authorization_guard_is_required\" .agents/skills/technical-planning/scripts/test_validate_contracts.py",
+          "source_ref": "SRC-PLAN-VALIDATOR"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contracts.py ReadyPlanContractTests.test_stage_authorization_guard_is_required",
+      "command_id": "CMD-TDD-FOCUSED-003",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; every named assertion passes."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Implementation authorization mutation test is absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_stage_authorization_guard_is_required\" .agents/skills/implementation-execution/scripts/test_validate_contracts.py",
+          "source_ref": "SRC-EXEC-VALIDATOR"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/implementation-execution/scripts/test_validate_contracts.py ImplementationContractTests.test_stage_authorization_guard_is_required",
+      "command_id": "CMD-TDD-FOCUSED-004",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; every named assertion passes."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Cross-skill routing mutation test is absent at baseline.",
+          "probe": "rg -n --fixed-strings \"test_unified_child_routing_contract_is_required\" .agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py",
+          "source_ref": "SRC-ORCH-VALIDATOR"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py DeliveryContractMutationTests.test_unified_child_routing_contract_is_required",
+      "command_id": "CMD-TDD-FOCUSED-005",
+      "completeness_criteria": [
+        "The named test inventory completes with failed=0 and unexpected skipped=0; temporary fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; every named assertion passes."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "run_full_suite removes the bounded fixture; completion verifies absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope related --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-RELATED-001",
+      "completeness_criteria": [
+        "Report lists every configured related command with exit_code=0; fixture is removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; related Knowledge behavior and every SDLC owner validator pass."
+      ],
+      "timeout_seconds": 1200
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --syntax-all",
+      "command_id": "CMD-BUILD-FULL-001",
+      "completeness_criteria": [
+        "Validator reports the full syntax inventory with no omitted discovered file."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "build-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; complete repository Python/schema syntax and owner contract inventory validates."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "run_full_suite removes the bounded fixture; completion verifies absence.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp",
+      "command_id": "CMD-TEST-FULL-001",
+      "completeness_criteria": [
+        "Report contains every configured full-suite command with exit_code=0 and unexpected skipped=0; fixture is removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; Knowledge, Requirements, Planning, Implementation, BUG, and Delivery owner/full suites pass."
+      ],
+      "timeout_seconds": 1800
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --governance",
+      "command_id": "CMD-GOVERNANCE-001",
+      "completeness_criteria": [
+        "All governance checks complete with no warning promoted to an unresolved failure."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "governance",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; canonical Knowledge structure, provenance, approvals, and staged-worktree governance pass."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py DeliveryPerformanceTests",
+      "command_id": "CMD-PERFORMANCE-001",
+      "completeness_criteria": [
+        "Every DeliveryPerformanceTests case runs with failed=0 and unexpected skipped=0; fixtures are removed."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep"
+      ],
+      "external_side_effects": [
+        {
+          "authorization": "Test-only TemporaryDirectory lifecycle declared by the existing owner harness.",
+          "effect": "Create isolated Git repositories, registries, mutation fixtures, and remove them in cleanup/finally.",
+          "reversible": true,
+          "target": "OS temporary directory"
+        }
+      ],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; existing Delivery probe and transition wall-time gates remain below two seconds."
+      ],
+      "timeout_seconds": 1200
+    }
+  ],
+  "contract_index": [
+    {
+      "contract_id": "BDD-FWK-001",
+      "kind": "bdd-framework",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "BDD-001",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "BDD-002",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "BDD-003",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-REQ-SKILL",
+        "SRC-REQ-YAML",
+        "SRC-REQ-BEHAVIOR",
+        "SRC-REQ-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "BDD-004",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-PLAN-SKILL",
+        "SRC-PLAN-YAML",
+        "SRC-PLAN-BEHAVIOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-005",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-EXEC-SKILL",
+        "SRC-EXEC-YAML",
+        "SRC-EXEC-ROUTE",
+        "SRC-EXEC-BEHAVIOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "contract_id": "BDD-006",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "BDD-007",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "BDD-008",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST",
+        "SRC-PK-SUITE",
+        "SRC-PK-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "BDD-009",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST",
+        "SRC-PK-SUITE",
+        "SRC-PK-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "TEST-001",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "TEST-002",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "TEST-003",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-REQ-SKILL",
+        "SRC-REQ-YAML",
+        "SRC-REQ-BEHAVIOR",
+        "SRC-REQ-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "TEST-004",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-PLAN-SKILL",
+        "SRC-PLAN-YAML",
+        "SRC-PLAN-BEHAVIOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-005",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-EXEC-SKILL",
+        "SRC-EXEC-YAML",
+        "SRC-EXEC-ROUTE",
+        "SRC-EXEC-BEHAVIOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "contract_id": "TEST-006",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "TEST-007",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST",
+        "SRC-PK-SUITE",
+        "SRC-PK-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-DISCOVERY-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-ORCH-BEHAVIOR"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-REQ-VALIDATOR",
+        "SRC-REQ-BEHAVIOR"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-003",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-PLAN-BEHAVIOR"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-004",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-EXEC-BEHAVIOR",
+        "SRC-EXEC-ROUTE"
+      ],
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-005",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-RELATED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-SUITE",
+        "SRC-REQ-VALIDATOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-ORCH-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-BUILD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-VALIDATOR",
+        "SRC-REQ-VALIDATOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-ORCH-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-TEST-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-SUITE",
+        "SRC-ORCH-TEST",
+        "SRC-REQ-VALIDATOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-ORCH-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-GOVERNANCE-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-PK-VALIDATOR",
+        "SRC-ORCH-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "CMD-PERFORMANCE-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-ORCH-BEHAVIOR"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "contract_id": "WP-001",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "WP-002",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-REQ-SKILL",
+        "SRC-REQ-YAML",
+        "SRC-REQ-BEHAVIOR",
+        "SRC-REQ-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "WP-003",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-PLAN-SKILL",
+        "SRC-PLAN-YAML",
+        "SRC-PLAN-BEHAVIOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "WP-004",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-EXEC-SKILL",
+        "SRC-EXEC-YAML",
+        "SRC-EXEC-ROUTE",
+        "SRC-EXEC-BEHAVIOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "contract_id": "WP-005",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST",
+        "SRC-PK-SUITE",
+        "SRC-PK-VALIDATOR"
+      ],
+      "wp_refs": [
+        "WP-005"
+      ]
+    }
+  ],
+  "planning_baseline": {
+    "head_sha": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+    "repo_id": "0c5534020993ce0e527ffefdd0bbbdf8e3e26138d3933defe22de1ed5ea2530c",
+    "status_sha256": "c715615c8c02737d91ace08f7b68cc008f606ec78bc875b8848a9de3d35c02e1"
+  },
+  "primary_plan": {
+    "path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md",
+    "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721"
+  },
+  "revision_impact": {
+    "changes": [
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003",
+          "WP-004",
+          "WP-005"
+        ],
+        "changed_ref": "SRC-SPEC",
+        "scope": "global-baseline"
+      }
+    ],
+    "revision": "candidate-20260903-unified-entry-01"
+  },
+  "schema": "ready-plan/v1",
+  "sources": [
+    {
+      "kind": "spec",
+      "location": "docs/work/work-20260903-unified-skill-entry-198002a2/requirements.md",
+      "plan_refs": [
+        "BG-001",
+        "BR-001",
+        "FR-001",
+        "FR-002",
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "FR-006",
+        "FR-007",
+        "FR-008",
+        "TR-001",
+        "NFR-001",
+        "NFR-002",
+        "NFR-003",
+        "NFR-004",
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005",
+        "AC-006",
+        "AC-007",
+        "AC-008",
+        "AC-009"
+      ],
+      "revision": "requirements-ready-1",
+      "sha256": "c727e388ea9b63c5ee1ccaad423247b6ae4765cf20ecf7cd215c1fef2bec8b20",
+      "source_id": "SRC-SPEC",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/delivery-orchestrator/SKILL.md",
+      "plan_refs": [
+        "CON-001",
+        "TD-002",
+        "MOD-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "c558fd42d85400bce378c8340951d75abc294621986cbd3c6907dd0428713528",
+      "source_id": "SRC-ORCH-SKILL",
+      "wp_refs": [
+        "WP-001",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/delivery-orchestrator/agents/openai.yaml",
+      "plan_refs": [
+        "TD-002",
+        "IMP-005",
+        "NFR-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "30c995ae4e297fc0c2a76c846826a5d38c3a8aae6c33e21ec7c1340052c7a27a",
+      "source_id": "SRC-ORCH-YAML",
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/references/stage-routing.md",
+      "plan_refs": [
+        "CON-001",
+        "CON-003",
+        "TD-002",
+        "BDD-007"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "1108e0cecd37847ed109d7e0588b54720fdbc6a808f3e1b20c008f98725d6a7e",
+      "source_id": "SRC-ORCH-ROUTE",
+      "wp_refs": [
+        "WP-001",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/references/behavior-evaluation.md",
+      "plan_refs": [
+        "BDD-006",
+        "BDD-007",
+        "BDD-008",
+        "BDD-009",
+        "CON-003",
+        "CON-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "f51dc52732c39e27a6a66e3bd65b644007af4c1f96eb419c480d093a4dea4248",
+      "source_id": "SRC-ORCH-BEHAVIOR",
+      "wp_refs": [
+        "WP-001",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+      "plan_refs": [
+        "TD-001",
+        "MOD-001",
+        "SEAM-001",
+        "SEAM-002"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "e48dd7b8f7417dba7cacfb6e44c85b7e99ff5bb0a4bbcb0eb09999e229610ac7",
+      "source_id": "SRC-ORCH-FACADE",
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/delivery-orchestrator/scripts/validate_contracts.py",
+      "plan_refs": [
+        "TD-004",
+        "TEST-001",
+        "TEST-002",
+        "TEST-006"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "99e39155b8766564266d5d94ad88dd2199999e6508fc6ba1af95455a05185428",
+      "source_id": "SRC-ORCH-VALIDATOR",
+      "wp_refs": [
+        "WP-001",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/delivery-orchestrator/scripts/test_delivery_worktree.py",
+      "plan_refs": [
+        "BDD-FWK-001",
+        "BDD-001",
+        "BDD-002",
+        "BDD-006",
+        "BDD-007",
+        "BDD-008",
+        "BDD-009",
+        "TEST-001",
+        "TEST-002",
+        "TEST-006",
+        "TEST-007"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "29981d56097656a4de2fb88857c88f174fd16dd8ce5e7c56871ff73b46a71fb9",
+      "source_id": "SRC-ORCH-TEST",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003",
+        "WP-004",
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/requirements-discovery/SKILL.md",
+      "plan_refs": [
+        "CON-002",
+        "TD-002",
+        "MOD-002",
+        "SEAM-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "5b76469a17a64aaba50dd877b8e34535335935851b6a383c4ba0178c7fd17f32",
+      "source_id": "SRC-REQ-SKILL",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/requirements-discovery/agents/openai.yaml",
+      "plan_refs": [
+        "CON-004",
+        "TD-002",
+        "IMP-002"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "79ace8760185a7461a2e7bcea16e9f246d56dae1f62423ca871546431257515e",
+      "source_id": "SRC-REQ-YAML",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/requirements-discovery/references/behavior-evaluation.md",
+      "plan_refs": [
+        "BDD-003",
+        "TEST-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "c92b26d12a979da38ce446c0ee308b6f51080674c8e890e12709ae26e0a7117c",
+      "source_id": "SRC-REQ-BEHAVIOR",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/requirements-discovery/scripts/validate_contracts.py",
+      "plan_refs": [
+        "TD-004",
+        "TEST-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "0d901992131a7f541a3396dae48765e5f07a82fcabdae1e8573a12951abcff10",
+      "source_id": "SRC-REQ-VALIDATOR",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/technical-planning/SKILL.md",
+      "plan_refs": [
+        "CON-002",
+        "TD-002",
+        "MOD-003",
+        "SEAM-004"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "a43407f2788a92857ff5d1def419deeda9970485e46ec5064bc5bba11c06f3dc",
+      "source_id": "SRC-PLAN-SKILL",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/technical-planning/agents/openai.yaml",
+      "plan_refs": [
+        "CON-004",
+        "TD-002",
+        "IMP-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "55144cf7d7103c004d1fd34defa7ee750afac11cd34dcfa2dc2126353c1431dd",
+      "source_id": "SRC-PLAN-YAML",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/technical-planning/references/behavior-evaluation.md",
+      "plan_refs": [
+        "BDD-004",
+        "TEST-004"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "16b1436cd7d79b6ba3ed7484630fb6a33108537d75d4a4003e0620148c65edfb",
+      "source_id": "SRC-PLAN-BEHAVIOR",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/technical-planning/scripts/validate_contracts.py",
+      "plan_refs": [
+        "TD-004",
+        "TEST-004"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "342b66bfb682452da6b0dbf30859856fe9a0ba2031fb33e8d691451e147609d9",
+      "source_id": "SRC-PLAN-VALIDATOR",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/implementation-execution/SKILL.md",
+      "plan_refs": [
+        "CON-002",
+        "TD-003",
+        "MOD-004",
+        "SEAM-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "186aaa3ba5bf9c4c0a52acb1d3a730ffb5579bc83f3fd2088af9ba014669fb2c",
+      "source_id": "SRC-EXEC-SKILL",
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/implementation-execution/agents/openai.yaml",
+      "plan_refs": [
+        "CON-004",
+        "TD-002",
+        "IMP-004"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "b69f4e890f11dc614c86611c51377dd6ef4784dc6da00294d2349c323a97ac6b",
+      "source_id": "SRC-EXEC-YAML",
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/implementation-execution/references/orchestrated-delivery.md",
+      "plan_refs": [
+        "CON-005",
+        "TD-003",
+        "BDD-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "3645598999e8b9108f5aa7ab1ce6df127232b5461a3f3a0fcc6aa775aa66d33a",
+      "source_id": "SRC-EXEC-ROUTE",
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/implementation-execution/references/behavior-evaluation.md",
+      "plan_refs": [
+        "BDD-005",
+        "BDD-009",
+        "TEST-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "eee7e4d3aa20092f41bd578caccc2fb3e3a0f3e22c1eefa2c791e78e7c07c9da",
+      "source_id": "SRC-EXEC-BEHAVIOR",
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/implementation-execution/scripts/validate_contracts.py",
+      "plan_refs": [
+        "TD-004",
+        "TEST-005"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "5bc07f279398d63e9b7ea09e4f6fdf99605f03619d5d94476a439bf57e3d5b0f",
+      "source_id": "SRC-EXEC-VALIDATOR",
+      "wp_refs": [
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/writing-great-skills/SKILL.md",
+      "plan_refs": [
+        "CON-004",
+        "TD-002",
+        "NFR-003"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "4d6ccbc3760b1bd4107c495a79872286ea69494003f3b0a719fc95b147457061",
+      "source_id": "SRC-SKILL-GUIDE",
+      "wp_refs": [
+        "WP-002",
+        "WP-003",
+        "WP-004"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/run_full_suite.py",
+      "plan_refs": [
+        "CMD-RELATED-001",
+        "CMD-TEST-FULL-001",
+        "TEST-007"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "532062a432c8ad40c5768c3becda19d84bf1a950a981c3932624c38176432686",
+      "source_id": "SRC-PK-SUITE",
+      "wp_refs": [
+        "WP-005"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/validate_contracts.py",
+      "plan_refs": [
+        "CMD-BUILD-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "TEST-007"
+      ],
+      "revision": "ef4747d89d83ef7fcd4136d7da30126c49b5c6c9",
+      "sha256": "ebbb9f7f8a0fe673f47df9c0fa13f7a974a307e24318e934e4dd1b018dd38533",
+      "source_id": "SRC-PK-VALIDATOR",
+      "wp_refs": [
+        "WP-005"
+      ]
+    }
+  ],
+  "work_packages": [
+    {
+      "blocked_by": [],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-001",
+        "BDD-002",
+        "BDD-006",
+        "TEST-001",
+        "TEST-002",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "WP-001"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-FACADE",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST"
+      ],
+      "wp_id": "WP-001"
+    },
+    {
+      "blocked_by": [
+        "WP-001"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-003",
+        "TEST-003",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "WP-002"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-REQ-SKILL",
+        "SRC-REQ-YAML",
+        "SRC-REQ-BEHAVIOR",
+        "SRC-REQ-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_id": "WP-002"
+    },
+    {
+      "blocked_by": [
+        "WP-001"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-003",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-004",
+        "TEST-004",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-003",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "WP-003"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-PLAN-SKILL",
+        "SRC-PLAN-YAML",
+        "SRC-PLAN-BEHAVIOR",
+        "SRC-PLAN-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_id": "WP-003"
+    },
+    {
+      "blocked_by": [
+        "WP-001"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-004",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-005",
+        "TEST-005",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-004",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "WP-004"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-TEST",
+        "SRC-EXEC-SKILL",
+        "SRC-EXEC-YAML",
+        "SRC-EXEC-ROUTE",
+        "SRC-EXEC-BEHAVIOR",
+        "SRC-EXEC-VALIDATOR",
+        "SRC-SKILL-GUIDE"
+      ],
+      "wp_id": "WP-004"
+    },
+    {
+      "blocked_by": [
+        "WP-002",
+        "WP-003",
+        "WP-004"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-005",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-PERFORMANCE-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-007",
+        "BDD-008",
+        "BDD-009",
+        "TEST-006",
+        "TEST-007",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-TDD-FOCUSED-005",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-PERFORMANCE-001",
+        "WP-005"
+      ],
+      "source_refs": [
+        "SRC-SPEC",
+        "SRC-ORCH-SKILL",
+        "SRC-ORCH-YAML",
+        "SRC-ORCH-ROUTE",
+        "SRC-ORCH-BEHAVIOR",
+        "SRC-ORCH-VALIDATOR",
+        "SRC-ORCH-TEST",
+        "SRC-PK-SUITE",
+        "SRC-PK-VALIDATOR"
+      ],
+      "wp_id": "WP-005"
+    }
+  ]
+}

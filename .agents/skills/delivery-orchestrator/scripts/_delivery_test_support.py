@@ -452,9 +452,15 @@ class DeliveryFixture(unittest.TestCase):
                     "git_workspace": "passed",
                     "toolchain": "passed",
                 },
-                "evidence_refs": ["evidence/capability-output.txt"],
+                "evidence_refs": [
+                    "evidence/capability/raw-reviewer.json",
+                    "evidence/capability/raw-git-workspace.json",
+                    "evidence/capability/raw-toolchain.json",
+                ],
             },
-            "evidence/capability-output.txt": {"outcome": "passed"},
+            "evidence/capability/raw-reviewer.json": {"outcome": "passed"},
+            "evidence/capability/raw-git-workspace.json": {"outcome": "passed"},
+            "evidence/capability/raw-toolchain.json": {"outcome": "passed"},
             "evidence/baseline.json": {
                 "schema": "implementation-baseline/v1",
                 "run_id": run_id,
@@ -557,7 +563,9 @@ class DeliveryFixture(unittest.TestCase):
             "handoff_path": handoff_relative,
             "capability_evidence_refs": [
                 "evidence/capability.json",
-                "evidence/capability-output.txt",
+                "evidence/capability/raw-reviewer.json",
+                "evidence/capability/raw-git-workspace.json",
+                "evidence/capability/raw-toolchain.json",
             ],
             "baseline_evidence_refs": [
                 "evidence/baseline.json",
