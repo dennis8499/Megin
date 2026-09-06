@@ -1,6 +1,7 @@
 # Delivery Orchestrator 行為驗證契約
 
 本文件只供建立或修改 `delivery-orchestrator` 時使用。每個案例使用隔離的暫存 Git repository／registry；不在 SDLC workspace 建立測試 worktree。
+所有案例中的人工Gate都繼承`.agents/skills/project-knowledge/references/human-gate-review.md`；驗收以immutable review files、直接連結與Summary-only Chat為準。
 
 ## 執行協定
 
@@ -44,7 +45,7 @@
 
 拒絕並修訂 requirements Candidate、拒絕並修訂 Plan Candidate；另讓 Planning 產生需求缺口、Implementation 產生 upstream reapproval。
 
-**Pass：** 每版完整展示與核准分離，舊 artifacts 保留；路由只走 planning→requirements 或 implementation→planning。未 Ready 不進下游，Plan Ready 後直接 implementation。
+**Pass：** 每版先seal並重驗immutable review files，Chat只提供summary projection、direct links與exact identity，核准另輪處理且舊artifacts保留；路由只走planning→requirements或implementation→planning。未Ready不進下游，Plan Ready後直接implementation。
 
 ## EVAL-DEL-005 — Generation 與 Complete freeze
 

@@ -19,6 +19,8 @@ Preflight → Executing → Verifying → Reviewing → Complete
 
 另有 `Reviewing → Verifying` 只表示 snapshot drift，未先進入 Fixing。`Verifying → Fixing` 表示主代理 full command failure；`Reviewing → Fixing` 表示 Reviewer blocking finding。Fixing 使 affected WP `Invalidated → Executing → Verified`，再回 Verifying。
 
+實作後需要人類核准Knowledge promotion時，遵守 [共用 Human Gate contract](../../project-knowledge/references/human-gate-review.md)（canonical path：`.agents/skills/project-knowledge/references/human-gate-review.md`）。Human Gate bundle inventory: latest `implementation-outcome/v1` JSON and Markdown as immutable `review-files/`, the sealed Knowledge Candidate, its complete postimages/finalizers, review manifest, validation, and exact identity. Preliminary/final fresh-review machine evidence remains unchanged and is not a Chat approval payload.
+
 `Awaiting upstream reapproval` 與 `Blocked` 終止目前 attempt。只有 Preflight/Ledger 判定為同 run 可接受的已核准 WP-local revision，才在同一 Ledger 追加 attempt；global-baseline revision 使用新 worktree／base／run。`Complete` 永遠凍結 run。
 
 終止狀態只有：
@@ -33,7 +35,7 @@ Preflight → Executing → Verifying → Reviewing → Complete
 
 進入terminal ordering前必須依序完成：preliminary fresh response → create-only保存其report與全部raw outputs → 以run ID、logical ref、report path／hash及逐command output binding寫入最新連續Outcome revision → 封存Candidate → 另一位fresh Reviewer完成final review。`Complete`再依序發生：final Reviewer response received → 寫入前重算product與required knowledge snapshots且相同 → 原樣保存raw response／outputs／report → 保存後重算snapshots且相同 → append implementation `Complete`。Knowledge snapshot必須由sealed Candidate與完整Git-eligible knowledge tree重建，不接受caller自行宣告相等。前六步各寫一份有序`terminal/<sequence>-<step>.json` machine witness，最後的Ledger transition證明`complete_appended`。Machine ordering的`report_persisted`代表current round raw response、report宣告的每個raw output ref與schema-valid final report整組均已有可讀bytes；consumer validator以canonical run root驗證連續report chain、terminal index、capability／baseline、main command raw outputs與六個witness的精確集合，不接受phantom ref或只列部分outputs。最後transition使用[Ledger terminal index](preflight-and-ledger.md)逐一引用；任一步失敗走Reviewer契約的drift或`Blocked`分支，不先凍結run。
 
-Implementation Ledger `Complete`不等於required delivery Complete。若delivery record有`knowledge_gate.policy: required`，主代理把Ledger、accepted review、`implementation-outcome/v1`、product snapshot與knowledge Candidate binding原子交給delivery，進`knowledge/active`；完整diff展示後進`knowledge/awaiting_user`。只有使用者核准且matching `knowledge-promotion/v1` Ready receipt、actual完整knowledge post-tree等於reviewed expected post-tree與post-apply full lint通過，delivery才可`complete/complete`。Legacy record沒有overlay時維持既有terminal transition。
+Implementation Ledger `Complete`不等於required delivery Complete。若delivery record有`knowledge_gate.policy: required`，主代理把Ledger、accepted review、`implementation-outcome/v1`、product snapshot與knowledge Candidate binding原子交給delivery，進`knowledge/active`；完整Candidate先落入immutable review files並重驗，Chat只呈現summary／direct links／manifest／exact identity後才進`knowledge/awaiting_user`。只有使用者核准同一review digest且matching `knowledge-promotion/v1` Ready receipt、actual完整knowledge post-tree等於reviewed expected post-tree與post-apply full lint通過，delivery才可`complete/complete`。Legacy record沒有overlay時維持既有terminal transition。
 
 交付回報：
 

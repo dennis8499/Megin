@@ -183,14 +183,26 @@ def _verified_knowledge_snapshot(
     module = _knowledge_delivery_module()
     worktree = Path(record["generations"][-1]["canonical_worktree"])
     repo_id = module.knowledge_governance.repository_id(worktree)
+    review_summary = _verified_human_gate_review(
+        record,
+        candidate_ref=candidate_ref,
+        payload_sha256=payload_sha256,
+    )
+    identity = review_summary["identity"]
+    review_bundle = review_summary["review_bundle"]
     try:
         return module.build_knowledge_snapshot(
             str(worktree),
             sealed={
                 "schema": "knowledge-candidate-seal/v1",
                 "repo_id": repo_id,
+                "promotion_id": identity["promotion_id"],
+                "stage": identity["stage"],
+                "work_id": identity["work_id"],
                 "candidate_ref": candidate_ref,
                 "payload_sha256": payload_sha256,
+                "review_ref": review_bundle["review_ref"],
+                "review_sha256": review_bundle["review_sha256"],
                 "status": "Candidate",
             },
         )
@@ -198,6 +210,28 @@ def _verified_knowledge_snapshot(
         raise DeliveryError(
             "knowledge Candidate or canonical tree cannot reproduce the reviewed snapshot",
             code="KNOWLEDGE_SNAPSHOT_DRIFT",
+            details={"knowledge_error": exc.code},
+        ) from exc
+
+
+def _verified_human_gate_review(
+    record: dict[str, Any],
+    *,
+    candidate_ref: str,
+    payload_sha256: str,
+) -> dict[str, Any]:
+    module = _knowledge_delivery_module()
+    worktree = Path(record["generations"][-1]["canonical_worktree"])
+    try:
+        return module.validate_human_gate_review(
+            str(worktree),
+            candidate_ref=candidate_ref,
+            payload_sha256=payload_sha256,
+        )
+    except module.KnowledgeError as exc:
+        raise DeliveryError(
+            "knowledge Candidate lacks the exact immutable human Gate review",
+            code="INVALID_KNOWLEDGE_REVIEW",
             details={"knowledge_error": exc.code},
         ) from exc
 
@@ -3666,6 +3700,11 @@ def _transition_record_unlocked(
                 "knowledge Candidate cannot be presented before fresh review",
                 code="MISSING_KNOWLEDGE_GATE",
             )
+        _verified_human_gate_review(
+            record,
+            candidate_ref=str(knowledge_gate.get("candidate_ref")),
+            payload_sha256=str(knowledge_gate.get("candidate_payload_sha256")),
+        )
 
     if current_phase == "knowledge" and phase == "complete":
         if not isinstance(knowledge_gate, dict) or current_status != "awaiting_user":

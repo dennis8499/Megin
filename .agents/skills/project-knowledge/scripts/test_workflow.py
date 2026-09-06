@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -17,13 +19,19 @@ import validate_contracts as knowledge_contracts
 from knowledge_governance import canonical_sha256
 
 from test_behavior import (
+    _build_governance_fixture,
+    _build_promotion_fixture,
+    _build_retrieval_fixture,
     _exercise_bug_knowledge_mapping,
+    _exercise_human_gate_compatibility,
     _exercise_implementation_knowledge_gate,
     _exercise_planning_co_promotion,
     _exercise_requirements_co_promotion,
     _git,
     _persist_preliminary_review_fixture,
     _remove_fixture,
+    _sha256,
+    _tree_snapshot,
     _write,
 )
 
@@ -129,14 +137,48 @@ class StageHookContractTests(unittest.TestCase):
         self.assertEqual("passed", report["lint"])
         self.assertEqual(6, len(report["affected_paths"]))
 
+    def test_bug_assessment_is_unmaterialized_until_the_shared_requirements_apply(self) -> None:
+        report = _exercise_requirements_co_promotion(
+            self.fixture_root,
+            include_bug_assessment=True,
+        )
+        self.assertTrue(report["preapproval_absent"])
+        self.assertEqual("PREIMAGE_DRIFT", report["collision_code"])
+        self.assertTrue(report["collision_zero_mutation"])
+        self.assertTrue(report["assessment_materialized"])
+        self.assertEqual(2, len(report["review_targets"]))
+        self.assertEqual(3, len(report["formal_paths"]))
+        self.assertEqual("likely", report["bug_assessment_summary"]["verdict"])
+        self.assertEqual(
+            "uncertain-diagnosis",
+            report["bug_assessment_summary"]["classification_risk"],
+        )
+        self.assertNotIn(
+            "The public command returns an incorrect result.",
+            report["summary_rendered"],
+        )
+
     def test_planning_claims_stay_planned_through_the_shared_gate(self) -> None:
         report = _exercise_planning_co_promotion(self.fixture_root)
         self.assertEqual("implementation", report["next_phase"])
-        self.assertEqual(3, len(report["formal_paths"]))
+        self.assertEqual(4, len(report["formal_paths"]))
+        self.assertTrue(
+            any(path.endswith("/occurrence_map.yaml") for path in report["formal_paths"])
+        )
         self.assertTrue(report["formal_paths"][-1].endswith("/plan.md"))
         self.assertEqual(["planned"], report["evidence_classes"])
         self.assertEqual(2, report["promotion_count"])
         self.assertEqual("passed", report["lint"])
+        self.assertEqual("bulk_edit", report["occurrence_summary"]["change_mode"])
+        self.assertTrue(report["occurrence_summary"]["manual_review_required"])
+        self.assertEqual(
+            2,
+            report["occurrence_summary"]["manual_review_item_count"],
+        )
+        self.assertEqual(
+            "manual-review-required",
+            report["occurrence_summary"]["classification_risk"],
+        )
 
     def test_requirements_no_change_has_a_sealed_receipt_and_no_claim_page(self) -> None:
         import knowledge_governance
@@ -173,6 +215,7 @@ class StageHookContractTests(unittest.TestCase):
             applied = apply_candidate(
                 str(repo),
                 candidate_ref=sealed["candidate_ref"],
+                review_sha256=sealed["review_sha256"],
                 approval_actor="requirements-owner",
                 approval_evidence="conversation:no-change-approved",
             )
@@ -189,6 +232,17 @@ class StageHookContractTests(unittest.TestCase):
         self.assertTrue(report["product_snapshot_stable"])
         self.assertTrue(report["external_knowledge_rejected"])
         self.assertEqual("passed", report["lint"])
+        self.assertEqual("standard", report["outcome_summary"]["work_kind"])
+        self.assertEqual("complete", report["outcome_summary"]["result"])
+        self.assertEqual(
+            "Review the implementation Outcome and proposed observed knowledge "
+            "changes before approval.",
+            report["gate_purpose"],
+        )
+        self.assertEqual(
+            "Publish an implementation Outcome-derived knowledge revision.",
+            report["gate_change"]["description"],
+        )
 
     def test_complete_outcome_rejects_failed_or_not_run_verification(self) -> None:
         from knowledge_outcome import write_implementation_outcome
@@ -1055,13 +1109,726 @@ class StageHookContractTests(unittest.TestCase):
         )
 
 
+class HumanGateReviewTests(unittest.TestCase):
+    workspace: Path
+    fixture_root: Path
+
+    def tearDown(self) -> None:
+        _remove_fixture(self.fixture_root)
+
+    def test_bootstrap_and_lint_repair_resume_preserve_gate_summary(self) -> None:
+        import knowledge_governance
+        from knowledge_cli import main
+
+        def invoke(repo: Path, registry: Path, arguments: list[str]) -> tuple[dict[str, object], str]:
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                mock.patch.object(
+                    knowledge_governance,
+                    "default_registry_root",
+                    return_value=registry,
+                ),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = main(arguments)
+            self.assertEqual(0, exit_code, stderr.getvalue())
+            return json.loads(stdout.getvalue()), stdout.getvalue()
+
+        bootstrap_repo = _build_governance_fixture(self.fixture_root)
+        bootstrap_registry = self.fixture_root / "bootstrap-resume-registry"
+        bootstrap, bootstrap_rendered = invoke(
+            bootstrap_repo,
+            bootstrap_registry,
+            [
+                "bootstrap",
+                "--repo",
+                str(bootstrap_repo),
+                "--approval-actor",
+                "bootstrap-owner",
+                "--approval-evidence",
+                "fixture:bootstrap-resume",
+            ],
+        )
+        resumed_bootstrap, resumed_bootstrap_rendered = invoke(
+            bootstrap_repo,
+            bootstrap_registry,
+            [
+                "review",
+                "--repo",
+                str(bootstrap_repo),
+                "--candidate-ref",
+                str(bootstrap["identity"]["candidate_ref"]),
+            ],
+        )
+        self.assertEqual(bootstrap["summary"], resumed_bootstrap["summary"])
+        self.assertEqual(bootstrap_rendered, resumed_bootstrap_rendered)
+
+        repair_repo = _build_retrieval_fixture(self.fixture_root)
+        repair_registry = self.fixture_root / "repair-resume-registry"
+        _write(
+            repair_repo / "src/stale-boundary.md",
+            "Changed stale advice must not be silently trusted.\n",
+        )
+        repair, repair_rendered = invoke(
+            repair_repo,
+            repair_registry,
+            [
+                "lint",
+                "--repo",
+                str(repair_repo),
+                "--approval-actor",
+                "repair-owner",
+                "--approval-evidence",
+                "fixture:repair-resume",
+            ],
+        )
+        resumed_repair, resumed_repair_rendered = invoke(
+            repair_repo,
+            repair_registry,
+            [
+                "review",
+                "--repo",
+                str(repair_repo),
+                "--candidate-ref",
+                str(repair["identity"]["candidate_ref"]),
+            ],
+        )
+        self.assertEqual(repair["summary"], resumed_repair["summary"])
+        self.assertEqual(repair_rendered, resumed_repair_rendered)
+
+    def test_operation_review_file_target_collision_is_rejected(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import seal_candidate_draft
+        from knowledge_query import KnowledgeError
+
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "cross-role-collision-registry"
+        collision_target = "docs/knowledge/topics/cross-role-collision.md"
+        collision_content = "# Existing review source\n"
+        _write(repo / collision_target, collision_content)
+        _git(repo, "add", ".")
+        before_repo = _tree_snapshot(repo)
+        before_registry = _tree_snapshot(registry)
+
+        with mock.patch.object(
+            knowledge_governance,
+            "default_registry_root",
+            return_value=registry,
+        ):
+            for operation_path, kind in (
+                (collision_target, "update"),
+                ("docs/knowledge/topics/CROSS-ROLE-COLLISION.md", "create"),
+            ):
+                with self.subTest(operation_path=operation_path):
+                    with self.assertRaises(KnowledgeError) as collision:
+                        seal_candidate_draft(
+                            str(repo),
+                            draft={
+                                "schema": "knowledge-candidate-draft/v1",
+                                "stage": "implementation",
+                                "work_id": "work-cross-role-collision",
+                                "decision": "change",
+                                "source_snapshot": [],
+                                "review_files": [
+                                    {
+                                        "role": "supporting",
+                                        "target_path": collision_target,
+                                        "content": collision_content,
+                                    }
+                                ],
+                                "operations": [
+                                    {
+                                        "kind": kind,
+                                        "path": operation_path,
+                                        "postimage": "# Proposed replacement\n",
+                                    }
+                                ],
+                            },
+                            approval_actor="collision-owner",
+                            approval_evidence="fixture:cross-role-collision",
+                        )
+                    self.assertEqual("REVIEW_TARGET_COLLISION", collision.exception.code)
+
+        self.assertEqual(before_repo, _tree_snapshot(repo))
+        self.assertEqual(before_registry, _tree_snapshot(registry))
+
+    def test_seal_persists_complete_review_sidecar(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import seal_candidate_draft
+
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "human-gate-registry"
+        supporting_path = repo / "evidence/human-gate-context.md"
+        supporting_text = "# Human Gate context\n\nComplete supporting evidence.\n"
+        _write(supporting_path, supporting_text)
+        before = _tree_snapshot(repo)
+        with mock.patch.object(
+            knowledge_governance,
+            "default_registry_root",
+            return_value=registry,
+        ):
+            sealed = seal_candidate_draft(
+                str(repo),
+                draft={
+                    "schema": "knowledge-candidate-draft/v1",
+                    "stage": "implementation",
+                    "work_id": "work-human-gate-review",
+                    "decision": "change",
+                    "source_snapshot": [],
+                    "review_files": [
+                        {
+                            "role": "supporting",
+                            "target_path": "evidence/human-gate-context.md",
+                            "content": supporting_text,
+                        }
+                    ],
+                    "operations": [
+                        {
+                            "kind": "create",
+                            "path": "docs/knowledge/topics/human-gate-review.md",
+                            "postimage": "# Human gate review\n",
+                        }
+                    ],
+                },
+                approval_actor="review-owner",
+                approval_evidence="fixture:human-gate-review",
+            )
+
+        self.assertIn("review_sha256", sealed)
+        self.assertIn("review_ref", sealed)
+        candidate_path = (
+            registry
+            / "repos"
+            / sealed["repo_id"]
+            / Path(*sealed["candidate_ref"].removeprefix("knowledge:").split("/"))
+        )
+        review_path = candidate_path.with_name("review.json")
+        self.assertTrue(review_path.is_file())
+        review_raw = review_path.read_bytes()
+        self.assertEqual(_sha256(review_raw), sealed["review_sha256"])
+        review = json.loads(review_raw)
+        self.assertEqual("human-gate-review/v1", review["schema"])
+        self.assertEqual(sealed["candidate_ref"], review["identity"]["candidate_ref"])
+        self.assertEqual(sealed["payload_sha256"], review["identity"]["payload_sha256"])
+        self.assertEqual("passed", review["validation"]["outcome"])
+        expected_stored = {
+            "candidate.json",
+            *(
+                operation["postimage_ref"]
+                for operation in json.loads(candidate_path.read_text(encoding="utf-8"))[
+                    "operations"
+                ]
+            ),
+            *(
+                review_file["stored_path"]
+                for review_file in json.loads(
+                    candidate_path.read_text(encoding="utf-8")
+                )["review_files"]
+            ),
+        }
+        self.assertEqual(
+            expected_stored,
+            {
+                item["stored_path"]
+                for item in review["review_bundle"]["manifest"]
+            },
+        )
+        supporting_entry = next(
+            item
+            for item in review["review_bundle"]["manifest"]
+            if item["role"] == "supporting"
+        )
+        self.assertEqual("evidence/human-gate-context.md", supporting_entry["target_path"])
+        self.assertEqual(
+            supporting_text.encode("utf-8"),
+            (candidate_path.parent / supporting_entry["stored_path"]).read_bytes(),
+        )
+        self.assertEqual(before, _tree_snapshot(repo))
+
+    def test_review_sidecar_failure_publishes_no_partial_candidate(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import seal_candidate_draft
+
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "atomic-review-registry"
+        real_atomic_create = knowledge_governance._atomic_create
+
+        def fail_review(path: Path, value: bytes) -> None:
+            if path.name == "review.json":
+                raise OSError("injected review sidecar failure")
+            real_atomic_create(path, value)
+
+        with (
+            mock.patch.object(
+                knowledge_governance,
+                "default_registry_root",
+                return_value=registry,
+            ),
+            mock.patch.object(
+                knowledge_governance,
+                "_atomic_create",
+                side_effect=fail_review,
+            ),
+            self.assertRaisesRegex(OSError, "injected review sidecar failure"),
+        ):
+            seal_candidate_draft(
+                str(repo),
+                draft={
+                    "schema": "knowledge-candidate-draft/v1",
+                    "stage": "implementation",
+                    "work_id": "work-atomic-review",
+                    "decision": "change",
+                    "source_snapshot": [],
+                    "operations": [
+                        {
+                            "kind": "create",
+                            "path": "docs/knowledge/topics/atomic-review.md",
+                            "postimage": "# Atomic review\n",
+                        }
+                    ],
+                },
+                approval_actor="review-owner",
+                approval_evidence="fixture:atomic-review",
+            )
+        candidates = list(registry.glob("repos/*/candidates/*"))
+        self.assertEqual([], candidates)
+
+    def test_review_projection_is_closed_and_summary_only(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import review_candidate, seal_candidate_draft
+
+        sentinel = "FULL_PAYLOAD_SENTINEL_TEST_022_1b73d9a4"
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "summary-projection-registry"
+        with mock.patch.object(
+            knowledge_governance,
+            "default_registry_root",
+            return_value=registry,
+        ):
+            sealed = seal_candidate_draft(
+                str(repo),
+                draft={
+                    "schema": "knowledge-candidate-draft/v1",
+                    "stage": "implementation",
+                    "work_id": "work-summary-projection",
+                    "decision": "change",
+                    "source_snapshot": [],
+                    "operations": [
+                        {
+                            "kind": "create",
+                            "path": "docs/knowledge/topics/summary-projection.md",
+                            "postimage": "# Summary projection\n\n" + ("large\n" * 8_000) + sentinel,
+                        }
+                    ],
+                },
+                approval_actor="review-owner",
+                approval_evidence="fixture:summary-projection",
+            )
+            summary = review_candidate(
+                str(repo),
+                candidate_ref=sealed["candidate_ref"],
+            )
+
+        self.assertEqual("human-gate-summary/v1", summary["schema"])
+        candidate_path = (
+            registry
+            / "repos"
+            / sealed["repo_id"]
+            / Path(*sealed["candidate_ref"].removeprefix("knowledge:").split("/"))
+        )
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        self.assertEqual("gate-specific-summary/v1", candidate["review_projection"])
+        self.assertEqual(
+            {
+                "schema",
+                "gate",
+                "summary",
+                "risk_and_compatibility",
+                "validation",
+                "review_bundle",
+                "identity",
+                "prompt",
+            },
+            set(summary),
+        )
+        rendered = json.dumps(summary, ensure_ascii=False, sort_keys=True)
+        self.assertEqual(
+            "Review the standalone Knowledge Candidate and proposed observed knowledge "
+            "changes before approval.",
+            summary["summary"]["purpose"],
+        )
+        self.assertEqual(
+            {
+                "description": (
+                    "Publish the standalone Candidate's proposed observed knowledge "
+                    "revision."
+                ),
+                "operation_count": 3,
+                "create_count": 3,
+                "update_count": 0,
+                "review_file_count": 0,
+            },
+            summary["summary"]["change"],
+        )
+        self.assertEqual(
+            {
+                "bug_assessment": None,
+                "occurrence": None,
+                "implementation_outcome": None,
+            },
+            summary["risk_and_compatibility"]["material"],
+        )
+        self.assertNotIn(sentinel, rendered)
+        self.assertNotIn('"postimage":', rendered)
+        self.assertNotIn('"postimages":', rendered)
+        self.assertEqual(sealed["review_sha256"], summary["identity"]["review_sha256"])
+        for item in summary["review_bundle"]["manifest"]:
+            path = Path(item["direct_path"])
+            self.assertTrue(path.is_absolute())
+            self.assertTrue(path.is_file())
+        schema = json.loads(
+            (
+                self.workspace
+                / ".agents/skills/project-knowledge/schemas/knowledge-contracts.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        for definition_name in ("humanGateReview", "humanGateSummary"):
+            definition = schema["$defs"][definition_name]
+            self.assertIs(False, definition["additionalProperties"])
+
+    def test_yaml_occurrence_projection_counts_explicit_manual_review_entries(self) -> None:
+        from knowledge_promotion import _occurrence_projection
+
+        occurrence = (
+            "schema: occurrence-map/v1\n"
+            "change_mode: targeted_edit\n"
+            "categories:\n"
+            "  code_symbols:\n"
+            "    action: manual_review\n"
+            "  import_paths:\n"
+            "    action: do_not_change\n"
+            "exceptions:\n"
+            "  - paths: docs/example.md\n"
+            "    action: \"manual_review\"\n"
+            "  - paths: docs/other.md\n"
+            "    action: 'manual_review' # explicit classification\n"
+        )
+        for suffix in ("yaml", "yml"):
+            with self.subTest(suffix=suffix):
+                projection = _occurrence_projection(
+                    {
+                        f"docs/work/work-occurrence/plan/occurrence_map.{suffix}": (
+                            occurrence.encode("utf-8")
+                        )
+                    }
+                )
+                self.assertIsNotNone(projection)
+                self.assertEqual(3, projection["manual_review_item_count"])
+                self.assertTrue(projection["manual_review_required"])
+                self.assertEqual(
+                    "manual-review-required",
+                    projection["classification_risk"],
+                )
+
+                mutated = _occurrence_projection(
+                    {
+                        f"docs/work/work-occurrence/plan/occurrence_map.{suffix}": (
+                            occurrence.replace("manual_review", "do_not_change")
+                        ).encode("utf-8")
+                    }
+                )
+                self.assertIsNotNone(mutated)
+                self.assertEqual(0, mutated["manual_review_item_count"])
+                self.assertFalse(mutated["manual_review_required"])
+                self.assertEqual("none", mutated["classification_risk"])
+
+    def test_review_projection_revalidates_an_already_read_linked_file(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import review_candidate, seal_candidate_draft
+        from knowledge_query import KnowledgeError
+
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "review-projection-drift-registry"
+        with mock.patch.object(
+            knowledge_governance,
+            "default_registry_root",
+            return_value=registry,
+        ):
+            sealed = seal_candidate_draft(
+                str(repo),
+                draft={
+                    "schema": "knowledge-candidate-draft/v1",
+                    "stage": "implementation",
+                    "work_id": "work-review-projection-drift",
+                    "decision": "change",
+                    "source_snapshot": [],
+                    "operations": [
+                        {
+                            "kind": "create",
+                            "path": "docs/knowledge/topics/review-projection-drift.md",
+                            "postimage": "# Stable before projection\n",
+                        }
+                    ],
+                },
+                approval_actor="review-owner",
+                approval_evidence="fixture:review-projection-drift",
+            )
+            candidate_path = (
+                registry
+                / "repos"
+                / sealed["repo_id"]
+                / Path(*sealed["candidate_ref"].removeprefix("knowledge:").split("/"))
+            )
+            candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+            linked_path = candidate_path.parent / Path(
+                *candidate["operations"][0]["postimage_ref"].split("/")
+            )
+            original_read = knowledge_governance._stable_registry_read
+            injected = False
+
+            def read_then_mutate(*args: object, **kwargs: object) -> bytes:
+                nonlocal injected
+                raw = original_read(*args, **kwargs)
+                path = Path(args[1])
+                if (
+                    not injected
+                    and path == linked_path
+                    and kwargs.get("label") == "human Gate review file"
+                ):
+                    linked_path.write_bytes(raw + b"drift")
+                    injected = True
+                return raw
+
+            with mock.patch.object(
+                knowledge_governance,
+                "_stable_registry_read",
+                side_effect=read_then_mutate,
+            ):
+                with self.assertRaises(KnowledgeError) as drifted:
+                    review_candidate(str(repo), candidate_ref=sealed["candidate_ref"])
+            self.assertTrue(injected)
+            self.assertIn(
+                drifted.exception.code,
+                {"POSTIMAGE_DRIFT", "REVIEW_FILE_DRIFT", "REVIEW_MANIFEST_DRIFT"},
+            )
+
+    def test_human_gate_owner_contract_is_single_source_and_mutation_sensitive(self) -> None:
+        authority = (
+            self.workspace
+            / ".agents/skills/project-knowledge/references/human-gate-review.md"
+        )
+        self.assertTrue(authority.is_file(), "shared human Gate authority is missing")
+        self.assertEqual([], knowledge_contracts.governance_errors())
+        pointer = ".agents/skills/project-knowledge/references/human-gate-review.md"
+        owner_paths = (
+            ".agents/skills/requirements-discovery/references/delivery-protocol.md",
+            ".agents/skills/technical-planning/references/delivery-protocol.md",
+            ".agents/skills/project-knowledge/SKILL.md",
+            ".agents/skills/bug-diagnosis/SKILL.md",
+            ".agents/skills/delivery-orchestrator/references/stage-routing.md",
+            ".agents/skills/implementation-execution/references/delivery-protocol.md",
+        )
+        original_read = knowledge_contracts._read
+        for owner_path in owner_paths:
+            with self.subTest(owner=owner_path):
+                def mutated_read(relative: str, target: str = owner_path) -> str:
+                    text = original_read(relative)
+                    return text.replace(pointer, "missing-human-gate-authority", 1) if relative == target else text
+
+                with mock.patch.object(
+                    knowledge_contracts,
+                    "_read",
+                    side_effect=mutated_read,
+                ):
+                    errors = knowledge_contracts.governance_errors()
+                self.assertTrue(
+                    any("human Gate owner" in error for error in errors),
+                    (owner_path, errors),
+                )
+
+        owner_roots = (
+            ".agents/skills/requirements-discovery/",
+            ".agents/skills/technical-planning/",
+            ".agents/skills/delivery-orchestrator/",
+            ".agents/skills/bug-diagnosis/",
+            ".agents/skills/implementation-execution/",
+            ".agents/skills/project-knowledge/",
+        )
+        repository_files, inventory_errors = knowledge_contracts._eligible_repository_files()
+        self.assertEqual([], inventory_errors)
+        active_gate_paths = tuple(
+            sorted(
+                path.relative_to(self.workspace).as_posix()
+                for path in repository_files
+                if path.suffix.casefold() == ".md"
+                and path.relative_to(self.workspace).as_posix().startswith(owner_roots)
+                and not path.relative_to(self.workspace)
+                .as_posix()
+                .endswith("/scripts/behavior-evaluation-report.md")
+            )
+        )
+        self.assertTrue(active_gate_paths)
+        self.assertIn(
+            ".agents/skills/requirements-discovery/references/behavior-evaluation.md",
+            active_gate_paths,
+        )
+        self.assertIn(
+            ".agents/skills/technical-planning/references/behavior-evaluation.md",
+            active_gate_paths,
+        )
+        self.assertIn(
+            ".agents/skills/delivery-orchestrator/references/behavior-evaluation.md",
+            active_gate_paths,
+        )
+        self.assertFalse(
+            any(path.endswith("/scripts/behavior-evaluation-report.md") for path in active_gate_paths)
+        )
+
+        semantic_variants = (
+            "必須逐 byte 貼出候選內容後才可核准。",
+            "所有 artifact 內容都要在確認前呈現。",
+            "Show the entire payload before approval.",
+            "Summary-only elsewhere；Show the entire payload before approval.",
+            "Summary-only Chat: present all returned Candidate files in Chat for approval.",
+            "Summary-only Chat: paste the complete payload into Chat for approval.",
+            "Summary and direct links: show the entire payload before approval.",
+        )
+        with mock.patch.object(
+            knowledge_contracts,
+            "_eligible_repository_files",
+            return_value=(repository_files, []),
+        ):
+            for index, active_path in enumerate(active_gate_paths):
+                contradiction = semantic_variants[index % len(semantic_variants)]
+                with self.subTest(contradictory_instruction=active_path):
+                    def contradictory_read(
+                        relative: str,
+                        target: str = active_path,
+                        injected: str = contradiction,
+                    ) -> str:
+                        text = original_read(relative)
+                        return text + f"\n{injected}\n" if relative == target else text
+
+                    with mock.patch.object(
+                        knowledge_contracts,
+                        "_read",
+                        side_effect=contradictory_read,
+                    ):
+                        errors = knowledge_contracts.governance_errors()
+                    self.assertTrue(
+                        any(
+                            "contradictory human Gate presentation" in error
+                            and active_path in error
+                            for error in errors
+                        ),
+                        (active_path, contradiction, errors),
+                    )
+
+        allowed_presentation_variants = (
+            "Summary-only Chat: do not paste the complete payload into Chat for approval.",
+            "Summary and direct links: never show the entire payload before approval.",
+            "不得在 Chat 完整展示 Candidate；只提供摘要與直接連結。",
+            "封存新版完整 bundle、以摘要和直接連結呈現並重新核准。",
+        )
+        for instruction in allowed_presentation_variants:
+            with self.subTest(allowed_presentation_instruction=instruction):
+                self.assertEqual(
+                    (),
+                    knowledge_contracts.contradictory_human_gate_instruction_lines(
+                        instruction
+                    ),
+                )
+
+    def test_apply_requires_the_exact_current_review_digest(self) -> None:
+        import knowledge_governance
+        from knowledge_promotion import apply_candidate, seal_candidate_draft
+        from knowledge_query import KnowledgeError
+
+        repo = _build_promotion_fixture(self.fixture_root)
+        registry = self.fixture_root / "review-binding-registry"
+        with mock.patch.object(
+            knowledge_governance,
+            "default_registry_root",
+            return_value=registry,
+        ):
+            sealed = seal_candidate_draft(
+                str(repo),
+                draft={
+                    "schema": "knowledge-candidate-draft/v1",
+                    "stage": "implementation",
+                    "work_id": "work-review-binding",
+                    "decision": "change",
+                    "source_snapshot": [],
+                    "operations": [
+                        {
+                            "kind": "create",
+                            "path": "docs/knowledge/bootstrap/catalog.md",
+                            "postimage": "# Review binding\n",
+                        }
+                    ],
+                },
+                approval_actor="review-owner",
+                approval_evidence="fixture:review-binding",
+            )
+            before = _tree_snapshot(repo)
+            with self.assertRaises(KnowledgeError) as missing:
+                apply_candidate(
+                    str(repo),
+                    candidate_ref=sealed["candidate_ref"],
+                    approval_actor="review-owner",
+                    approval_evidence="fixture:review-binding",
+                )
+            self.assertEqual("REVIEW_BINDING_MISSING", missing.exception.code)
+            self.assertEqual(before, _tree_snapshot(repo))
+            with self.assertRaises(KnowledgeError) as drifted:
+                apply_candidate(
+                    str(repo),
+                    candidate_ref=sealed["candidate_ref"],
+                    review_sha256="0" * 64,
+                    approval_actor="review-owner",
+                    approval_evidence="fixture:review-binding",
+                )
+            self.assertEqual("REVIEW_BINDING_DRIFT", drifted.exception.code)
+            self.assertEqual(before, _tree_snapshot(repo))
+            applied = apply_candidate(
+                str(repo),
+                candidate_ref=sealed["candidate_ref"],
+                review_sha256=sealed["review_sha256"],
+                approval_actor="review-owner",
+                approval_evidence="fixture:review-binding",
+            )
+        self.assertEqual("knowledge-apply/v1", applied["schema"])
+
+    def test_legacy_pending_and_historical_ready_compatibility(self) -> None:
+        report = _exercise_human_gate_compatibility(self.fixture_root)
+        self.assertEqual("passed", report["apply_lint"])
+        self.assertEqual("knowledge-lint/v1", report["automatic_schema"])
+        self.assertTrue(report["historical_ready_preserved"])
+        self.assertTrue(report["legacy_reseal_required"])
+        self.assertTrue(report["review_drift_rejected"])
+
+
+TEST_CASES = {
+    "StageHookContractTests": StageHookContractTests,
+    "HumanGateReviewTests": HumanGateReviewTests,
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("test_names", nargs="*", choices=sorted(TEST_CASES))
     parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
     args = parser.parse_args(argv)
-    StageHookContractTests.workspace = Path.cwd().resolve()
-    StageHookContractTests.fixture_root = args.fixture_root.resolve()
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(StageHookContractTests)
+    for test_case in TEST_CASES.values():
+        test_case.workspace = Path.cwd().resolve()
+        test_case.fixture_root = args.fixture_root.resolve()
+    selected = args.test_names or list(TEST_CASES)
+    suite = unittest.TestSuite(
+        unittest.defaultTestLoader.loadTestsFromTestCase(TEST_CASES[name])
+        for name in selected
+    )
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() and not result.skipped else 1
 

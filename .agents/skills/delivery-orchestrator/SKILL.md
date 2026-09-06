@@ -8,6 +8,7 @@ description: 交付軟體變更的統一入口：建立或續接 Work ID 專用 
 # Delivery Orchestrator
 
 本 Skill 是唯一 mutating SDLC 入口，以穩定 work_id 保存 workspace identity、兩次人工核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state、phase authorization 與 routing。
+人工Gate的review surface一律遵循`.agents/skills/project-knowledge/references/human-gate-review.md`：先重驗immutable review files，Chat只輸出摘要、direct links與exact identity。
 
 ## 呼叫邊界
 
@@ -53,7 +54,7 @@ Workspace ready 後完整讀取 [階段授權](references/stage-authorization.md
 - requirements → requirements-discovery
 - planning → technical-planning
 - implementation → implementation-execution
-- knowledge → 展示 reviewed Candidate，等待獨立 knowledge promotion 核准；產品修改則回 implementation
+- knowledge → 重驗reviewed Candidate，Chat只呈現summary projection與direct links，等待獨立knowledge promotion核准；產品修改則回implementation
 
 只有 `outcome: authorized` 才 dispatch；其他結果保持零 child mutation並由本 Skill 修復或建立 context。取得授權後 Child 先持久化自身結果；orchestrator 再以一次 atomic transition 保存 refs／state。Child 不直接執行 delivery transition。
 

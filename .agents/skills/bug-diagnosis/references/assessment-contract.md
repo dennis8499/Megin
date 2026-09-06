@@ -3,6 +3,7 @@
 # `bug-assessment/v1` 契約
 
 本文件擁有 BUG ID、assessment files、schema semantics、create-only materialization 與安全邊界。Machine shape 由 [JSON Schema](assessment.schema.json)定義。
+所有涉及人工核准的呈現均遵循 `.agents/skills/project-knowledge/references/human-gate-review.md`：完整檔案先封存並提供直接連結，Chat 只輸出封閉摘要。
 
 ## Identity 與位置
 
@@ -16,13 +17,13 @@
 | Machine sidecar | `docs/bugs/<bug-id>/assessment-N.json` |
 | BUG verification | `docs/bugs/<bug-id>/verifications/<work-id>.json` |
 
-所有檔案與目錄 entry create-only。任一路徑在核准／materialize 間被占用時，整組不寫；重新配置下一個 revision 或 ID，完整展示並依既有 gate 重新綁定。
+所有檔案與目錄 entry create-only。任一路徑在核准／materialize 間被占用時，整組不寫；重新配置下一個 revision 或 ID，封存新版完整檔案 bundle、以 Summary-only Chat 提供直接連結，並依既有 gate 重新綁定。
 
 ## Read-only diagnosis 與 writer ownership
 
 `bug-diagnosis` 只在對話或 host-temp evidence 形成 Candidate，不寫 repository。
 
-- 開案：delivery／requirements writer 在第一道既有核准中一起展示 assessment Markdown、JSON sidecar 與 Requirements；核准後以同一次 transition materialize並保存兩個 hashes。
+- 開案：diagnosis以host-temp提供assessment Markdown／JSON的完整bytes、canonical paths與hashes；不得先建立`docs/bugs/**`檔案。delivery／requirements writer在第一道既有核准前，把這兩個prospective create-only postimages與Requirements一起封存為同一immutable review bundle；Chat只呈現摘要、direct links與exact identity，核准後以同一次transition materialize並保存兩個hashes。任一路徑collision或drift時整組維持零寫入。
 - 途中 current-scope／affecting：Implementation writer先保存host-temp diagnosis；需要上游改變時在 handoff 前 materialize並轉 reapproval。
 - 途中 unrelated：不得修改其產品；先以host-temp create-only全域inbox保存遮蔽refs，再於fresh review或任何terminal handoff前materialize repository assessment。
 

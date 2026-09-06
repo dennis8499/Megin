@@ -1,6 +1,7 @@
 # Requirements Discovery 行為驗證契約
 
 本文件只供維護 requirements-discovery 時使用。每案使用隔離 fixture 與 fresh evaluator；evaluator 取得 Skill、真實請求與最少 evidence，不取得預期答案或修法。
+所有案例中的人工 Gate 都繼承 `.agents/skills/project-knowledge/references/human-gate-review.md`；驗收以 immutable review files、直接連結與 Summary-only Chat 為準。
 
 ## 協定
 
@@ -43,7 +44,7 @@ Fixture 提供治理、README、既有規格、詞彙與程式碼 evidence，另
 
 分別產生未完成、無法完成、品質通過 Candidate 及明確確認 Ready；另讓建議路徑在確認後被占用。
 
-**Pass：** 四個公開狀態語義不變；Candidate 完整展示與路徑確認同輪不寫；Ready 只在明確確認後 create-only；collision 改最小後綴並重新確認。
+**Pass：** 四個公開狀態語義不變；Candidate先封存並重驗完整review files，Chat只提供摘要、直接連結與exact identity，且路徑確認同輪不寫；Ready只在明確確認同一review identity後create-only；collision改最小後綴、重新seal並重新確認。
 
 ## EVAL-REQ-007 — 文件形狀與追溯
 

@@ -1,0 +1,76 @@
+{
+  "schema": "occurrence-map/v1",
+  "change_mode": "bulk_edit",
+  "target": {
+    "term": "full Candidate, artifact, diff, or postimages embedded in Chat approval gates",
+    "replacement": "File-first review bundle plus Summary-only Chat"
+  },
+  "template_status": "project-local JSON adaptation because the current trusted planning bundle accepts only Markdown and JSON; no repository occurrence-map runtime exists at the planning baseline",
+  "categories": {
+    "code_symbols": {
+      "action": "manual_review",
+      "reason": "Preserve stable promotion and delivery symbols; add or rename only presentation-facing helpers whose behavior changes."
+    },
+    "import_paths": {
+      "action": "do_not_change",
+      "reason": "No module relocation or package rename is required."
+    },
+    "filesystem_paths": {
+      "action": "manual_review",
+      "reason": "Add the shared authority and immutable review sidecar deliberately; preserve canonical artifact and registry roots."
+    },
+    "serialized_keys": {
+      "action": "manual_review",
+      "reason": "Add a versioned human-gate review contract while preserving ready-plan/v1, delivery-run/v1, knowledge-candidate/v1, receipts, and automatic evidence schemas."
+    },
+    "cli_commands": {
+      "action": "manual_review",
+      "reason": "Change only pending-Candidate human presentation and review/apply binding; preserve query, validation, test, CI, and raw evidence behavior."
+    },
+    "user_facing_strings": {
+      "action": "rename_if_user_visible",
+      "reason": "Update active human approval instructions and prompts to File-first + Summary-only Chat; preserve historical records and automatic-gate wording."
+    },
+    "tests_fixtures": {
+      "action": "manual_review",
+      "reason": "Add large-payload and unique-sentinel cases, and revise only assertions that encode the former full-Chat contract."
+    },
+    "logs_telemetry": {
+      "action": "do_not_change",
+      "reason": "Keep delivery events, promotion logs, receipts, command raw outputs, performance signals, and CI evidence byte-compatible."
+    }
+  },
+  "exceptions": [
+    {
+      "paths": ["docs/work/**", "docs/knowledge/meta/promotions/**"],
+      "action": "do_not_change",
+      "reason": "Historical Ready artifacts and approval evidence remain immutable; the current work bundle is newly created governance output only."
+    },
+    {
+      "paths": [".agents/skills/**/scripts/behavior-evaluation-report.md"],
+      "action": "do_not_change",
+      "reason": "These are historical evaluation records, not active Gate contracts."
+    },
+    {
+      "paths": [
+        ".agents/skills/project-knowledge/references/human-gate-review.md",
+        ".agents/skills/project-knowledge/schemas/knowledge-contracts.schema.json"
+      ],
+      "action": "manual_review",
+      "reason": "These become the single prose and machine-readable authorities for the new review projection."
+    },
+    {
+      "paths": [
+        ".agents/skills/requirements-discovery/**",
+        ".agents/skills/technical-planning/**",
+        ".agents/skills/delivery-orchestrator/**",
+        ".agents/skills/bug-diagnosis/**",
+        ".agents/skills/implementation-execution/**",
+        ".agents/skills/project-knowledge/**"
+      ],
+      "action": "manual_review",
+      "reason": "Each occurrence must be classified as active human-Gate behavior, automatic Gate evidence, or historical prose before editing."
+    }
+  ],
+  "moves": []
+}

@@ -160,7 +160,15 @@ def validate_all(skill_root: Path | None = None) -> list[str]:
     for state in sorted(STATES):
         if f"- `{state}`：" not in delivery:
             errors.append(f"delivery state missing: {state}")
-    for required in ("完整 bytes", "精確建議路徑", "create-only", "唯一問題"):
+    for required in (
+        ".agents/skills/project-knowledge/references/human-gate-review.md",
+        "Human Gate bundle inventory",
+        "完整 review files",
+        "全部 direct links",
+        "Chat 無完整 artifact",
+        "create-only",
+        "唯一問題",
+    ):
         if required not in delivery:
             errors.append(f"delivery protocol missing gate: {required}")
 

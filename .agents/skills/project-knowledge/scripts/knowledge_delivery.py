@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import stat
 from pathlib import Path
 from typing import Any
@@ -147,6 +148,81 @@ def _stable_registry_read(root: Path, path: Path) -> bytes:
     return raw
 
 
+def validate_human_gate_review(
+    repo_value: str,
+    *,
+    sealed: dict[str, Any] | None = None,
+    candidate_ref: str | None = None,
+    payload_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Revalidate the immutable review and its Candidate identity at a Gate boundary."""
+
+    repo = Path(repo_value).resolve()
+    repo_id = knowledge_governance.repository_id(repo)
+    expected_review_ref: str | None = None
+    expected_review_sha256: str | None = None
+    if sealed is not None:
+        if (
+            not isinstance(sealed, dict)
+            or sealed.get("schema") != "knowledge-candidate-seal/v1"
+            or sealed.get("repo_id") != repo_id
+            or sealed.get("status") != "Candidate"
+        ):
+            raise KnowledgeError("CANDIDATE_INVALID", "sealed Candidate result is invalid", exit_code=2)
+        candidate_ref = sealed.get("candidate_ref")
+        payload_sha256 = sealed.get("payload_sha256")
+        expected_review_ref = sealed.get("review_ref")
+        expected_review_sha256 = sealed.get("review_sha256")
+        if (
+            not isinstance(expected_review_ref, str)
+            or not expected_review_ref
+            or not isinstance(expected_review_sha256, str)
+            or re.fullmatch(r"[a-f0-9]{64}", expected_review_sha256) is None
+        ):
+            raise KnowledgeError(
+                "REVIEW_BINDING_MISSING",
+                "Gate transition requires the exact persisted review reference and digest",
+                exit_code=2,
+                recoverable=True,
+            )
+    if (
+        not isinstance(candidate_ref, str)
+        or not candidate_ref
+        or not isinstance(payload_sha256, str)
+        or re.fullmatch(r"[a-f0-9]{64}", payload_sha256) is None
+    ):
+        raise KnowledgeError("CANDIDATE_INVALID", "Candidate review identity is invalid", exit_code=2)
+
+    from knowledge_promotion import review_candidate
+
+    summary = review_candidate(str(repo), candidate_ref=candidate_ref)
+    identity = summary.get("identity", {})
+    review_bundle = summary.get("review_bundle", {})
+    if (
+        identity.get("repo_id") != repo_id
+        or identity.get("candidate_ref") != candidate_ref
+        or identity.get("payload_sha256") != payload_sha256
+        or identity.get("review_sha256") != review_bundle.get("review_sha256")
+    ):
+        raise KnowledgeError(
+            "REVIEW_BINDING_DRIFT",
+            "human Gate review differs from the bound Candidate identity",
+            exit_code=3,
+            recoverable=True,
+        )
+    if sealed is not None and (
+        review_bundle.get("review_ref") != expected_review_ref
+        or review_bundle.get("review_sha256") != expected_review_sha256
+    ):
+        raise KnowledgeError(
+            "REVIEW_BINDING_DRIFT",
+            "human Gate review differs from the exact review shown for approval",
+            exit_code=3,
+            recoverable=True,
+        )
+    return summary
+
+
 def build_knowledge_snapshot(
     repo_value: str,
     *,
@@ -161,6 +237,7 @@ def build_knowledge_snapshot(
         or sealed.get("status") != "Candidate"
     ):
         raise KnowledgeError("CANDIDATE_INVALID", "sealed Candidate result is invalid", exit_code=2)
+    validate_human_gate_review(str(repo), sealed=sealed)
     candidate_ref = sealed.get("candidate_ref")
     registry_root = knowledge_governance.default_registry_root()
     candidate_path = _candidate_path(
@@ -313,6 +390,7 @@ def advance_knowledge_gate(
             raise KnowledgeError("KNOWLEDGE_GATE_INVALID", "review gate bindings are incomplete", exit_code=2)
         repo = Path(repo_value).resolve()
         _validate_outcome(repo, outcome, str(work_id))
+        validate_human_gate_review(str(repo), sealed=sealed)
         if (
             not isinstance(knowledge_snapshot_before, dict)
             or not isinstance(knowledge_snapshot_after, dict)
@@ -387,4 +465,3 @@ def advance_knowledge_gate(
         current["status"] = "complete"
         return current
     raise KnowledgeError("KNOWLEDGE_GATE_INVALID", f"unknown gate action: {action}", exit_code=2)
-

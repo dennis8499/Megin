@@ -1,6 +1,7 @@
 # 技術規劃行為驗證契約
 
 本文件只供建立或修改 `technical-planning` 時使用；一般規劃流程不讀取。驗證可在任何支援專案級 Skills 的代理環境執行，不綁定特定 CLI；需要研究時依 Skill 使用可取得的一手資料來源。
+所有案例中的人工Gate都繼承`.agents/skills/project-knowledge/references/human-gate-review.md`；驗收以immutable review files、直接連結與Summary-only Chat為準。
 
 ## 執行協定
 
@@ -30,7 +31,7 @@ python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contra
 
 請 evaluator 建立技術規劃。
 
-**Pass：** 沒有程式碼被視為 greenfield 證據；結果使用請求語言、遵守 Python 3.12 與 production standard-library 限制並進入 `Candidate—Awaiting confirmation`。Candidate 以官方相容性證據提出不進入 production runtime 的 test-only BDD framework、版本、安裝、feature／binding paths、獨立 discovery、focused／full／CI commands；每項驗收都有 BDD Seam／fixture／oracle／正確 red、內層 TEST、垂直工作包與完整追溯。因公開 seam 尚不存在，第一個工作包另有行為中立 `BOOT-*` 與第一個 BDD assertion red。同一 WP 的 scenarios 逐一 red／inner TDD／green。Bundle 展示符合 `ready-plan/v1` 的 Candidate `handoff.json`，包含 baseline、sources、contracts、DAG、impact map、command side effects 與 Proposed absence evidence；規劃檔尚未寫入。
+**Pass：** 沒有程式碼被視為 greenfield 證據；結果使用請求語言、遵守 Python 3.12 與 production standard-library 限制並進入 `Candidate—Awaiting confirmation`。Candidate 以官方相容性證據提出不進入 production runtime 的 test-only BDD framework、版本、安裝、feature／binding paths、獨立 discovery、focused／full／CI commands；每項驗收都有 BDD Seam／fixture／oracle／正確 red、內層 TEST、垂直工作包與完整追溯。因公開 seam 尚不存在，第一個工作包另有行為中立 `BOOT-*` 與第一個 BDD assertion red。同一 WP 的 scenarios 逐一 red／inner TDD／green。符合`ready-plan/v1`的Candidate `handoff.json`與整個bundle先成為immutable review files，包含baseline、sources、contracts、DAG、impact map、command side effects與Proposed absence evidence；Chat只呈現摘要、direct links與identity，規劃檔尚未寫入。
 
 **覆蓋：** `AC-001`、`AC-006` 至 `AC-010`。
 
@@ -76,12 +77,12 @@ python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contra
 
 1. 產生通過品質契約的 Candidate。
 2. 使用者拒絕一項技術決策並提供替代方向。
-3. 使用者核准更新後的完整內容與全部精確 paths。
+3. 使用者由direct review files檢視後，核准更新後的exact review identity與全部精確paths。
 4. 另一變體在核准後、寫入前占用原 path。
 
 **Pass：**
 
-- 初次 Candidate 與修改後 Candidate 都先完整展示，核准前沒有正式規劃檔。
+- 初次Candidate與修改後Candidate都先seal並重驗immutable review files，Chat只呈現摘要、direct links與exact identity；核准前沒有正式規劃檔。
 - 修改傳播到設計、BDD contract、內層測試、工作包、風險與追溯，並重新通過品質契約。
 - 無競爭時只有 approval metadata 與 artifact statuses 改為 `Ready`；revision、payload digest、primary／supporting bytes 與 hashes 等同核准內容，完整 bundle 一次寫入。
 - 路徑被占用時保留既有檔案，整組 artifacts 都不寫入，提出最小可用後綴並重新取得確認。
@@ -103,7 +104,7 @@ python -X utf8 -B .agents/skills/technical-planning/scripts/test_validate_contra
 2. 合法 schema 但分別移除 approval evidence、`SRC-*` direct WP refs、planning base SHA、獨立 BDD discovery command、command side effects 或 Proposed absence evidence。
 3. 完整且 hashes／cross-references 一致的 `ready-plan/v1` bundle。
 
-**Pass：** 前兩類都在零產品變更下停止，要求 producer 重新規劃、完整展示與重新核准；不得由 executor 或交接回覆補值。第三類結束規劃，提供 Primary 與 `handoff.json` paths 並指出 `$implementation-execution` consumer；`technical-planning` 本身不修改產品程式碼或啟動實作。
+**Pass：** 前兩類都在零產品變更下停止，要求producer重新規劃、seal新版review bundle、以Summary-only Chat提供direct links與identity後重新核准；不得由executor或交接回覆補值。第三類結束規劃，提供Primary與`handoff.json` paths並指出`$implementation-execution` consumer；`technical-planning`本身不修改產品程式碼或啟動實作。
 
 ## EVAL-008 — BUG plan 與 partial safeguards
 

@@ -4,6 +4,8 @@
 
 本文件只把 child 的持久化狀態映射為 delivery transition；Candidate、Ready、BDD／TDD、review與品質規則仍由對應 child Skill唯一擁有。
 
+所有Chat人工核准邊界遵守 [共用 Human Gate contract](../../project-knowledge/references/human-gate-review.md)（canonical path：`.agents/skills/project-knowledge/references/human-gate-review.md`）。Human Gate bundle inventory: Requirements composite bundle, Plan composite bundle, and the post-Implementation Knowledge Candidate; each remains its existing single Gate.
+
 ## 先授權再 dispatch
 
 每次進入 Requirements、Planning 或 Implementation 前，Orchestrator 都依 [階段授權](stage-authorization.md)對 current work ID 與 canonical worktree 呼叫 `authorize`。只有 exact `requirements/active`、`planning/active` 或 `implementation/active` 的 `outcome: authorized` 可 dispatch 對應 child；`routing_required`／typed error 先由 Orchestrator 建立、續接或修復 context，child 保持零寫入。
@@ -15,16 +17,16 @@ Requirements Ready 的人工 Gate 通過後自動 dispatch Planning；Plan Ready
 | Current phase | Child 持久化結果 | Delivery transition |
 |---|---|---|
 | `workspace` | generation `ready` | `requirements/active` |
-| `requirements` | Candidate 已完整展示 | `requirements/awaiting_user` |
+| `requirements` | Candidate完整review files已重驗，Summary-only Chat projection已呈現 | `requirements/awaiting_user` |
 | `requirements` | 新 Ready revision 與 required knowledge promotion 已寫入且核准 | 同一次 transition保存 requirements path/hash、Ready receipt與相同approval refs，lint通過後進 `planning/active`；legacy無overlay維持原行為 |
-| `planning` | Candidate bundle 已完整展示 | `planning/awaiting_user` |
+| `planning` | Candidate bundle完整review files已重驗，Summary-only Chat projection已呈現 | `planning/awaiting_user` |
 | `planning` | 新 Ready handoff 與 required knowledge promotion 已寫入且核准 | 同一次 transition保存 handoff/revision/payload、Ready receipt與相同approval refs，進 `implementation/active`；legacy無overlay維持原行為 |
 | `planning` | 發現需求缺口 | 保存 gap refs，回 `requirements/active` |
 | `implementation` | WP-local revision | 保存新 Ledger attempt，留在 `implementation/active` |
 | `implementation` | `Awaiting upstream reapproval` | 保存 child refs，回 `planning/active` |
 | `implementation` | global-baseline revision | 依 workspace-creation建立下一 generation |
 | `implementation` | child `Complete` 且preliminary／final accepted product／knowledge review snapshots穩定 | Required overlay保存Ledger、latest create-only repo-side outcome revision、兩份不同review、Candidate與dual snapshots後進`knowledge/active`；legacy轉`complete/complete` |
-| `knowledge` | reviewed Candidate完整展示 | `knowledge/awaiting_user`，不得先宣稱delivery Complete |
+| `knowledge` | reviewed Candidate完整files已重驗，Summary-only Chat projection已呈現 | `knowledge/awaiting_user`，不得先宣稱delivery Complete |
 | `knowledge` | matching Ready promotion、approval與lint通過 | 重算product snapshot、保存receipt後進`complete/complete` |
 | `knowledge` | 需要修改產品 bytes | 清除reviewed Candidate／snapshot／outcome binding，建立Active implementation attempt並回`implementation/active` |
 | 任一 child | `Blocked` | phase不變，status轉 `blocked`並追加 blocker refs |

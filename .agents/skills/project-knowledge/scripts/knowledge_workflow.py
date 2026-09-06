@@ -36,19 +36,37 @@ STAGE_POLICY = {
 }
 
 
-def _validate_formal_path(stage: str, work_id: str, artifact_path: str) -> str:
+def _path_has_redirect(repo: Path, relative: str) -> bool:
+    parts = Path(*relative.split("/")).parts
+    for index in range(1, len(parts) + 1):
+        cursor = repo.joinpath(*parts[:index])
+        if cursor.is_symlink() or getattr(cursor, "is_junction", lambda: False)():
+            return True
+    return False
+
+
+def _validate_formal_path(
+    stage: str,
+    work_id: str,
+    artifact_path: str,
+    *,
+    allow_bug_assessment: bool = False,
+) -> str:
     relative = normalized_path(artifact_path)
     root = f"docs/work/{work_id}"
     if stage == "requirements":
         pattern = rf"^{re.escape(root)}/requirements(?:-[2-9][0-9]*)?\.md$"
-        if re.fullmatch(pattern, relative) is None:
+        bug_pattern = r"^docs/bugs/bug-[a-z0-9]+(?:-[a-z0-9]+)*/assessment-[1-9][0-9]*\.(?:md|json)$"
+        if re.fullmatch(pattern, relative) is None and not (
+            allow_bug_assessment and re.fullmatch(bug_pattern, relative) is not None
+        ):
             raise KnowledgeError(
                 "FORMAL_PATH_INVALID",
                 "requirements artifact is outside the current Work ID revision path",
                 exit_code=2,
             )
     elif stage == "planning":
-        pattern = rf"^{re.escape(root)}/plan(?:-[2-9][0-9]*)?/[^/]+\.(?:md|json)$"
+        pattern = rf"^{re.escape(root)}/plan(?:-[2-9][0-9]*)?/[^/]+\.(?:md|json|yaml|yml)$"
         if re.fullmatch(pattern, relative) is None:
             raise KnowledgeError(
                 "FORMAL_PATH_INVALID",
@@ -150,6 +168,12 @@ def _planning_bundle_operations(
         raise KnowledgeError(
             "READY_PLAN_BUNDLE_INCOMPLETE",
             "planning requires the complete Ready-plan artifact bundle",
+            exit_code=2,
+        )
+    if not primary_path.endswith(".md"):
+        raise KnowledgeError(
+            "READY_PLAN_BUNDLE_INVALID",
+            "planning primary artifact must remain Markdown",
             exit_code=2,
         )
     postimages: dict[str, str] = {}
@@ -267,6 +291,7 @@ def build_stage_candidate_draft(
     claim_text: str,
     knowledge_decision: str = "change",
     artifact_bundle: list[dict[str, str]] | None = None,
+    bug_assessment: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build full formal + Wiki postimages for a requirements or planning gate."""
 
@@ -277,6 +302,72 @@ def build_stage_candidate_draft(
         raise KnowledgeError("STAGE_INVALID", "stage or work_id is invalid", exit_code=2)
     if knowledge_decision not in {"change", "no-change"}:
         raise KnowledgeError("DRAFT_CONTRACT_INVALID", "knowledge_decision is invalid", exit_code=2)
+    review_files: list[dict[str, str]] = []
+    bug_operations: list[dict[str, str]] = []
+    if bug_assessment is not None:
+        if stage != "requirements" or set(bug_assessment) != {
+            "path",
+            "sha256",
+            "content",
+            "markdown_path",
+            "markdown_sha256",
+            "markdown_content",
+        }:
+            raise KnowledgeError(
+                "BUG_ASSESSMENT_INVALID",
+                "BUG assessment can only join a Requirements Gate with complete bindings",
+                exit_code=2,
+            )
+        sidecar_path = normalized_path(str(bug_assessment["path"]))
+        markdown_path = normalized_path(str(bug_assessment["markdown_path"]))
+        sidecar_match = re.fullmatch(
+            r"docs/bugs/(bug-[a-z0-9]+(?:-[a-z0-9]+)*)/assessment-([1-9][0-9]*)\.json",
+            sidecar_path,
+        )
+        markdown_match = re.fullmatch(
+            r"docs/bugs/(bug-[a-z0-9]+(?:-[a-z0-9]+)*)/assessment-([1-9][0-9]*)\.md",
+            markdown_path,
+        )
+        if (
+            sidecar_match is None
+            or markdown_match is None
+            or sidecar_match.groups() != markdown_match.groups()
+        ):
+            raise KnowledgeError(
+                "BUG_ASSESSMENT_INVALID",
+                "BUG assessment Markdown and JSON paths are not one canonical revision",
+                exit_code=2,
+            )
+        sidecar_text = _normalized_text(bug_assessment["content"], "BUG assessment JSON")
+        markdown_text = _normalized_text(
+            bug_assessment["markdown_content"],
+            "BUG assessment Markdown",
+        )
+        sidecar_bytes = sidecar_text.encode("utf-8")
+        markdown_bytes = markdown_text.encode("utf-8")
+        if (
+            sha256_bytes(sidecar_bytes) != bug_assessment["sha256"]
+            or sha256_bytes(markdown_bytes) != bug_assessment["markdown_sha256"]
+        ):
+            raise KnowledgeError(
+                "BUG_ASSESSMENT_DRIFT",
+                "BUG assessment Candidate bytes differ from their supplied hashes",
+                exit_code=3,
+            )
+        from knowledge_promotion import _validated_bug_assessment_pair
+
+        _validated_bug_assessment_pair(
+            sidecar_path=sidecar_path,
+            sidecar_bytes=sidecar_bytes,
+            markdown_path=markdown_path,
+            markdown_bytes=markdown_bytes,
+            repository_root=repo,
+            require_create_only=True,
+        )
+        bug_operations = [
+            _operation(repo, markdown_path, markdown_text, create_only=True),
+            _operation(repo, sidecar_path, sidecar_text, create_only=True),
+        ]
     normalized_artifact = _normalized_text(artifact_text, "artifact_text")
     if knowledge_decision == "change" and not all(
         isinstance(value, str) and value.strip() for value in (title, claim_text)
@@ -300,6 +391,7 @@ def build_stage_candidate_draft(
             )
         formal_operations = [
             _operation(repo, formal_path, normalized_artifact, create_only=True),
+            *bug_operations,
         ]
     if knowledge_decision == "no-change":
         return {
@@ -308,6 +400,7 @@ def build_stage_candidate_draft(
             "work_id": work_id,
             "decision": "no-change",
             "source_snapshot": [],
+            "review_files": review_files,
             "operations": formal_operations,
         }
     lines = normalized_artifact.splitlines()
@@ -366,6 +459,7 @@ def build_stage_candidate_draft(
         "work_id": work_id,
         "decision": "change",
         "source_snapshot": [],
+        "review_files": review_files,
         "operations": [
             *formal_operations,
             _operation(repo, content_path, content),
@@ -451,14 +545,51 @@ def validate_stage_promotion(
             exit_code=3,
         )
     for formal_path in formal_paths:
-        _validate_formal_path(stage, work_id, formal_path)
+        _validate_formal_path(
+            stage,
+            work_id,
+            formal_path,
+            allow_bug_assessment=True,
+        )
     if stage == "requirements":
-        if len(formal_paths) != 1:
+        requirement_paths = [
+            value
+            for value in formal_paths
+            if re.fullmatch(
+                rf"docs/work/{re.escape(work_id)}/requirements(?:-[2-9][0-9]*)?\.md",
+                value,
+            )
+        ]
+        assessment_paths = [value for value in formal_paths if value not in requirement_paths]
+        if len(requirement_paths) != 1 or len(assessment_paths) not in {0, 2}:
             raise KnowledgeError(
                 "MISSING_KNOWLEDGE_GATE",
-                "requirements promotion must bind exactly one current Work ID revision",
+                "requirements promotion must bind one current Work ID revision and an optional BUG assessment pair",
                 exit_code=3,
             )
+        if assessment_paths:
+            by_suffix = {Path(value).suffix: value for value in assessment_paths}
+            if set(by_suffix) != {".md", ".json"}:
+                raise KnowledgeError(
+                    "MISSING_KNOWLEDGE_GATE",
+                    "requirements promotion BUG assessment manifest is incomplete",
+                    exit_code=3,
+                )
+            try:
+                from knowledge_promotion import _validated_bug_assessment_pair
+
+                _validated_bug_assessment_pair(
+                    sidecar_path=by_suffix[".json"],
+                    sidecar_bytes=(repo / Path(*by_suffix[".json"].split("/"))).read_bytes(),
+                    markdown_path=by_suffix[".md"],
+                    markdown_bytes=(repo / Path(*by_suffix[".md"].split("/"))).read_bytes(),
+                )
+            except (OSError, KnowledgeError) as exc:
+                raise KnowledgeError(
+                    "MISSING_KNOWLEDGE_GATE",
+                    "requirements promotion BUG assessment bytes are missing or invalid",
+                    exit_code=3,
+                ) from exc
     else:
         handoff_paths = [path for path in formal_paths if path.endswith("/handoff.json")]
         if len(handoff_paths) != 1 or _trusted_ready_plan_paths(repo, handoff_paths[0]) != set(

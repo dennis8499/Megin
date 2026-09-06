@@ -6,6 +6,8 @@
     {"$ref": "#/$defs/page"},
     {"$ref": "#/$defs/context"},
     {"$ref": "#/$defs/candidate"},
+    {"$ref": "#/$defs/humanGateReview"},
+    {"$ref": "#/$defs/humanGateSummary"},
     {"$ref": "#/$defs/promotion"},
     {"$ref": "#/$defs/applyResult"},
     {"$ref": "#/$defs/lint"},
@@ -146,6 +148,18 @@
         "postimage_ref": {"type": "string", "minLength": 1}
       }
     },
+    "reviewFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "target_path", "stored_path", "sha256", "byte_count"],
+      "properties": {
+        "role": {"enum": ["supporting", "automatic"]},
+        "target_path": {"$ref": "#/$defs/normalizedPath"},
+        "stored_path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "byte_count": {"type": "integer", "minimum": 0}
+      }
+    },
     "fileHash": {
       "type": "object",
       "additionalProperties": false,
@@ -180,6 +194,7 @@
         "approval",
         "source_snapshot",
         "operations",
+        "review_files",
         "payload_sha256",
         "status"
       ],
@@ -189,6 +204,7 @@
         "stage": {"type": "string", "minLength": 1},
         "work_id": {"type": "string", "minLength": 1},
         "decision": {"enum": ["change", "no-change"]},
+        "review_projection": {"const": "gate-specific-summary/v1"},
         "approval": {
           "type": "object",
           "additionalProperties": false,
@@ -199,9 +215,369 @@
           }
         },
         "source_snapshot": {"type": "array", "items": {"$ref": "#/$defs/sourceRef"}},
+        "classification": {"$ref": "#/$defs/humanGateClassification"},
         "operations": {"type": "array", "items": {"$ref": "#/$defs/operation"}},
+        "review_files": {"type": "array", "items": {"$ref": "#/$defs/reviewFile"}},
         "payload_sha256": {"$ref": "#/$defs/sha256"},
         "status": {"const": "Candidate"}
+      }
+    },
+    "humanGateManifestEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "target_path", "stored_path", "sha256", "byte_count"],
+      "properties": {
+        "role": {"enum": ["candidate", "postimage", "supporting", "automatic"]},
+        "target_path": {"type": "string", "minLength": 1},
+        "stored_path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "byte_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "humanGateSummaryManifestEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "target_path", "stored_path", "sha256", "byte_count", "direct_path"],
+      "properties": {
+        "role": {"enum": ["candidate", "postimage", "supporting", "automatic"]},
+        "target_path": {"type": "string", "minLength": 1},
+        "stored_path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "byte_count": {"type": "integer", "minimum": 0},
+        "direct_path": {"type": "string", "minLength": 1}
+      }
+    },
+    "humanGateApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor", "evidence"],
+      "properties": {
+        "actor": {"type": "string", "minLength": 1},
+        "evidence": {"type": "string", "minLength": 1}
+      }
+    },
+    "humanGateClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminal", "candidate", "conflict", "unknown"],
+      "properties": {
+        "terminal": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/normalizedPath"}},
+        "candidate": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/normalizedPath"}},
+        "conflict": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/normalizedPath"}},
+        "unknown": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/normalizedPath"}}
+      }
+    },
+    "humanGateLintProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "diagnostic_count", "diagnostic_codes"],
+      "properties": {
+        "outcome": {"enum": ["passed", "failed", "decision_required"]},
+        "diagnostic_count": {"type": "integer", "minimum": 0},
+        "diagnostic_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "humanGateChangeProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "operation_count",
+        "create_count",
+        "update_count",
+        "review_file_count"
+      ],
+      "properties": {
+        "description": {"type": "string", "minLength": 1},
+        "operation_count": {"type": "integer", "minimum": 1},
+        "create_count": {"type": "integer", "minimum": 0},
+        "update_count": {"type": "integer", "minimum": 0},
+        "review_file_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "humanGateBugAssessmentProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "severity",
+        "source_relation",
+        "reproduction_status",
+        "root_cause_status",
+        "disposition",
+        "security_privacy_or_data_risk",
+        "classification_risk"
+      ],
+      "properties": {
+        "verdict": {"enum": ["confirmed", "likely", "not-a-bug", "insufficient-evidence"]},
+        "severity": {"enum": ["critical", "high", "medium", "low"]},
+        "source_relation": {"enum": ["intake", "current-scope", "affecting-current-work", "unrelated"]},
+        "reproduction_status": {"enum": ["reproduced", "intermittent", "not-reproduced", "not-attempted"]},
+        "root_cause_status": {"enum": ["confirmed", "hypothesized", "unknown"]},
+        "disposition": {
+          "enum": [
+            "delivery",
+            "standard-feature",
+            "closed",
+            "current-run",
+            "upstream-reapproval",
+            "deferred-inbox",
+            "blocked"
+          ]
+        },
+        "security_privacy_or_data_risk": {"type": "boolean"},
+        "classification_risk": {
+          "enum": ["none", "uncertain-diagnosis", "high-impact", "security-review-required"]
+        }
+      }
+    },
+    "humanGateOccurrenceProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "change_mode",
+        "manual_review_required",
+        "manual_review_item_count",
+        "classification_risk"
+      ],
+      "properties": {
+        "change_mode": {"enum": ["bulk_edit", "targeted_edit", "single_edit", "unknown"]},
+        "manual_review_required": {"type": "boolean"},
+        "manual_review_item_count": {"type": "integer", "minimum": 0},
+        "classification_risk": {"enum": ["none", "manual-review-required", "unknown"]}
+      }
+    },
+    "humanGateImplementationOutcomeProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_kind",
+        "result",
+        "knowledge_decision",
+        "changed_path_count",
+        "known_deviation_count",
+        "residual_risk_count",
+        "follow_up_count"
+      ],
+      "properties": {
+        "work_kind": {"enum": ["standard", "bug"]},
+        "result": {"enum": ["complete", "verified", "partial", "failed"]},
+        "knowledge_decision": {"enum": ["change", "no-change"]},
+        "changed_path_count": {"type": "integer", "minimum": 1},
+        "known_deviation_count": {"type": "integer", "minimum": 0},
+        "residual_risk_count": {"type": "integer", "minimum": 0},
+        "follow_up_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "humanGateMaterialRiskProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bug_assessment", "occurrence", "implementation_outcome"],
+      "properties": {
+        "bug_assessment": {
+          "oneOf": [
+            {"$ref": "#/$defs/humanGateBugAssessmentProjection"},
+            {"type": "null"}
+          ]
+        },
+        "occurrence": {
+          "oneOf": [
+            {"$ref": "#/$defs/humanGateOccurrenceProjection"},
+            {"type": "null"}
+          ]
+        },
+        "implementation_outcome": {
+          "oneOf": [
+            {"$ref": "#/$defs/humanGateImplementationOutcomeProjection"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "humanGateAutomaticEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "outcome", "stored_path", "sha256"],
+      "properties": {
+        "schema": {"const": "knowledge-lint/v1"},
+        "outcome": {"enum": ["passed", "failed", "decision_required"]},
+        "stored_path": {"$ref": "#/$defs/normalizedPath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "humanGateReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "gate",
+        "summary",
+        "risk_and_compatibility",
+        "validation",
+        "review_bundle",
+        "identity",
+        "prompt"
+      ],
+      "properties": {
+        "schema": {"const": "human-gate-review/v1"},
+        "gate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "status"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "status": {"const": "Candidate"}
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["purpose", "decision", "affected_path_count", "affected_paths"],
+          "properties": {
+            "purpose": {"type": "string", "minLength": 1},
+            "decision": {"enum": ["change", "no-change"]},
+            "affected_path_count": {"type": "integer", "minimum": 1},
+            "affected_paths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/normalizedPath"}
+            },
+            "classification": {"$ref": "#/$defs/humanGateClassification"},
+            "lint": {"$ref": "#/$defs/humanGateLintProjection"},
+            "change": {"$ref": "#/$defs/humanGateChangeProjection"}
+          }
+        },
+        "risk_and_compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["approval_scope", "automatic_gates", "history"],
+          "properties": {
+            "approval_scope": {"type": "string", "minLength": 1},
+            "automatic_gates": {"type": "string", "minLength": 1},
+            "history": {"type": "string", "minLength": 1},
+            "material": {"$ref": "#/$defs/humanGateMaterialRiskProjection"}
+          }
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "checks", "automatic_evidence"],
+          "properties": {
+            "outcome": {"const": "passed"},
+            "checks": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"type": "string", "minLength": 1}
+            },
+            "automatic_evidence": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/humanGateAutomaticEvidence"}
+            }
+          }
+        },
+        "review_bundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["review_ref", "manifest"],
+          "properties": {
+            "review_ref": {"type": "string", "minLength": 1},
+            "manifest": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/humanGateManifestEntry"}
+            }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repo_id",
+            "promotion_id",
+            "stage",
+            "work_id",
+            "candidate_ref",
+            "payload_sha256",
+            "prospective_approval"
+          ],
+          "properties": {
+            "repo_id": {"$ref": "#/$defs/sha256"},
+            "promotion_id": {"type": "string", "minLength": 1},
+            "stage": {"type": "string", "minLength": 1},
+            "work_id": {"type": "string", "minLength": 1},
+            "candidate_ref": {"type": "string", "minLength": 1},
+            "payload_sha256": {"$ref": "#/$defs/sha256"},
+            "prospective_approval": {"$ref": "#/$defs/humanGateApproval"}
+          }
+        },
+        "prompt": {"const": "Approve this exact review bundle or request modifications."}
+      }
+    },
+    "humanGateSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "gate",
+        "summary",
+        "risk_and_compatibility",
+        "validation",
+        "review_bundle",
+        "identity",
+        "prompt"
+      ],
+      "properties": {
+        "schema": {"const": "human-gate-summary/v1"},
+        "gate": {"$ref": "#/$defs/humanGateReview/properties/gate"},
+        "summary": {"$ref": "#/$defs/humanGateReview/properties/summary"},
+        "risk_and_compatibility": {"$ref": "#/$defs/humanGateReview/properties/risk_and_compatibility"},
+        "validation": {"$ref": "#/$defs/humanGateReview/properties/validation"},
+        "review_bundle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["review_ref", "review_sha256", "direct_path", "manifest"],
+          "properties": {
+            "review_ref": {"type": "string", "minLength": 1},
+            "review_sha256": {"$ref": "#/$defs/sha256"},
+            "direct_path": {"type": "string", "minLength": 1},
+            "manifest": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/humanGateSummaryManifestEntry"}
+            }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repo_id",
+            "promotion_id",
+            "stage",
+            "work_id",
+            "candidate_ref",
+            "payload_sha256",
+            "review_sha256",
+            "prospective_approval"
+          ],
+          "properties": {
+            "repo_id": {"$ref": "#/$defs/sha256"},
+            "promotion_id": {"type": "string", "minLength": 1},
+            "stage": {"type": "string", "minLength": 1},
+            "work_id": {"type": "string", "minLength": 1},
+            "candidate_ref": {"type": "string", "minLength": 1},
+            "payload_sha256": {"$ref": "#/$defs/sha256"},
+            "review_sha256": {"$ref": "#/$defs/sha256"},
+            "prospective_approval": {"$ref": "#/$defs/humanGateApproval"}
+          }
+        },
+        "prompt": {"const": "Approve this exact review bundle or request modifications."}
       }
     },
     "promotion": {
@@ -318,5 +694,3 @@
     }
   }
 }
-
-

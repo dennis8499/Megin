@@ -787,7 +787,7 @@ def _validate_structural_pointers(skills_root: Path, errors: list[str]) -> None:
             "outcome: authorized",
             "planning/active",
             "routing_required",
-            "第一次寫入或展示 Candidate 前",
+            "第一次寫入或seal Candidate前",
             "維持零 Plan／Knowledge Candidate 寫入",
             "Plan-only 解說、研究、審查、治理驗證與隔離測試",
         ],

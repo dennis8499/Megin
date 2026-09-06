@@ -7,6 +7,8 @@ description: 規劃由 Delivery Orchestrator 路由的已釐清開發規格，�
 
 # 技術規劃
 
+所有人工 Gate 一律遵循 `.agents/skills/project-knowledge/references/human-gate-review.md` 的 File-first／Summary-only Chat 契約。
+
 把來源規格的 `WHAT` 與可引用的專案、治理及一手平台證據轉成可執行的 `HOW`。本入口是來源選擇、證據門檻、未知分類及 Candidate 路由的唯一權威。
 
 ## 邊界
@@ -19,7 +21,7 @@ description: 規劃由 Delivery Orchestrator 路由的已釐清開發規格，�
 
 ## 0. 驗證 routed context
 
-完整讀取 `.agents/skills/delivery-orchestrator/references/stage-authorization.md`。這次工作一旦會形成或保存 Candidate、Plan、handoff、knowledge draft 或其他 repository／host-temp／外部狀態，必須在第一次寫入或展示 Candidate 前執行：
+完整讀取 `.agents/skills/delivery-orchestrator/references/stage-authorization.md`。這次工作一旦會形成或保存 Candidate、Plan、handoff、knowledge draft 或其他 repository／host-temp／外部狀態，必須在第一次寫入或seal Candidate前執行：
 
 `python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspace.py authorize --repo . --phase planning [--work-id <work-id>]`
 
@@ -82,6 +84,6 @@ Bug Candidate另包含唯一`kind: bug` source、`purpose: bug-reproduction` com
 
 讀取[品質契約](references/quality-contract.md)，逐項二元檢查。失敗項回到擁有該規則的階段；必要證據或決策不可得時走 `Blocked`。
 
-全部通過後讀取[交付協定](references/delivery-protocol.md)。該文件是 Candidate 展示、核准、安全寫入及交付狀態的唯一權威；依它在同一回合完成精確 artifact bytes、revision、hashes、digest 與 `handoff.json` 的序列化及完整展示。設計摘要不是終止狀態；命令全為有證據的 `Proposed` 也不妨礙形成 Candidate。本回合只能停在 `Blocked`、等待單一決策、`Candidate—Awaiting confirmation` 或已寫入的 `Ready`。
+全部通過後讀取[交付協定](references/delivery-protocol.md)。該文件是 Candidate 呈現、核准、安全寫入及交付狀態的唯一權威；依它在同一回合完成精確 artifact bytes、revision、hashes、digest 與 `handoff.json` 的序列化，將完整內容放入 immutable bundle 並在 Chat 只提供摘要與直接連結。設計摘要不是終止狀態；命令全為有證據的 `Proposed` 也不妨礙形成 Candidate。本回合只能停在 `Blocked`、等待單一決策、`Candidate—Awaiting confirmation` 或已寫入的 `Ready`。
 
 維護本 Skill 時才讀取[行為驗證契約](references/behavior-evaluation.md)，執行其開發期檢查器與全部案例；一般規劃不載入該文件。

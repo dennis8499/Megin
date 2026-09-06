@@ -25,6 +25,7 @@ description: 探索由 Delivery Orchestrator 路由且仍待釐清的產品或�
 - 分析只描述 WHY、WHAT、WHO、WHEN 與可觀察驗收；外部強制限制可成為需求，純 HOW 交給技術規劃。
 - Bug run把已核准assessment視為唯讀diagnosis evidence；本文件仍是observed／expected、影響、範圍與驗收的唯一WHAT權威。
 - 使用者回答只確認當輪決策。Candidate 展示、路徑確認與寫入授權由交付協定管理。
+- 人工 Gate 一律遵循 `.agents/skills/project-knowledge/references/human-gate-review.md` 的 File-first／Summary-only Chat 契約。
 - 每份文件涵蓋一個可獨立規劃、驗收或發布的成果。
 - 使用者主要語言用於訪談與成文；穩定識別碼保持 ASCII。
 
@@ -100,7 +101,7 @@ Frontier 與 downstream 未知均為空，且沒有矛盾或未定義關鍵詞�
 
 當品質通過、使用者要求提前停止／目前成果／開始實作時，完整讀取 [交付協定](references/delivery-protocol.md)，只執行符合目前狀態的分支。只有需要產生文件時才載入 [文件模板](references/requirements-analysis-template.md)。
 
-完成條件：狀態、完整展示、建議路徑、寫入與 handoff 全部符合交付協定；本 Skill 沒有產品程式碼寫入。
+完成條件：狀態、immutable 完整檔案與直接連結、Summary-only Chat、建議路徑、寫入與 handoff 全部符合交付協定；本 Skill 沒有產品程式碼寫入。
 
 ## 維護本 Skill
 

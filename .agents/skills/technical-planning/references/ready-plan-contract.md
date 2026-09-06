@@ -3,6 +3,7 @@
 # `ready-plan/v1` 交接契約
 
 本文件是 Technical Planning producer 與 Implementation Execution consumer 之間的唯一 handoff 權威。[JSON Schema](ready-plan.schema.json)定義可機器檢查的形狀；本文件定義欄位語義、生命週期與跨欄位不變量。
+人工 Plan Gate 的檔案與 Chat 呈現遵循 `.agents/skills/project-knowledge/references/human-gate-review.md`；本文件只定義 plan bundle 與核准身分。
 
 ## Bundle 與版本
 
@@ -12,7 +13,7 @@
 - 零至多份因維護者、驗證方式或生命週期不同而拆出的 `role: supporting` artifacts。
 - 一份固定名為 `handoff.json`、`role: handoff` 的 artifact。
 
-`handoff.json.schema` 固定為 `ready-plan/v1`。consumer 只接受明確支援的版本；無版本、版本不支援或缺少 handoff 的舊計畫，唯一交接路由是重新規劃、完整展示與重新核准。
+`handoff.json.schema` 固定為 `ready-plan/v1`。consumer 只接受明確支援的版本；無版本、版本不支援或缺少 handoff 的舊計畫，唯一交接路由是重新規劃、封存新版完整 bundle、以摘要和直接連結呈現並重新核准。
 
 Artifact 只使用兩個正交欄位：
 
@@ -23,7 +24,7 @@ Artifact 只使用兩個正交欄位：
 
 ## Candidate 與核准身分
 
-`candidate.revision` 是每次完整展示都更新的不透明 revision。`candidate.payload_sha256` 綁定使用者看過的全部 handoff 語義與 primary／supporting hashes，且可在 Ready metadata 更新後重現。計算方式是深拷貝完整 handoff object，移除 `candidate.payload_sha256`，將 `approval` 正規化為 Candidate 的 `status` 與三個 `null` 身分欄位，並將所有 `artifacts[].approval_status` 正規化為 `Candidate`；再以 UTF-8、排序 object keys、無多餘空白、已正規化為 `/` 的 paths 且保留 handoff array 順序做 SHA-256。任何 source、contract、command、DAG、impact 或 artifact path／role／hash 改變都會改變 digest。
+`candidate.revision` 是每次封存新版 File-first review bundle 都更新的不透明 revision。`candidate.payload_sha256` 綁定使用者可由直接連結檢視的全部 handoff 語義與 primary／supporting hashes，且可在 Ready metadata 更新後重現。計算方式是深拷貝完整 handoff object，移除 `candidate.payload_sha256`，將 `approval` 正規化為 Candidate 的 `status` 與三個 `null` 身分欄位，並將所有 `artifacts[].approval_status` 正規化為 `Candidate`；再以 UTF-8、排序 object keys、無多餘空白、已正規化為 `/` 的 paths 且保留 handoff array 順序做 SHA-256。任何 source、contract、command、DAG、impact 或 artifact path／role／hash 改變都會改變 digest。
 
 `handoff.json` 的 manifest self hash 固定為 `null`，避免遞迴；consumer 直接雜湊實際 handoff bytes，另用上述正規化重算 approval payload digest。
 
@@ -32,7 +33,7 @@ Candidate 的 `approval.status` 與所有 artifact `approval_status` 均為 `Can
 1. 將 `approval.status` 與全部 artifact `approval_status` 改為 `Ready`。
 2. 寫入 `approval.actor`、RFC 3339 `confirmed_at` 與能定位原始核准回覆的 `evidence`。
 
-Primary／supporting bytes、revision、payload digest、paths 與其 hashes 保持等同使用者看過的 Candidate。任何其他變更都建立新 revision、重算 digest、重新展示並重新核准。
+Primary／supporting bytes、revision、payload digest、paths 與其 hashes 保持等同使用者由direct review files檢視的Candidate。任何其他變更都建立新revision、重算digest、重新seal review bundle，以Summary-only Chat提供新direct links與identity後重新核准。
 
 ## Planning baseline 與 artifacts
 

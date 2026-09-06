@@ -631,6 +631,7 @@ class DeliveryTransitionTests(DeliveryFixture):
         applied = apply_candidate(
             str(delivery),
             candidate_ref=candidate_ref,
+            review_sha256=sealed["review_sha256"],
             approval_actor="knowledge-owner",
             approval_evidence="conversation:knowledge-promotion-approved",
         )

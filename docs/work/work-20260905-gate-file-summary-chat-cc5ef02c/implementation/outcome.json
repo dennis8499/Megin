@@ -1,0 +1,218 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/bug-diagnosis/SKILL.md",
+      "sha256": "c34310dbd005dac67b27d2a91e6d5a9037c8dd06a8f9eac898e2229635593170",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/bug-diagnosis/references/assessment-contract.md",
+      "sha256": "550a48383a2a0ea0a33a62930e5086e41115c4a4f499f5aec177fe3324be871c",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/SKILL.md",
+      "sha256": "fc9281cd9449e9f07f199a1759905f35547bf44a80742ac6c3fbbe6e239f0bef",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/behavior-evaluation.md",
+      "sha256": "4ffa92454c14047207c6966f30d8b4ee024b897e2d8ea1e83d62135593cf5f48",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/stage-routing.md",
+      "sha256": "e280edf4fbacfabcc1d529ba48c0a6a2622aa17f275991bf7dce086db69d7481",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/references/workspace-and-run.md",
+      "sha256": "1c82197bfd5be28bec9f59fab429ff67604f8fd141ef3cf0c7b466bcbfb4b5b9",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "sha256": "4c91dd7762d4fb3be1359531c16d997ac4b833e220867582bbb0f8cf120c8a13",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py",
+      "sha256": "092341365bef318fa15bfdc2d862d67594a244b4f45700cf336176d20c776998",
+      "summary": "Added mutation-sensitive contract, compatibility, and atomicity coverage."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/delivery-protocol.md",
+      "sha256": "2b27393e6622376e713279c15f3be48d9660b237506155e88aef036700d03507",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/SKILL.md",
+      "sha256": "23e7490978ed26188fbcd80c4e9f7b898fe4e4f8ea92f9a5a20008a1503a0965",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/references/human-gate-review.md",
+      "sha256": "a45a3cae3d4fc20856a38486e371daf1806be5bc31a41956721654f6327ce6a0",
+      "summary": "Added the shared File-first and Summary-only Chat authority."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/schemas/knowledge-contracts.schema.json",
+      "sha256": "da2bd2641241e2d7b8fcbef2984eb059184c092f3b63602e14561158b197ead5",
+      "summary": "Defined closed review-bundle and Summary-only Chat schemas."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_cli.py",
+      "sha256": "562c5cbc0df19c0c7d002cf9b1ae0f8d2f40d793af386d87d325ea62f8e614fb",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_delivery.py",
+      "sha256": "0e00705afea7c988b162ce97692458d9d831baa889ecbcb91c4789d33e5e7015",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_governance.py",
+      "sha256": "dd1763efb7679f6759ef6dc37107c301d65176ccd97b1e44294df7eea0cf0a5e",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_outcome.py",
+      "sha256": "f860d944ad12294320be82bb5e31534816cd9bf1865b221465a3592bfa20f47a",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_promotion.py",
+      "sha256": "4d3648248a0dd11ebd6e5e70d8bf63e0c5a5ca4b5db93fef39777161a126a3aa",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_workflow.py",
+      "sha256": "407d0ab22c5c33b5197db5088e37511ea62bd1d8279fd5d40584c9344125b965",
+      "summary": "Implemented immutable review bundles, exact identity binding, and atomic approved apply."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_behavior.py",
+      "sha256": "19f9944d2f2137960a760ea5ed8119b14685e4807484bb1071e71ceef53e0eb1",
+      "summary": "Added mutation-sensitive contract, compatibility, and atomicity coverage."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_governance.py",
+      "sha256": "f405c84e9ce95ea9c3fb736d4dcddd872077c18eb5012bb4d0f0b28540eea66a",
+      "summary": "Added mutation-sensitive contract, compatibility, and atomicity coverage."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_workflow.py",
+      "sha256": "f48e6a674d5444c43c49e3816ca9b6de68bf4bab95bf1d34fe28939dd31250f5",
+      "summary": "Added mutation-sensitive contract, compatibility, and atomicity coverage."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/validate_contracts.py",
+      "sha256": "6c8a661c4fc0dce8760ee198d880c8962e7b34ab220a9256aed19e38219f6d91",
+      "summary": "Enforced owner-wide File-first Gate semantics and contradiction scanning."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/SKILL.md",
+      "sha256": "33fc51d2f0f0344c5e8f595f8cb28e4b4f68abd80928448f1ecb5524db70d2fb",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/references/behavior-evaluation.md",
+      "sha256": "9cd6aa5a6ef78318068f85f171219128cd8b1d65a624b2081a705120f4aea93d",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/references/delivery-protocol.md",
+      "sha256": "ab2dd0e9b7272dfc4235ed8b174a6b3aecdafe256d373be2491b8548eed3b47e",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/requirements-discovery/scripts/validate_contracts.py",
+      "sha256": "c890db9bd582c2d45d7849cedadd7e736f712bfb7d9ad603f02f027ae87feaa1",
+      "summary": "Enforced owner-wide File-first Gate semantics and contradiction scanning."
+    },
+    {
+      "path": ".agents/skills/technical-planning/SKILL.md",
+      "sha256": "ec4eb4392f7b85e48932933b9053ab725b4228c2a05e019a8373204c0abd566f",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/behavior-evaluation.md",
+      "sha256": "680eabc3ae2b01bdc696c009d7b691bd62ed3c231bd4dbe41d2e5efe78924981",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/delivery-protocol.md",
+      "sha256": "ee60d6b2d17f805f70adaf35743efbccc331810b3a1a0dc963467adeca4c9c56",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/ready-plan-contract.md",
+      "sha256": "92f356f2f842ad628644aa8bb93c6e8dbef68eb9128545a328d27972c0415cc2",
+      "summary": "Aligned this Gate owner with the shared File-first and Summary-only Chat contract."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+      "sha256": "0f3caeaa64d19a71962b920da1aef3c1b498e9c0488cdd519c512fa12646cf4a",
+      "summary": "Added mutation-sensitive contract, compatibility, and atomicity coverage."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/validate_contracts.py",
+      "sha256": "649c08a67ced3622d354d2768303699509313648f726196893d0df25915b0476",
+      "summary": "Enforced owner-wide File-first Gate semantics and contradiction scanning."
+    }
+  ],
+  "created_at": "2026-09-05T20:27:20+08:00",
+  "implementation_run_id": "a1c8990351e77fffc4c01b17d2f596f20dd018746aebd33f4834de12c7fc9aff",
+  "knowledge_decision": "change",
+  "known_deviations": [],
+  "markdown": {
+    "path": "docs/work/work-20260905-gate-file-summary-chat-cc5ef02c/implementation/outcome.md",
+    "sha256": "9609d54f692f12dfd41579305198089c71ed2d300c97f368f1a92329b10e7e41"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-a1c89903-r4"
+    ],
+    "report_ref": "reviews/round-4/report.json",
+    "report_sha256": "8a44ab2f1abcd3713de2f790dd1b41bb13c007c38b2f5bf67bf324a444bdee63",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "Every governed Gate now uses immutable File-first review bundles and Summary-only Chat approval prompts.",
+  "verification": [
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-4/outputs/cmd-build-full-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/round-4/outputs/cmd-test-full-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-4/outputs/cmd-bdd-full-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "reviews/round-4/outputs/cmd-governance-001.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260905-gate-file-summary-chat-cc5ef02c",
+  "work_kind": "standard"
+}

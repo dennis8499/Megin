@@ -45,11 +45,13 @@ description: 診斷疑似 BUG、flaky failure、效能回歸或不明工程異�
 
 完整讀取 [Assessment 契約](references/assessment-contract.md)；需要人類可讀內容時再讀 [模板](references/assessment-template.md)。Assessment 是 diagnosis evidence，不是 Requirements 或 Plan。
 
+與Requirements共同取得人工核准時，遵守 [共用 Human Gate contract](../project-knowledge/references/human-gate-review.md)（canonical path：`.agents/skills/project-knowledge/references/human-gate-review.md`）。Human Gate bundle inventory: BUG assessment Markdown and JSON, the Requirements primary, and all applicable Knowledge files in the existing Requirements Gate.
+
 - `confirmed`／`likely`：可提議 bug delivery；在建立 worktree 前仍不得寫 repository。
 - `not-a-bug`：若是 expected behavior 改變，轉 standard feature；否則結束且不建立 delivery run。
 - `insufficient-evidence`：保存下一個可否證 probe，不以猜測進入修復。
 
-開案時，assessment 與 Requirements Candidate 在第一道既有 gate 一起完整展示、一起綁定；核准後才由 delivery／requirements writer create-only materialize。途中 deferred assessment 先留在 host-temp evidence，fresh review 前或任何 terminal handoff 前由目前 delivery writer materialize。
+開案時，assessment 與 Requirements Candidate 在第一道既有Gate一起封入immutable review files與同一manifest；Chat只呈現摘要、direct links與exact identity，仍只問一次。核准後才由delivery／requirements writer重驗同一bundle並create-only materialize。途中 deferred assessment 先留在 host-temp evidence，fresh review 前或任何 terminal handoff 前由目前 delivery writer materialize。
 
 完成條件：verdict、reproduction／root-cause status、relation、severity、風險、disposition 與 evidence refs 可由 schema 驗證；診斷 Skill 自身沒有 repository write。
 

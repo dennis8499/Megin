@@ -124,6 +124,28 @@ class ReadyPlanContractTests(unittest.TestCase):
                 errors,
             )
 
+    def test_stage_authorization_guard_requires_file_first_seal_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            copied = Path(temp_dir) / "skills"
+            shutil.copytree(
+                SKILLS_ROOT / "technical-planning",
+                copied / "technical-planning",
+            )
+            skill_path = copied / "technical-planning/SKILL.md"
+            text = skill_path.read_text(encoding="utf-8")
+            required = "第一次寫入或seal Candidate前"
+            self.assertIn(required, text)
+            skill_path.write_text(
+                text.replace(required, "第一次寫入或展示 Candidate 前", 1),
+                encoding="utf-8",
+                newline="\n",
+            )
+            errors = validator.validate_all(copied)
+            self.assertTrue(
+                any("stage authorization guard" in error for error in errors),
+                errors,
+            )
+
     def test_ready_instance_and_cross_references(self) -> None:
         example = ready_example()
         self.assertEqual([], validator.validate_instance(example, self.ready_schema))

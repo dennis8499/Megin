@@ -43,9 +43,13 @@ def _parser() -> argparse.ArgumentParser:
     candidate.add_argument("--approval-actor", required=True)
     candidate.add_argument("--approval-evidence", required=True)
     candidate.add_argument("--known-secret-env", action="append", default=[])
+    review = subcommands.add_parser("review")
+    review.add_argument("--repo", required=True)
+    review.add_argument("--candidate-ref", required=True)
     apply = subcommands.add_parser("apply")
     apply.add_argument("--repo", required=True)
     apply.add_argument("--candidate-ref", required=True)
+    apply.add_argument("--review-sha256", required=True)
     apply.add_argument("--approval-actor", required=True)
     apply.add_argument("--approval-evidence", required=True)
     apply.add_argument("--known-secret-env", action="append", default=[])
@@ -65,11 +69,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if arguments.command == "bootstrap":
             from knowledge_governance import bootstrap_repository
+            from knowledge_promotion import review_candidate
 
-            result = bootstrap_repository(
+            bootstrap_result = bootstrap_repository(
                 arguments.repo,
                 approval_actor=arguments.approval_actor,
                 approval_evidence=arguments.approval_evidence,
+            )
+            result = review_candidate(
+                arguments.repo,
+                candidate_ref=bootstrap_result["candidate_ref"],
             )
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 0
@@ -87,22 +96,43 @@ def main(argv: list[str] | None = None) -> int:
                 repair_approval_actor=arguments.approval_actor,
                 repair_approval_evidence=arguments.approval_evidence,
             )
+            repair_candidate_ref = result.get("repair_candidate_ref")
+            if isinstance(repair_candidate_ref, str):
+                from knowledge_promotion import review_candidate
+
+                result = review_candidate(
+                    arguments.repo,
+                    candidate_ref=repair_candidate_ref,
+                )
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 0
         if arguments.command == "candidate":
-            from knowledge_promotion import seal_candidate_file
+            from knowledge_promotion import review_candidate, seal_candidate_file
 
             known_secrets = tuple(
                 os.environ[name]
                 for name in arguments.known_secret_env
                 if name in os.environ and os.environ[name]
             )
-            result = seal_candidate_file(
+            sealed = seal_candidate_file(
                 arguments.repo,
                 draft_path=arguments.draft,
                 approval_actor=arguments.approval_actor,
                 approval_evidence=arguments.approval_evidence,
                 known_secret_values=known_secrets,
+            )
+            result = review_candidate(
+                arguments.repo,
+                candidate_ref=sealed["candidate_ref"],
+            )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        if arguments.command == "review":
+            from knowledge_promotion import review_candidate
+
+            result = review_candidate(
+                arguments.repo,
+                candidate_ref=arguments.candidate_ref,
             )
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 0
@@ -117,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             result = apply_candidate(
                 arguments.repo,
                 candidate_ref=arguments.candidate_ref,
+                review_sha256=arguments.review_sha256,
                 approval_actor=arguments.approval_actor,
                 approval_evidence=arguments.approval_evidence,
                 known_secret_values=known_secrets,
@@ -145,5 +176,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))
-
-

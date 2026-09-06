@@ -1172,6 +1172,36 @@ def _current_pages(repo: Path) -> list[dict[str, Any]]:
     return pages
 
 
+def _outcome_review_files(
+    repo: Path,
+    outcome: dict[str, Any],
+    *,
+    label: str,
+) -> tuple[str, bytes, list[dict[str, str]]]:
+    markdown_path = normalized_path(str(outcome.get("markdown_path", "")))
+    outcome_path = normalized_path(str(outcome.get("path", "")))
+    try:
+        raw_by_path = {
+            relative: (repo / Path(*relative.split("/"))).read_bytes()
+            for relative in (outcome_path, markdown_path)
+        }
+        review_files = [
+            {
+                "role": "supporting",
+                "target_path": relative,
+                "content": raw_by_path[relative].decode("utf-8"),
+            }
+            for relative in sorted(raw_by_path, key=lambda value: value.encode("utf-8"))
+        ]
+    except (OSError, UnicodeDecodeError) as exc:
+        raise KnowledgeError(
+            "OUTCOME_DRIFT",
+            f"{label} outcome review files are unavailable or not UTF-8",
+            exit_code=3,
+        ) from exc
+    return markdown_path, raw_by_path[markdown_path], review_files
+
+
 def build_implementation_candidate_draft(
     repo_value: str,
     *,
@@ -1179,8 +1209,11 @@ def build_implementation_candidate_draft(
 ) -> dict[str, Any]:
     repo = Path(repo_value).resolve()
     record = validate_implementation_outcome_result(repo_value, outcome=outcome)
-    markdown_path = normalized_path(str(outcome.get("markdown_path", "")))
-    markdown_raw = (repo / Path(*markdown_path.split("/"))).read_bytes()
+    markdown_path, markdown_raw, review_files = _outcome_review_files(
+        repo,
+        outcome,
+        label="implementation",
+    )
     work_id = record["work_id"]
     if record["knowledge_decision"] == "no-change":
         return {
@@ -1189,6 +1222,7 @@ def build_implementation_candidate_draft(
             "work_id": work_id,
             "decision": "no-change",
             "source_snapshot": [],
+            "review_files": review_files,
             "operations": [],
         }
     summary = record["summary"]
@@ -1245,6 +1279,7 @@ def build_implementation_candidate_draft(
         "work_id": work_id,
         "decision": "change",
         "source_snapshot": [source_ref],
+        "review_files": review_files,
         "operations": [
             operation(content_path, content),
             operation(
@@ -1265,11 +1300,11 @@ def build_bug_candidate_draft(
 
     repo = Path(repo_value).resolve()
     record = validate_implementation_outcome_result(repo_value, outcome=outcome)
-    markdown_path = normalized_path(str(outcome.get("markdown_path", "")))
-    try:
-        markdown_raw = (repo / Path(*markdown_path.split("/"))).read_bytes()
-    except OSError as exc:
-        raise KnowledgeError("OUTCOME_DRIFT", "BUG outcome bytes are unavailable", exit_code=3) from exc
+    markdown_path, markdown_raw, review_files = _outcome_review_files(
+        repo,
+        outcome,
+        label="BUG",
+    )
     if (
         record.get("work_kind") != "bug"
         or not isinstance(record.get("bug"), dict)
@@ -1283,6 +1318,7 @@ def build_bug_candidate_draft(
             "work_id": work_id,
             "decision": "no-change",
             "source_snapshot": [],
+            "review_files": review_files,
             "operations": [],
         }
     result = str(record.get("result"))
@@ -1341,6 +1377,7 @@ def build_bug_candidate_draft(
         "work_id": work_id,
         "decision": "change",
         "source_snapshot": [source_ref],
+        "review_files": review_files,
         "operations": [
             operation(content_path, content),
             operation(

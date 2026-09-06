@@ -598,6 +598,8 @@ def _persist_candidate(
     repo_id: str,
     candidate: dict[str, Any],
     postimages: list[tuple[str, bytes]],
+    review_files: list[tuple[str, bytes]],
+    review: bytes,
 ) -> str:
     promotion_id = candidate["promotion_id"]
     candidates_root = registry_root / "repos" / repo_id / "candidates"
@@ -613,6 +615,9 @@ def _persist_candidate(
         existing_candidate = final / "candidate.json"
         expected_postimages = {
             normalized_path(relative): value for relative, value in postimages
+        }
+        expected_review_files = {
+            normalized_path(relative): value for relative, value in review_files
         }
         try:
             existing = _stable_registry_read(
@@ -632,6 +637,22 @@ def _persist_candidate(
                     invalid_code="UNSAFE_REGISTRY",
                     label="sealed Candidate postimage",
                 ) == value
+            for relative, value in expected_review_files.items():
+                path = final / Path(*relative.split("/"))
+                matches = matches and _stable_registry_read(
+                    registry_root,
+                    path,
+                    missing_code="CANDIDATE_EXISTS",
+                    invalid_code="UNSAFE_REGISTRY",
+                    label="sealed Candidate review file",
+                ) == value
+            matches = matches and _stable_registry_read(
+                registry_root,
+                final / "review.json",
+                missing_code="CANDIDATE_EXISTS",
+                invalid_code="UNSAFE_REGISTRY",
+                label="sealed Candidate review",
+            ) == review
             if matches:
                 return f"knowledge:candidates/{promotion_id}/candidate.json"
         except KnowledgeError as exc:
@@ -658,6 +679,17 @@ def _persist_candidate(
                 invalid_code="UNSAFE_REGISTRY",
                 label="sealed Candidate postimage",
             )
+        for relative, value in review_files:
+            destination = temporary / Path(*normalized_path(relative).split("/"))
+            _assert_registry_path_safe(registry_root, destination)
+            _atomic_create(destination, value)
+            _stable_registry_read(
+                registry_root,
+                destination,
+                missing_code="UNSAFE_REGISTRY",
+                invalid_code="UNSAFE_REGISTRY",
+                label="sealed Candidate review file",
+            )
         candidate_path = temporary / "candidate.json"
         _assert_registry_path_safe(registry_root, candidate_path)
         _atomic_create(candidate_path, encoded)
@@ -667,6 +699,16 @@ def _persist_candidate(
             missing_code="UNSAFE_REGISTRY",
             invalid_code="UNSAFE_REGISTRY",
             label="sealed Candidate",
+        )
+        review_path = temporary / "review.json"
+        _assert_registry_path_safe(registry_root, review_path)
+        _atomic_create(review_path, review)
+        _stable_registry_read(
+            registry_root,
+            review_path,
+            missing_code="UNSAFE_REGISTRY",
+            invalid_code="UNSAFE_REGISTRY",
+            label="sealed Candidate review",
         )
         _assert_registry_path_safe(registry_root, temporary)
         _assert_registry_path_safe(registry_root, final)
@@ -700,6 +742,7 @@ def _seal_repair_candidate(
     *,
     approval_actor: str,
     approval_evidence: str,
+    automatic_evidence: dict[str, Any],
 ) -> tuple[str | None, str | None]:
     if not repairs:
         return None, None
@@ -738,10 +781,26 @@ def _seal_repair_candidate(
             "work_id": "repair",
             "decision": "change",
             "source_snapshot": [],
+            "review_files": [
+                {
+                    "role": "automatic",
+                    "target_path": "automatic/knowledge-lint.json",
+                    "content": (
+                        json.dumps(
+                            automatic_evidence,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            indent=2,
+                        )
+                        + "\n"
+                    ),
+                }
+            ],
             "operations": operations,
         },
         approval_actor=approval_actor,
         approval_evidence=approval_evidence,
+        _allow_automatic_evidence=True,
     )
     return sealed["candidate_ref"], sealed["payload_sha256"]
 
@@ -1276,15 +1335,6 @@ def lint_repository(
     )
     eligible_claim_ids.sort()
     repo_id = repository_id(repo)
-    repair_ref: str | None = None
-    repair_payload: str | None = None
-    if repairs and repair_approval_actor and repair_approval_evidence:
-        repair_ref, repair_payload = _seal_repair_candidate(
-            repo,
-            repairs,
-            approval_actor=repair_approval_actor,
-            approval_evidence=repair_approval_evidence,
-        )
     non_decision_diagnostics = [
         item
         for item in diagnostics
@@ -1297,15 +1347,26 @@ def lint_repository(
         if contradiction_pairs
         else "passed"
     )
-    return {
+    result = {
         "schema": "knowledge-lint/v1",
         "outcome": outcome,
         "diagnostics": diagnostics,
         "eligible_claim_ids": eligible_claim_ids,
         "repo_id": repo_id,
-        "repair_candidate_ref": repair_ref,
-        "repair_candidate_payload_sha256": repair_payload,
+        "repair_candidate_ref": None,
+        "repair_candidate_payload_sha256": None,
     }
+    if repairs and repair_approval_actor and repair_approval_evidence:
+        repair_ref, repair_payload = _seal_repair_candidate(
+            repo,
+            repairs,
+            approval_actor=repair_approval_actor,
+            approval_evidence=repair_approval_evidence,
+            automatic_evidence=result,
+        )
+        result["repair_candidate_ref"] = repair_ref
+        result["repair_candidate_payload_sha256"] = repair_payload
+    return result
 
 
 def _bootstrap_candidate_draft(
@@ -1428,6 +1489,7 @@ def _bootstrap_candidate_draft(
         "stage": "bootstrap",
         "work_id": _work_id(classification),
         "decision": "change",
+        "classification": copy.deepcopy(classification),
         "source_snapshot": source_snapshot,
         "operations": operations,
     }
@@ -1457,8 +1519,9 @@ def bootstrap_repository(
         "classification": classification,
         "candidate_ref": sealed["candidate_ref"],
         "candidate_payload_sha256": sealed["payload_sha256"],
+        "review_ref": sealed["review_ref"],
+        "review_sha256": sealed["review_sha256"],
         "affected_paths": sealed["affected_paths"],
-        "postimages": sealed["postimages"],
         "approval": sealed["approval"],
         "quarantine_candidate_ref": (
             sealed["candidate_ref"] if classification["conflict"] else None

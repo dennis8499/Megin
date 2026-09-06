@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "user",
+    "evidence": "conversation:knowledge-gate-work-20260905-gate-file-summary-chat-cc5ef02c-candidate-3"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-b991891d6d20c91c/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "1a979b1f4fa0f16e896354cbe56f3d5012c20c6e9abadeeb828f52530067f401",
+  "promotion_id": "promotion-implementation-b991891d6d20c91c",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260905-gate-file-summary-chat-cc5ef02c"
+}

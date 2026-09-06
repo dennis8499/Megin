@@ -13,6 +13,7 @@ Use the offline public seam at `scripts/knowledge_cli.py`. Git-eligible reposito
 - `bootstrap`: classify only owner-validated terminal evidence, Candidate, conflicts, and unknowns; seal one lint-clean baseline Candidate containing any contested quarantine without changing the repository.
 - `lint`: validate provenance, lifecycle, links, IDs, contradictions, index, and promotion log; it may seal a repair Candidate but never applies it.
 - `candidate`: validate full postimages and seal an immutable Candidate for human review.
+- `review`: stable-read the complete immutable bundle and return only its closed Chat summary projection.
 - `apply`: after a new explicit human approval of the exact sealed payload, transactionally apply it and run post-apply lint.
 - `recover`: when any command returns `RECOVERY_REQUIRED`, finish or roll back the recorded transaction before doing anything else.
 
@@ -35,23 +36,31 @@ Use the stage values `requirements`, `planning`, `implementation`, `bug`, or `ad
 
 ## Candidate and approval protocol
 
+The single human-facing authority is [Human approval Gate review](references/human-gate-review.md) at `.agents/skills/project-knowledge/references/human-gate-review.md`. Human Gate bundle inventory: `candidate.json`, `review.json`, all complete `postimages/`, applicable `review-files/` supporting/automatic evidence, deterministic promotion finalizers, validation, manifest, and exact identity.
+
 A draft is a closed `knowledge-candidate-draft/v1` object with `stage`, `work_id`, explicit `decision: change|no-change`, verified `source_snapshot`, and `operations`. Each operation contains `kind`, normalized repository `path`, and the complete UTF-8 postimage. Before sealing, allocate a prospective approval actor and stable evidence token. This binding identifies the payload the human will review; it is not itself approval.
 
 ```text
 python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py candidate --repo . --draft <host-temp-draft.json> --approval-actor <expected-actor> --approval-evidence <stable-evidence-token>
 ```
 
-The seal always adds the exact `docs/knowledge/log.md` and Ready receipt pre/postimages to the digest and display. Present all returned `affected_paths`, complete `postimages`, `approval`, `candidate_ref`, and `payload_sha256`. Approval is valid only when the human has seen that exact payload after the latest source and preimage snapshot. A prior plan approval, a conversational “continue,” test success, or reviewer verdict is not knowledge approval unless the owner workflow explicitly binds it as the same requirements/planning gate.
+The seal always adds the exact `docs/knowledge/log.md` and Ready receipt pre/postimages to the immutable bundle. The `candidate` command returns `human-gate-summary/v1`, never full payload bytes. Re-run the same validation without resealing when resuming a Gate:
+
+```text
+python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py review --repo . --candidate-ref <ref>
+```
+
+Present only the returned seven-category summary, direct paths, manifest, `candidate_ref`, `payload_sha256`, and `review_sha256` according to the shared authority. Approval is valid only when it clearly identifies that current bundle after the latest source and preimage validation. A prior plan approval, a conversational “continue,” test success, or reviewer verdict is not knowledge approval unless the owner workflow explicitly binds it as the same requirements/planning gate.
 
 After explicit approval, pass a non-secret actor and evidence reference:
 
 ```text
-python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py apply --repo . --candidate-ref <ref> --approval-actor <actor> --approval-evidence <evidence-ref>
+python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py apply --repo . --candidate-ref <ref> --review-sha256 <sha256> --approval-actor <actor> --approval-evidence <evidence-ref>
 ```
 
-Never stage, commit, push, merge, or delete a worktree as part of knowledge promotion. Apply holds the repository promotion lock while it revalidates finalizers, sources, operations, and target preimages; drift detected after initial validation fails before the journal or product writes. A successful apply returns `knowledge-apply/v1`, a persisted Ready receipt, and passing post-apply lint. Drift, a partial write, a secret pattern, or an unexpected target fails closed.
+Never stage, commit, push, merge, or delete a worktree as part of knowledge promotion. Apply holds the repository promotion lock while it revalidates the review digest, manifest files, finalizers, sources, operations, and target preimages; drift detected after initial validation fails before the journal or product writes. A pending legacy Candidate without `review.json` must be resealed with a new prospective evidence token. A successful apply returns `knowledge-apply/v1`, a persisted Ready receipt, and passing post-apply lint. Drift, a partial write, a secret pattern, or an unexpected target fails closed.
 
-Bootstrap and repair sealing use the same prospective binding and remain read-only until a later exact apply. Plain `lint --repo .` is diagnostic-only; add both binding flags when a repair Candidate is required:
+Bootstrap and repair sealing use the same prospective binding and return the same Summary-only Chat projection; they remain read-only until a later exact apply. Plain `lint --repo .` is diagnostic-only and keeps its complete automatic lint result; add both binding flags when a repair Candidate is required:
 
 ```text
 python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py bootstrap --repo . --approval-actor <expected-actor> --approval-evidence <stable-evidence-token>
@@ -75,4 +84,3 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py reco
 ```
 
 Run `scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp` for a release check. Its BUILD-FULL validation compiles every Git-eligible repository `*.py`, parses every Git-eligible `*.schema.json`, and reports the exact `python_files_checked` and `json_schema_files_checked` inventory counts; a partial skill-local scan is not sufficient. Cross-platform release evidence requires equivalent Windows and Linux reports from `.github/workflows/knowledge-portability.yml`; one local OS result is not Windows/Linux evidence. Machine shapes are defined in `schemas/knowledge-contracts.schema.json`.
-

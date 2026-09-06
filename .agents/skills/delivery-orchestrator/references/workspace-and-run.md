@@ -3,6 +3,7 @@
 # Workspace 與 Run 契約
 
 本文件是 `work_id` identity、host-temp registry、`delivery-run/v1`、resume 與 record continuity 的唯一權威。New work／generation 的 Git mutation 由 [Workspace 建立契約](workspace-creation.md)擁有。
+所有人工 Gate 的呈現遵循 `.agents/skills/project-knowledge/references/human-gate-review.md`；本文件只擁有 phase／record binding，不另定 Chat payload 規則。
 
 ## Identity 與固定位置
 
@@ -69,7 +70,7 @@ Optional knowledge overlay：
 
 - 新 record 的`policy`固定為`required`；`candidate_ref`／payload、reviewed knowledge snapshot、product snapshot、repo-side outcome、Ready promotion history與current promotion都使用closed contract。
 - Required requirements與plan gate各自必須在同一次人工核准 transition綁定相同approval evidence的`knowledge-promotion/v1` Ready receipt與passed lint；缺任何一側回`MISSING_KNOWLEDGE_GATE`。
-- Preliminary fresh review先以實體report／raw outputs核准尚未含Outcome的product；latest create-only `implementation-outcome/v1`綁current run、preliminary report path／hash與逐command evidence。封存Candidate後由不同final fresh review綁相同的`knowledge_snapshot_before/after`、Candidate ref／digest與只排除`docs/knowledge/**`的final product snapshot，才進`knowledge/active`。Knowledge snapshot由目前全部Git-eligible `docs/knowledge/**` pre-tree與sealed operations重建expected post-tree；不得信任caller只傳相等ID。展示完整diff後才進`knowledge/awaiting_user`。
+- Preliminary fresh review先以實體report／raw outputs核准尚未含Outcome的product；latest create-only `implementation-outcome/v1`綁current run、preliminary report path／hash與逐command evidence。封存Candidate後由不同final fresh review綁相同的`knowledge_snapshot_before/after`、Candidate ref／digest與只排除`docs/knowledge/**`的final product snapshot，才進`knowledge/active`。Knowledge snapshot由目前全部Git-eligible `docs/knowledge/**` pre-tree與sealed operations重建expected post-tree；不得信任caller只傳相等ID。完整 diff 留在同一 immutable manifest 並提供直接連結，Chat 只回摘要後才進`knowledge/awaiting_user`。
 - `knowledge/awaiting_user → complete/complete`只接受與review binding相同的implementation／bug Candidate、Ready receipt、相同approval evidence、實際完整knowledge tree等於reviewed expected post-tree及passed full lint。Required record不得`implementation → complete`；legacy absence仍走既有terminal checks。
 
 完成條件：schema 與 semantic validation 同時通過，最後 event 精確重建目前 phase/status，current refs 各指向一個已記錄且 hash 相符的 revision/run。

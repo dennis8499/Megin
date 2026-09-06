@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -68,24 +69,26 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual(0, exit_code)
         self.assertEqual("", stderr.getvalue())
         result = json.loads(stdout.getvalue())
+        self.assertEqual("human-gate-summary/v1", result["schema"])
+        classification = result["summary"]["classification"]
         self.assertEqual(
             ["docs/work/work-alpha/requirements.md"],
-            result["classification"]["terminal"],
+            classification["terminal"],
         )
         self.assertEqual(
             ["docs/work/work-alpha/plan/plan.md"],
-            result["classification"]["candidate"],
+            classification["candidate"],
         )
-        self.assertEqual(2, len(result["classification"]["conflict"]))
+        self.assertEqual(2, len(classification["conflict"]))
         self.assertEqual(
             ["docs/telemetry/status.json"],
-            result["classification"]["unknown"],
+            classification["unknown"],
         )
         candidate_path = (
             registry
             / "repos"
-            / result["repo_id"]
-            / Path(*result["candidate_ref"].removeprefix("knowledge:").split("/"))
+            / result["identity"]["repo_id"]
+            / Path(*result["identity"]["candidate_ref"].removeprefix("knowledge:").split("/"))
         )
         self.assertTrue(candidate_path.is_file())
         candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
@@ -118,12 +121,12 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual(0, exit_code)
         self.assertEqual("", stderr.getvalue())
         result = json.loads(stdout.getvalue())
-        quarantine_ref = result.get("quarantine_candidate_ref")
+        quarantine_ref = result["identity"]["candidate_ref"]
         self.assertIsInstance(quarantine_ref, str)
         candidate_path = (
             registry
             / "repos"
-            / result["repo_id"]
+            / result["identity"]["repo_id"]
             / Path(*quarantine_ref.removeprefix("knowledge:").split("/"))
         )
         candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
@@ -165,7 +168,8 @@ class GovernanceTests(unittest.TestCase):
             result = json.loads(stdout.getvalue())
             applied = apply_candidate(
                 str(repo),
-                candidate_ref=result["candidate_ref"],
+                candidate_ref=result["identity"]["candidate_ref"],
+                review_sha256=result["review_bundle"]["review_sha256"],
                 approval_actor="bootstrap-owner",
                 approval_evidence="fixture:bootstrap-approved",
             )
@@ -178,6 +182,8 @@ class GovernanceTests(unittest.TestCase):
         self.assertTrue((repo / "docs/knowledge/incidents/legacy-status-conflict.md").is_file())
 
     def test_stale_source_drift_produces_stable_repair_candidate(self) -> None:
+        import knowledge_governance
+
         repo = _build_retrieval_fixture(self.fixture_root)
         registry = self.fixture_root / "registry"
         (repo / "src/stale-boundary.md").write_text(
@@ -200,23 +206,58 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual(0, exit_code)
         self.assertEqual("", stderr.getvalue())
         report = json.loads(stdout.getvalue())
-        self.assertEqual("failed", report["outcome"])
+        self.assertEqual("human-gate-summary/v1", report["schema"])
+        self.assertEqual("failed", report["summary"]["lint"]["outcome"])
+        self.assertEqual("lint-repair", report["identity"]["stage"])
+        self.assertIn("SOURCE_HASH_DRIFT", report["summary"]["lint"]["diagnostic_codes"])
+        automatic_entries = [
+            item
+            for item in report["review_bundle"]["manifest"]
+            if item["role"] == "automatic"
+        ]
+        self.assertEqual(1, len(automatic_entries))
+        automatic_path = Path(automatic_entries[0]["direct_path"])
+        raw_lint_bytes = automatic_path.read_bytes()
+        self.assertEqual(automatic_entries[0]["byte_count"], len(raw_lint_bytes))
+        self.assertEqual(
+            automatic_entries[0]["sha256"],
+            hashlib.sha256(raw_lint_bytes).hexdigest(),
+        )
+        raw_lint = json.loads(raw_lint_bytes)
+        self.assertEqual(
+            {
+                "schema",
+                "outcome",
+                "diagnostics",
+                "eligible_claim_ids",
+                "repo_id",
+                "repair_candidate_ref",
+                "repair_candidate_payload_sha256",
+            },
+            set(raw_lint),
+        )
+        self.assertEqual("knowledge-lint/v1", raw_lint["schema"])
+        self.assertEqual(report["identity"]["candidate_ref"], raw_lint["repair_candidate_ref"])
+        self.assertEqual(
+            report["identity"]["payload_sha256"],
+            raw_lint["repair_candidate_payload_sha256"],
+        )
         self.assertIn(
             (
                 "SOURCE_HASH_DRIFT",
                 "docs/knowledge/meta/pages/page-stale-capability-token.json",
             ),
-            {(item["code"], item["path"]) for item in report["diagnostics"]},
+            {(item["code"], item["path"]) for item in raw_lint["diagnostics"]},
         )
-        self.assertIsInstance(report.get("repair_candidate_ref"), str)
+        self.assertIsInstance(report["identity"]["candidate_ref"], str)
         self.assertNotIn(
             "claim-stale-capability-token",
-            report["eligible_claim_ids"],
+            raw_lint["eligible_claim_ids"],
         )
 
     def test_log_only_drift_produces_an_applyable_repair_candidate(self) -> None:
         import knowledge_governance
-        from knowledge_promotion import apply_candidate, seal_candidate_draft
+        from knowledge_promotion import apply_candidate, review_candidate, seal_candidate_draft
 
         repo = self.fixture_root / f"log-only-repair-{uuid.uuid4().hex}"
         repo.mkdir(parents=True)
@@ -241,6 +282,7 @@ class GovernanceTests(unittest.TestCase):
             apply_candidate(
                 str(repo),
                 candidate_ref=initial["candidate_ref"],
+                review_sha256=initial["review_sha256"],
                 approval_actor="initial-owner",
                 approval_evidence="fixture:initial-approved",
             )
@@ -252,9 +294,14 @@ class GovernanceTests(unittest.TestCase):
             )
             self.assertEqual("failed", repair["outcome"])
             self.assertIsInstance(repair["repair_candidate_ref"], str)
+            repair_summary = review_candidate(
+                str(repo),
+                candidate_ref=repair["repair_candidate_ref"],
+            )
             applied = apply_candidate(
                 str(repo),
                 candidate_ref=repair["repair_candidate_ref"],
+                review_sha256=repair_summary["review_bundle"]["review_sha256"],
                 approval_actor="repair-owner",
                 approval_evidence="fixture:log-repair-approved",
             )
@@ -263,6 +310,8 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual("passed", final_lint["outcome"])
 
     def test_symmetric_contradictions_are_decision_required(self) -> None:
+        import knowledge_governance
+
         repo = _build_contradiction_fixture(self.fixture_root)
         registry = self.fixture_root / "registry"
         query_stdout = io.StringIO()
@@ -294,11 +343,13 @@ class GovernanceTests(unittest.TestCase):
             ])
         self.assertEqual(0, lint_exit)
         report = json.loads(lint_stdout.getvalue())
-        self.assertEqual("decision_required", report["outcome"])
-        self.assertEqual([], report["eligible_claim_ids"])
+        raw_lint = knowledge_governance.lint_repository(str(repo))
+        self.assertEqual("human-gate-summary/v1", report["schema"])
+        self.assertEqual("decision_required", report["summary"]["lint"]["outcome"])
+        self.assertEqual([], raw_lint["eligible_claim_ids"])
         self.assertIn(
             "CONTRADICTION_DECISION_REQUIRED",
-            {item["code"] for item in report["diagnostics"]},
+            report["summary"]["lint"]["diagnostic_codes"],
         )
 
     def test_apply_rejects_preimage_drift_before_any_commit(self) -> None:
@@ -314,7 +365,9 @@ class GovernanceTests(unittest.TestCase):
                 "--approval-actor", "bootstrap-owner",
                 "--approval-evidence", "fixture:bootstrap-approved",
             ]))
-        candidate_ref = json.loads(bootstrap_stdout.getvalue())["candidate_ref"]
+        bootstrap_summary = json.loads(bootstrap_stdout.getvalue())
+        candidate_ref = bootstrap_summary["identity"]["candidate_ref"]
+        review_sha256 = bootstrap_summary["review_bundle"]["review_sha256"]
         unexpected = repo / "docs/knowledge/glossary.md"
         unexpected.parent.mkdir(parents=True, exist_ok=True)
         unexpected.write_text("# Concurrent writer\n", encoding="utf-8", newline="\n")
@@ -334,6 +387,8 @@ class GovernanceTests(unittest.TestCase):
                         str(repo),
                         "--candidate-ref",
                         candidate_ref,
+                        "--review-sha256",
+                        review_sha256,
                         "--approval-actor",
                         "bootstrap-owner",
                         "--approval-evidence",
@@ -370,7 +425,9 @@ class GovernanceTests(unittest.TestCase):
                 "--approval-actor", "bootstrap-owner",
                 "--approval-evidence", "fixture:bootstrap-approved",
             ]))
-        candidate_ref = json.loads(bootstrap_stdout.getvalue())["candidate_ref"]
+        bootstrap_summary = json.loads(bootstrap_stdout.getvalue())
+        candidate_ref = bootstrap_summary["identity"]["candidate_ref"]
+        review_sha256 = bootstrap_summary["review_bundle"]["review_sha256"]
         concurrent = repo / "docs" / "knowledge" / "glossary.md"
         concurrent_bytes = b"# Concurrent and unapproved glossary\n"
         original_validator = knowledge_promotion._validated_operations
@@ -402,6 +459,7 @@ class GovernanceTests(unittest.TestCase):
             apply_candidate(
                 str(repo),
                 candidate_ref=candidate_ref,
+                review_sha256=review_sha256,
                 approval_actor="bootstrap-owner",
                 approval_evidence="fixture:bootstrap-approved",
             )
@@ -461,6 +519,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="commit-reviewer",
                     approval_evidence="fixture:commit-boundary",
                 )
@@ -525,6 +584,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="commit-reviewer",
                     approval_evidence="fixture:update-commit-boundary",
                 )
@@ -583,6 +643,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="retirement-reviewer",
                     approval_evidence="fixture:retirement-read-fault",
                 )
@@ -655,6 +716,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="retirement-reviewer",
                     approval_evidence="fixture:retirement-restore-collision",
                 )
@@ -676,6 +738,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="retirement-reviewer",
                     approval_evidence="fixture:retirement-restore-collision",
                 )
@@ -750,6 +813,7 @@ class GovernanceTests(unittest.TestCase):
                 apply_candidate(
                     str(repo),
                     candidate_ref=sealed["candidate_ref"],
+                    review_sha256=sealed["review_sha256"],
                     approval_actor="rollback-reviewer",
                     approval_evidence="fixture:rollback-boundary",
                     fault_at="after-replace-0",
@@ -960,8 +1024,6 @@ class GovernanceTests(unittest.TestCase):
         ):
             exit_code = knowledge_main([
                 "lint", "--repo", str(repo),
-                "--approval-actor", "repair-owner",
-                "--approval-evidence", "fixture:repair-approved",
             ])
         self.assertEqual(0, exit_code, stderr.getvalue())
         self.assertEqual("", stderr.getvalue())
@@ -988,7 +1050,7 @@ class GovernanceTests(unittest.TestCase):
                 "claim-illegal-state",
             }.isdisjoint(report["eligible_claim_ids"])
         )
-        self.assertIsInstance(report["repair_candidate_ref"], str)
+        self.assertIsNone(report.get("repair_candidate_ref"))
         self.assertEqual(before, _tree_snapshot(repo))
 
     def test_security_fault_matrix_rolls_back_and_requires_recovery(self) -> None:
@@ -1033,6 +1095,7 @@ class GovernanceTests(unittest.TestCase):
             "from knowledge_promotion import apply_candidate,SimulatedCrash\n"
             "try:\n"
             f" apply_candidate({str(repo)!r}, candidate_ref={sealed['candidate_ref']!r}, "
+            f"review_sha256={sealed['review_sha256']!r}, "
             "approval_actor='crash-reviewer', approval_evidence='fixture:real-process-crash', "
             "fault_at='crash-after-replace-0')\n"
             "except SimulatedCrash:\n"
@@ -1061,6 +1124,7 @@ class GovernanceTests(unittest.TestCase):
             applied = apply_candidate(
                 str(repo),
                 candidate_ref=sealed["candidate_ref"],
+                review_sha256=sealed["review_sha256"],
                 approval_actor="crash-reviewer",
                 approval_evidence="fixture:real-process-crash",
             )
