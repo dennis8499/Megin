@@ -8,8 +8,11 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
+import sys
+import tempfile
 import unittest
 from unittest import mock
 from pathlib import Path
@@ -1810,9 +1813,464 @@ class HumanGateReviewTests(unittest.TestCase):
         self.assertTrue(report["review_drift_rejected"])
 
 
+class DocumentationAndCiImprovementTests(unittest.TestCase):
+    workspace: Path
+    fixture_root: Path
+
+    def test_ci_covers_all_project_skills_docs_and_line_endings_with_a_quick_gate(self) -> None:
+        workflow = (
+            self.workspace / ".github/workflows/knowledge-portability.yml"
+        ).read_text(encoding="utf-8")
+        for path_filter in (
+            '".agents/skills/**"',
+            '"docs/**"',
+            '".gitattributes"',
+            '"README.md"',
+            '"OPERATIONS.md"',
+        ):
+            self.assertIn(path_filter, workflow)
+        self.assertRegex(workflow, r"(?m)^  quick:\s*$")
+        self.assertRegex(workflow, r"(?ms)^  platform:.*?needs: quick")
+        self.assertIn("run_quick_checks.py", workflow)
+        self.assertIn("if-no-files-found: error", workflow)
+        quick_runner = (
+            self.workspace
+            / ".agents/skills/project-knowledge/scripts/run_quick_checks.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"command_id": "QUICK-DOCUMENTATION"', quick_runner)
+        self.assertIn('"DocumentationAndCiImprovementTests"', quick_runner)
+
+    def test_root_guides_link_to_real_entrypoints_and_owner_contracts(self) -> None:
+        readme = self.workspace / "README.md"
+        operations = self.workspace / "OPERATIONS.md"
+        self.assertTrue(readme.is_file())
+        self.assertTrue(operations.is_file())
+        combined = readme.read_text(encoding="utf-8") + operations.read_text(
+            encoding="utf-8"
+        )
+        for fragment in (
+            "delivery_workspace.py probe",
+            "delivery_workspace.py locate",
+            "run_full_suite.py --scope all",
+            "knowledge_cli.py lint",
+            "stage-authorization.md",
+            "delivery-protocol.md",
+        ):
+            self.assertIn(fragment, combined)
+        for guide in (readme, operations):
+            text = guide.read_text(encoding="utf-8")
+            for target in re.findall(r"\[[^]]+\]\(([^)]+)\)", text):
+                relative = target.strip("<>").split("#", 1)[0]
+                if not relative or "://" in relative:
+                    continue
+                self.assertTrue(
+                    (guide.parent / Path(*relative.split("/"))).resolve().exists(),
+                    f"broken link in {guide.name}: {target}",
+                )
+
+    def test_documented_read_only_commands_are_accepted_by_the_public_parsers(self) -> None:
+        commands = (
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                "-B",
+                ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+                "probe",
+                "--help",
+            ],
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                "-B",
+                ".agents/skills/project-knowledge/scripts/knowledge_cli.py",
+                "query",
+                "--help",
+            ],
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                "-B",
+                ".agents/skills/delivery-orchestrator/scripts/delivery_workspace.py",
+                "doctor",
+                "--help",
+            ],
+            [
+                sys.executable,
+                "-X",
+                "utf8",
+                "-B",
+                ".agents/skills/project-knowledge/scripts/run_full_suite.py",
+                "--help",
+            ],
+        )
+        for command in commands:
+            completed = subprocess.run(
+                command,
+                cwd=self.workspace,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+                shell=False,
+            )
+            self.assertEqual(
+                0,
+                completed.returncode,
+                completed.stderr.decode("utf-8", errors="replace"),
+            )
+
+    def test_documented_metrics_example_is_isolated_and_preserves_product_bytes(self) -> None:
+        import run_full_suite
+
+        readme = (self.workspace / "README.md").read_text(encoding="utf-8")
+        operations = (self.workspace / "OPERATIONS.md").read_text(encoding="utf-8")
+        combined = readme + operations
+        metrics_relative = ".knowledge-test-tmp/final-metrics.json"
+        self.assertIn(metrics_relative, readme)
+        self.assertIn(metrics_relative, operations)
+        self.assertIn("human gate", combined)
+        before = {
+            path: digest
+            for path, digest in _tree_snapshot(self.workspace).items()
+            if not path.startswith(".knowledge-test-tmp/")
+        }
+        metrics_path = self.workspace / metrics_relative
+        fixture_existed = metrics_path.parent.exists()
+        metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        metrics_path.unlink(missing_ok=True)
+        try:
+            with (
+                mock.patch.object(
+                    run_full_suite,
+                    "_commands",
+                    return_value=[
+                        {"command_id": "DOC-EXAMPLE", "arguments": ["doc-example"], "timeout": 5}
+                    ],
+                ),
+                mock.patch.object(
+                    run_full_suite.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess(
+                        ["doc-example"], 0, b"verified\n", b""
+                    ),
+                ),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.chdir(self.workspace),
+            ):
+                exit_code = run_full_suite.main(
+                    [
+                        "--scope",
+                        "related",
+                        "--fixture-root",
+                        ".knowledge-test-tmp",
+                        "--metrics-output",
+                        metrics_relative,
+                    ]
+                )
+            self.assertEqual(0, exit_code)
+            self.assertTrue(metrics_path.is_file())
+            self.assertEqual(
+                "knowledge-suite-metrics/v1",
+                json.loads(metrics_path.read_text(encoding="utf-8"))["schema"],
+            )
+        finally:
+            metrics_path.unlink(missing_ok=True)
+            if not fixture_existed:
+                metrics_path.parent.rmdir()
+        after = {
+            path: digest
+            for path, digest in _tree_snapshot(self.workspace).items()
+            if not path.startswith(".knowledge-test-tmp/")
+        }
+        self.assertEqual(before, after)
+
+
+class SuiteMetricsTests(unittest.TestCase):
+    workspace: Path
+    fixture_root: Path
+
+    def _paths(self, suffix: str) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
+        temporary = tempfile.TemporaryDirectory(prefix=f"suite-metrics-{suffix}-")
+        root = Path(temporary.name)
+        fixture = root / ".knowledge-test-tmp"
+        metrics = root / f"suite-metrics-{suffix}.json"
+        fixture.mkdir()
+        return temporary, fixture, metrics
+
+    def test_optional_metrics_preserve_the_functional_stdout_contract(self) -> None:
+        import run_full_suite
+
+        temporary, fixture, metrics_path = self._paths("passed")
+        metrics_path = fixture / "final-metrics.json"
+        fixture.rmdir()
+        commands = [
+            {"command_id": "ONE", "arguments": ["one"], "timeout": 10},
+            {"command_id": "TWO", "arguments": ["two"], "timeout": 20},
+        ]
+        responses = [
+            subprocess.CompletedProcess(["one"], 0, b"first output\n", b""),
+            subprocess.CompletedProcess(["two"], 0, b"second output\n", b""),
+        ]
+        stdout = io.StringIO()
+        try:
+            with (
+                mock.patch.object(run_full_suite, "_commands", return_value=commands),
+                mock.patch.object(run_full_suite.subprocess, "run", side_effect=responses),
+                contextlib.redirect_stdout(stdout),
+                contextlib.chdir(Path(temporary.name)),
+            ):
+                exit_code = run_full_suite.main(
+                    [
+                        "--scope",
+                        "related",
+                        "--fixture-root",
+                        str(fixture),
+                        "--metrics-output",
+                        str(metrics_path),
+                    ]
+                )
+            functional = json.loads(stdout.getvalue())
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        finally:
+            temporary.cleanup()
+
+        self.assertEqual(0, exit_code)
+        self.assertEqual(
+            {"schema", "scope", "outcome", "commands"},
+            set(functional),
+        )
+        self.assertEqual("knowledge-suite-report/v1", functional["schema"])
+        self.assertEqual(
+            [
+                {
+                    "command_id": "ONE",
+                    "exit_code": 0,
+                    "stdout": "first output\n",
+                    "stderr": "",
+                },
+                {
+                    "command_id": "TWO",
+                    "exit_code": 0,
+                    "stdout": "second output\n",
+                    "stderr": "",
+                },
+            ],
+            functional["commands"],
+        )
+        self.assertEqual("knowledge-suite-metrics/v1", metrics["schema"])
+        self.assertEqual(["passed", "passed"], [item["status"] for item in metrics["commands"]])
+        self.assertTrue(all(item["duration_seconds"] is not None for item in metrics["commands"]))
+        self.assertFalse(any("stdout" in item or "stderr" in item for item in metrics["commands"]))
+
+    def test_timeout_stops_execution_and_marks_the_remaining_inventory_not_run(self) -> None:
+        import run_full_suite
+
+        temporary, fixture, metrics_path = self._paths("failure")
+        commands = [
+            {"command_id": "ONE", "arguments": ["one"], "timeout": 10},
+            {"command_id": "TWO", "arguments": ["two"], "timeout": 20},
+            {"command_id": "THREE", "arguments": ["three"], "timeout": 30},
+        ]
+        responses = [
+            subprocess.CompletedProcess(["one"], 0, b"ok\n", b""),
+            subprocess.TimeoutExpired(["two"], timeout=20, output=b"partial\n", stderr=b"slow\n"),
+        ]
+        stderr = io.StringIO()
+        try:
+            with (
+                mock.patch.object(run_full_suite, "_commands", return_value=commands),
+                mock.patch.object(run_full_suite.subprocess, "run", side_effect=responses) as invoked,
+                contextlib.redirect_stderr(stderr),
+                contextlib.chdir(Path(temporary.name)),
+            ):
+                exit_code = run_full_suite.main(
+                    [
+                        "--scope",
+                        "related",
+                        "--fixture-root",
+                        str(fixture),
+                        "--metrics-output",
+                        str(metrics_path),
+                    ]
+                )
+            functional = json.loads(stderr.getvalue())
+            metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+        finally:
+            temporary.cleanup()
+
+        self.assertEqual(1, exit_code)
+        self.assertEqual(2, invoked.call_count)
+        self.assertEqual(["ONE", "TWO"], [item["command_id"] for item in functional["commands"]])
+        self.assertTrue(functional["commands"][-1]["timeout"])
+        self.assertEqual(
+            ["passed", "timeout", "not_run"],
+            [item["status"] for item in metrics["commands"]],
+        )
+        self.assertIsNone(metrics["commands"][-1]["duration_seconds"])
+        self.assertIsNone(metrics["commands"][-1]["exit_code"])
+
+    def test_redirected_collision_and_write_failure_cannot_report_success(self) -> None:
+        import run_full_suite
+
+        temporary, fixture, metrics_path = self._paths("safety")
+        redirected = Path(temporary.name) / "redirected"
+        redirected.mkdir()
+        with mock.patch.object(
+            run_full_suite,
+            "_is_redirect",
+            side_effect=lambda path: path.name == "redirected",
+        ):
+            with self.assertRaisesRegex(ValueError, "redirected"):
+                run_full_suite._metrics_target(
+                    Path(temporary.name).resolve(),
+                    str(redirected / "metrics.json"),
+                )
+        collision = Path(temporary.name) / "collision.json"
+        collision.mkdir()
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            run_full_suite._metrics_target(
+                Path(temporary.name).resolve(),
+                str(collision),
+            )
+
+        commands = [{"command_id": "ONE", "arguments": ["one"], "timeout": 10}]
+        stderr = io.StringIO()
+        try:
+            with (
+                mock.patch.object(run_full_suite, "_commands", return_value=commands),
+                mock.patch.object(
+                    run_full_suite.subprocess,
+                    "run",
+                    return_value=subprocess.CompletedProcess(["one"], 0, b"ok\n", b""),
+                ),
+                mock.patch.object(run_full_suite, "_write_metrics", side_effect=OSError("denied")),
+                contextlib.redirect_stderr(stderr),
+                contextlib.chdir(Path(temporary.name)),
+            ):
+                exit_code = run_full_suite.main(
+                    [
+                        "--scope",
+                        "related",
+                        "--fixture-root",
+                        str(fixture),
+                        "--metrics-output",
+                        str(metrics_path),
+                    ]
+                )
+            functional = json.loads(stderr.getvalue())
+        finally:
+            temporary.cleanup()
+        self.assertEqual(2, exit_code)
+        self.assertEqual("failed", functional["outcome"])
+
+
+class SearchQualityBaselineTests(unittest.TestCase):
+    workspace: Path
+    fixture_root: Path
+
+    def tearDown(self) -> None:
+        _remove_fixture(self.fixture_root)
+
+    def test_fixed_multilingual_corpus_reports_top5_and_source_safety(self) -> None:
+        import measure_search_quality
+
+        corpus_path = (
+            self.workspace
+            / ".agents/skills/project-knowledge/references/search-quality-cases.json"
+        )
+        corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+        self.assertEqual("search-quality-cases/v1", corpus["schema"])
+        self.assertEqual(1.0, corpus["minimum_top5_hit_rate"])
+        self.assertGreaterEqual(len(corpus["cases"]), 20)
+        self.assertTrue(
+            {"zh", "en", "mixed", "exact-id", "no-valid-source"}
+            <= {item["category"] for item in corpus["cases"]}
+        )
+        for case in corpus["cases"]:
+            if case["category"] == "no-valid-source":
+                self.assertEqual([], case["expected_sources"])
+                continue
+            self.assertTrue(case["expected_sources"], case["case_id"])
+            for source in case["expected_sources"]:
+                self.assertRegex(source["sha256"], r"^[0-9a-f]{64}$")
+                self.assertGreaterEqual(source["locator"]["start_line"], 1)
+                self.assertGreaterEqual(
+                    source["locator"]["end_line"],
+                    source["locator"]["start_line"],
+                )
+
+        report = measure_search_quality.measure_repository(
+            self.workspace,
+            corpus_path,
+        )
+        self.assertEqual("knowledge-search-quality/v1", report["schema"])
+        self.assertEqual(len(corpus["cases"]), report["case_count"])
+        self.assertEqual("passed", report["source_safety"]["outcome"])
+        self.assertTrue(report["source_safety"]["no_valid_source_passed"])
+        self.assertTrue(report["source_safety"]["invalid_source_exclusion_passed"])
+        self.assertEqual("required", report["top5"]["gate"])
+        self.assertEqual(corpus["minimum_top5_hit_rate"], report["top5"]["minimum_hit_rate"])
+        self.assertGreaterEqual(
+            report["top5"]["hit_rate"], report["top5"]["minimum_hit_rate"]
+        )
+        serialized = json.dumps(report, ensure_ascii=False)
+        self.assertNotIn('"query"', serialized)
+        self.assertNotIn('"excerpt"', serialized)
+
+    def test_top5_regression_fails_even_when_source_safety_passes(self) -> None:
+        import measure_search_quality
+
+        corpus_path = (
+            self.workspace
+            / ".agents/skills/project-knowledge/references/search-quality-cases.json"
+        )
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(
+                measure_search_quality,
+                "query_repository",
+                return_value={"results": []},
+            ),
+            contextlib.redirect_stdout(stdout),
+        ):
+            exit_code = measure_search_quality.main(
+                ["--repo", str(self.workspace), "--corpus", str(corpus_path)]
+            )
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(1, exit_code)
+        self.assertEqual("failed", report["outcome"])
+        self.assertEqual("passed", report["source_safety"]["outcome"])
+        self.assertEqual(0.0, report["top5"]["hit_rate"])
+        self.assertFalse(report["top5"]["baseline_passed"])
+
+    def test_controlled_drifted_source_is_excluded_from_real_results(self) -> None:
+        import measure_search_quality
+
+        repo = _build_retrieval_fixture(self.fixture_root)
+        drifted = repo / "src/stale-boundary.md"
+        drifted.write_text(
+            "Controlled drift fixture must not be returned.\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        context = measure_search_quality.query_repository(
+            str(repo),
+            stage="requirements",
+            query="capability token",
+        )
+        observed = {item["path"] for item in context["results"]}
+        self.assertIn("docs/knowledge/security/capability-token.md", observed)
+        self.assertNotIn("docs/knowledge/incidents/stale-capability-token.md", observed)
+
+
 TEST_CASES = {
     "StageHookContractTests": StageHookContractTests,
     "HumanGateReviewTests": HumanGateReviewTests,
+    "DocumentationAndCiImprovementTests": DocumentationAndCiImprovementTests,
+    "SuiteMetricsTests": SuiteMetricsTests,
+    "SearchQualityBaselineTests": SearchQualityBaselineTests,
 }
 
 

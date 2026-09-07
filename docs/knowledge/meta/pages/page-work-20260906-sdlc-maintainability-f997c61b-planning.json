@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260906-sdlc-maintainability-f997c61b-planning",
+      "content_anchor": "planning-claim",
+      "contradicts": [],
+      "evidence_class": "planned",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "611a521403739995856110ad24f399faec9695279f266fe40f029cda9dc164c2",
+          "locator": {
+            "end_line": 13,
+            "start_line": 13
+          },
+          "path": "docs/work/work-20260906-sdlc-maintainability-f997c61b/plan/plan.md",
+          "sha256": "d13b241613b889d187cefd59cf4a970e7efbf36a477c18356eab428fb850b380"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/decisions/work-20260906-sdlc-maintainability-f997c61b-planning.md",
+  "content_sha256": "beedb30e43132d5b7064f7c5f19111a220caadf3270fe61a181ecb13facbb80e",
+  "lifecycle": "current",
+  "page_id": "page-work-20260906-sdlc-maintainability-f997c61b-planning",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "planning"
+  ],
+  "title": "SDLC 專案可維護性、診斷與量測技術規劃"
+}

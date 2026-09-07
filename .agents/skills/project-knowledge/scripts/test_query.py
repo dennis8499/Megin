@@ -1083,6 +1083,42 @@ class PerformanceTests(unittest.TestCase):
             )
         self.assertFalse(self.fixture_root.exists())
 
+    def test_fixture_cleanup_does_not_strip_posix_directory_permissions(self) -> None:
+        import knowledge_benchmark
+        import test_behavior
+
+        real_rmtree = shutil.rmtree
+        if self.fixture_root.exists():
+            _remove_fixture(self.fixture_root)
+
+        for module, remover in (
+            (knowledge_benchmark, knowledge_benchmark._safe_remove_fixture),
+            (test_behavior, test_behavior._remove_fixture),
+        ):
+            with self.subTest(module=module.__name__):
+                self.fixture_root.mkdir()
+                (self.fixture_root / "sentinel.txt").write_text(
+                    "fixture\n",
+                    encoding="utf-8",
+                    newline="\n",
+                )
+
+                def remove_without_callback(path, **_kwargs):
+                    real_rmtree(path)
+
+                with (
+                    mock.patch.object(module, "_WINDOWS", False, create=True),
+                    mock.patch.object(module.os, "chmod") as chmod,
+                    mock.patch.object(
+                        module.shutil,
+                        "rmtree",
+                        side_effect=remove_without_callback,
+                    ),
+                ):
+                    remover(self.fixture_root)
+                chmod.assert_not_called()
+                self.assertFalse(self.fixture_root.exists())
+
     def test_portability_comparator_requires_cold_warm_hash_contract(self) -> None:
         import compare_portability_reports
 

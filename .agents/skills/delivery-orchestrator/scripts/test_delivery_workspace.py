@@ -4,9 +4,14 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.util
+import inspect
+import io
 import json
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -27,13 +32,9 @@ from test_delivery_worktree import DeliveryWorktreeTests, UnifiedEntryAuthorizat
 class DeliveryPerformanceTests(support.DeliveryFixture):
     def test_50k_repository_probe_transition_and_authorize_stay_under_two_seconds(self) -> None:
         primary = self.make_repo("performance-50k-project")
-        blob = subprocess.run(
+        blob = support.run(
             ["git", "-C", str(primary), "hash-object", "-w", "--stdin"],
-            input=b"fixture\n",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            shell=False,
+            input_bytes=b"fixture\n",
         ).stdout.decode("ascii").strip()
         index_entries = b"".join(
             (
@@ -41,13 +42,9 @@ class DeliveryPerformanceTests(support.DeliveryFixture):
             ).encode("ascii")
             for index in range(49_999)
         )
-        subprocess.run(
+        support.run(
             ["git", "-C", str(primary), "update-index", "--add", "--index-info"],
-            input=index_entries,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            shell=False,
+            input_bytes=index_entries,
         )
         support.git(primary, "commit", "-m", "50k performance fixture")
         support.git(primary, "checkout-index", "--all", "--force")
@@ -247,6 +244,434 @@ class DeliveryPerformanceTests(support.DeliveryFixture):
         )
 
 
+class DeliveryTransitionArchitectureTests(support.DeliveryFixture):
+    BDD_BINDINGS = {"BDD-028": "test_phase_handlers_and_validator_adapter_are_explicit"}
+
+    def test_phase_handlers_and_validator_adapter_are_explicit(self) -> None:
+        script_dir = Path(__file__).resolve().parent
+        handlers_path = script_dir / "_delivery_transition_handlers.py"
+        adapter_path = script_dir / "_delivery_validator_adapter.py"
+        self.assertTrue(handlers_path.is_file(), "phase transition handlers are absent")
+        self.assertTrue(adapter_path.is_file(), "owner validator adapter is absent")
+
+        handlers_spec = importlib.util.spec_from_file_location(
+            "delivery_transition_handlers_contract", handlers_path
+        )
+        self.assertIsNotNone(handlers_spec)
+        self.assertIsNotNone(handlers_spec.loader)
+        handlers = importlib.util.module_from_spec(handlers_spec)
+        sys.modules[handlers_spec.name] = handlers
+        handlers_spec.loader.exec_module(handlers)
+        self.assertEqual(
+            {"requirements", "planning", "implementation", "knowledge"},
+            set(handlers.PHASE_HANDLERS),
+        )
+        self.assertTrue(
+            all(
+                isinstance(handler, handlers.TransitionPhaseHandler)
+                for handler in handlers.PHASE_HANDLERS.values()
+            )
+        )
+        self.assertTrue(hasattr(handlers, "TransitionContext"))
+        self.assertTrue(handlers.TransitionContext.__dataclass_params__.frozen)
+        request = handlers.TransitionRequest(
+            current_phase="requirements",
+            current_status="active",
+            phase="planning",
+            status="active",
+            requirements=handlers.OptionalBinding(("path", "hash", ("approval",))),
+            plan=handlers.OptionalBinding((None, None, None, ())),
+            implementation=handlers.OptionalBinding((None, None, None)),
+            knowledge_review=handlers.OptionalBinding((None, None, None, None, None)),
+            promotion=handlers.OptionalBinding((None, None, None, None)),
+        )
+        self.assertEqual(("planning", "active"), handlers.validate_transition_route(request))
+
+        adapter_spec = importlib.util.spec_from_file_location(
+            "delivery_validator_adapter_contract", adapter_path
+        )
+        self.assertIsNotNone(adapter_spec)
+        self.assertIsNotNone(adapter_spec.loader)
+        adapter = importlib.util.module_from_spec(adapter_spec)
+        sys.modules[adapter_spec.name] = adapter
+        adapter_spec.loader.exec_module(adapter)
+        owner = adapter.OwnerValidatorAdapter()
+        self.assertIs(owner.validator("planning"), owner.validator("planning"))
+
+        record_source = (script_dir / "_delivery_record.py").read_text(encoding="utf-8")
+        self.assertNotIn("importlib.util", record_source)
+        coordinator = inspect.getsource(support.workspace._transition_record_unlocked)
+        self.assertIn("apply_transition_handlers", coordinator)
+        for phase_owned_block in (
+            'PHASE_HANDLERS["requirements"]',
+            'PHASE_HANDLERS["planning"]',
+            'PHASE_HANDLERS["implementation"]',
+            'PHASE_HANDLERS["knowledge"]',
+            "if transition_request.requirements.supplied",
+            "if transition_request.plan.supplied",
+            "if transition_request.implementation.supplied",
+            "if review_supplied",
+        ):
+            self.assertNotIn(phase_owned_block, coordinator)
+
+    def test_windows_git_capture_uses_regular_files_and_preserves_bytes(self) -> None:
+        observed: dict[str, object] = {}
+
+        def fake_run(command, **kwargs):
+            observed.update(kwargs)
+            self.assertIsNot(kwargs.get("stdin"), subprocess.PIPE)
+            self.assertIsNot(kwargs.get("stdout"), subprocess.PIPE)
+            self.assertIsNot(kwargs.get("stderr"), subprocess.PIPE)
+            self.assertEqual(b"request-bytes", kwargs["stdin"].read())
+            kwargs["stdout"].write(b"response-bytes")
+            kwargs["stderr"].write(b"diagnostic-bytes")
+            kwargs["stdout"].flush()
+            kwargs["stderr"].flush()
+            return subprocess.CompletedProcess(command, 17)
+
+        with mock.patch.object(delivery_git.subprocess, "run", side_effect=fake_run):
+            completed = delivery_git._run_captured_process(
+                ["git", "version"],
+                environment={"LC_ALL": "C"},
+                input_bytes=b"request-bytes",
+                use_regular_files=True,
+            )
+
+        self.assertEqual(17, completed.returncode)
+        self.assertEqual(b"response-bytes", completed.stdout)
+        self.assertEqual(b"diagnostic-bytes", completed.stderr)
+        self.assertFalse(observed.get("shell", False))
+
+        fixture_result = subprocess.CompletedProcess(["git", "version"], 0, b"fixture", b"")
+        with mock.patch.object(
+            support,
+            "_run_captured_process",
+            return_value=fixture_result,
+        ) as fixture_capture:
+            self.assertIs(fixture_result, support.run(["git", "version"]))
+        fixture_capture.assert_called_once()
+
+
+class DeliveryDoctorTests(support.DeliveryFixture):
+    BDD_BINDINGS = {"BDD-030": "test_doctor_passes_with_seven_checks_and_zero_writes"}
+
+    @staticmethod
+    def _path_snapshot(path: Path) -> tuple[bool, dict[str, str]]:
+        return path.exists(), support.file_bytes(path) if path.exists() else {}
+
+    def _observed_snapshot(
+        self,
+        primary: Path,
+        delivery: Path,
+        sentinel: Path,
+        registry: Path | None = None,
+    ) -> dict[str, object]:
+        observed_registry = registry or self.registry
+        return {
+            "primary": support.primary_snapshot(primary),
+            "delivery": support.primary_snapshot(delivery),
+            "registry": self._path_snapshot(observed_registry),
+            "sentinel": sentinel.read_bytes(),
+        }
+
+    def test_doctor_passes_with_seven_checks_and_zero_writes(self) -> None:
+        primary = self.make_repo("doctor-valid")
+        work_id = "doctor-valid-work"
+        delivery = Path(self.start(primary, work_id)["worktree"])
+        sentinel = self.root / "outside-sentinel.bin"
+        sentinel.write_bytes(b"outside remains unchanged\n")
+        before = self._observed_snapshot(primary, delivery, sentinel)
+
+        report = support.workspace.doctor_workspace(
+            delivery,
+            root=self.registry,
+            work_id=work_id,
+        )
+
+        self.assertEqual("delivery-doctor/v1", report["schema"])
+        self.assertEqual("passed", report["outcome"])
+        self.assertEqual(0, support.workspace.doctor_exit_code(report))
+        self.assertEqual(
+            [
+                "repository_identity",
+                "registry",
+                "record",
+                "generation",
+                "artifacts",
+                "evidence",
+                "recovery",
+            ],
+            [check["check_id"] for check in report["checks"]],
+        )
+        self.assertTrue(all(check["outcome"] == "passed" for check in report["checks"]))
+        self.assertEqual(work_id, report["work"]["work_id"])
+        self.assertTrue(
+            any(action["code"] == "RESUME_CURRENT_RUN" for action in report["next_actions"])
+        )
+        self.assertEqual(before, self._observed_snapshot(primary, delivery, sentinel))
+
+    def test_discovery_failures_are_closed_and_do_not_select_a_run(self) -> None:
+        no_run_repo = self.make_repo("doctor-no-run")
+        absent_registry = self.root / "absent-registry"
+        report = support.workspace.doctor_workspace(no_run_repo, root=absent_registry)
+        self.assertEqual("blocked", report["outcome"])
+        self.assertIn("NO_ACTIVE_RUN", {item["code"] for item in report["diagnostics"]})
+        self.assertIsNone(report["work"])
+        self.assertFalse(absent_registry.exists())
+
+        missing_repo = self.make_repo("doctor-missing-record")
+        missing_probe = support.workspace.probe_repository(missing_repo)
+        missing_root = self.root / "missing-registry"
+        missing_dir = (
+            missing_root
+            / "repos"
+            / missing_probe["repo_id"]
+            / "works"
+            / "doctor-missing-work"
+        )
+        missing_dir.mkdir(parents=True)
+        before_missing = self._path_snapshot(missing_root)
+        missing = support.workspace.doctor_workspace(
+            missing_repo,
+            root=missing_root,
+            work_id="doctor-missing-work",
+        )
+        self.assertIn("RECORD_MISSING", {item["code"] for item in missing["diagnostics"]})
+        self.assertEqual(before_missing, self._path_snapshot(missing_root))
+
+        corrupt_repo = self.make_repo("doctor-corrupt-record")
+        corrupt_probe = support.workspace.probe_repository(corrupt_repo)
+        corrupt_root = self.root / "corrupt-registry"
+        corrupt_path = (
+            corrupt_root
+            / "repos"
+            / corrupt_probe["repo_id"]
+            / "works"
+            / "doctor-corrupt-work"
+            / "run.json"
+        )
+        corrupt_path.parent.mkdir(parents=True)
+        corrupt_path.write_bytes(b'{"schema":"delivery-run/v1",')
+        before_corrupt = self._path_snapshot(corrupt_root)
+        corrupt = support.workspace.doctor_workspace(
+            corrupt_repo,
+            root=corrupt_root,
+            work_id="doctor-corrupt-work",
+        )
+        self.assertIn("INVALID_RECORD", {item["code"] for item in corrupt["diagnostics"]})
+        self.assertEqual(before_corrupt, self._path_snapshot(corrupt_root))
+
+        ambiguous_repo = self.make_repo("doctor-ambiguous")
+        first = Path(self.start(ambiguous_repo, "doctor-first-work")["worktree"])
+        second = Path(self.start(ambiguous_repo, "doctor-second-work")["worktree"])
+        sentinel = self.root / "ambiguous-sentinel.bin"
+        sentinel.write_bytes(b"keep")
+        before = {
+            "primary": support.primary_snapshot(ambiguous_repo),
+            "first": support.primary_snapshot(first),
+            "second": support.primary_snapshot(second),
+            "registry": self._path_snapshot(self.registry),
+            "sentinel": sentinel.read_bytes(),
+        }
+        ambiguous = support.workspace.doctor_workspace(ambiguous_repo, root=self.registry)
+        self.assertIn("AMBIGUOUS_RUNS", {item["code"] for item in ambiguous["diagnostics"]})
+        self.assertEqual(["doctor-first-work", "doctor-second-work"], ambiguous["available_work_ids"])
+        self.assertIsNone(ambiguous["work"])
+        self.assertEqual(
+            before,
+            {
+                "primary": support.primary_snapshot(ambiguous_repo),
+                "first": support.primary_snapshot(first),
+                "second": support.primary_snapshot(second),
+                "registry": self._path_snapshot(self.registry),
+                "sentinel": sentinel.read_bytes(),
+            },
+        )
+
+    def test_identity_artifact_evidence_and_recovery_are_distinct(self) -> None:
+        identity_repo = self.make_repo("doctor-identity")
+        identity_work = "doctor-identity-work"
+        identity_delivery = Path(self.start(identity_repo, identity_work)["worktree"])
+        identity = support.workspace.doctor_workspace(
+            identity_repo,
+            root=self.registry,
+            work_id=identity_work,
+        )
+        self.assertIn("IDENTITY_MISMATCH", {item["code"] for item in identity["diagnostics"]})
+        self.assertEqual(3, support.workspace.doctor_exit_code(identity))
+
+        drift_repo = self.make_repo("doctor-artifact")
+        drift_work = "doctor-artifact-work"
+        drift_delivery = Path(self.start(drift_repo, drift_work)["worktree"])
+        self.enter_requirements(drift_delivery, drift_work)
+        requirements_path, requirements_sha = self.approve_requirements(
+            drift_delivery, drift_work
+        )
+        self.approve_plan(
+            drift_delivery,
+            drift_work,
+            requirements_path,
+            requirements_sha,
+        )
+        requirements_file = drift_delivery / Path(*requirements_path.split("/"))
+        requirements_file.write_text("# drifted bytes\n", encoding="utf-8", newline="\n")
+        before_drift = requirements_file.read_bytes()
+        drift = support.workspace.doctor_workspace(
+            drift_delivery,
+            root=self.registry,
+            work_id=drift_work,
+        )
+        self.assertIn("ARTIFACT_DRIFT", {item["code"] for item in drift["diagnostics"]})
+        self.assertEqual(before_drift, requirements_file.read_bytes())
+
+        evidence_repo = self.make_repo("doctor-evidence")
+        evidence_work = "doctor-evidence-work"
+        evidence_delivery = Path(self.start(evidence_repo, evidence_work)["worktree"])
+        self.enter_requirements(evidence_delivery, evidence_work)
+        self.approve_requirements(evidence_delivery, evidence_work)
+        evidence_probe = support.workspace.probe_repository(evidence_delivery)
+        record_path = (
+            self.registry
+            / "repos"
+            / evidence_probe["repo_id"]
+            / "works"
+            / evidence_work
+            / "run.json"
+        )
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record["requirements"]["revisions"][-1]["approval_evidence_refs"] = []
+        record_path.write_text(
+            json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        before_evidence = record_path.read_bytes()
+        evidence = support.workspace.doctor_workspace(
+            evidence_delivery,
+            root=self.registry,
+            work_id=evidence_work,
+        )
+        self.assertIn("EVIDENCE_MISSING", {item["code"] for item in evidence["diagnostics"]})
+        self.assertEqual(before_evidence, record_path.read_bytes())
+
+        recovery_repo = self.make_repo("doctor-recovery")
+        recovery_work = "doctor-recovery-work"
+        recovery_delivery = Path(self.start(recovery_repo, recovery_work)["worktree"])
+        recovery_probe = support.workspace.probe_repository(recovery_delivery)
+        knowledge_repo_root = (
+            Path(tempfile.gettempdir()).resolve()
+            / "project-knowledge"
+            / "repos"
+            / recovery_probe["repo_id"]
+        )
+        journal = knowledge_repo_root / "journals" / "doctor-fixture" / "journal.json"
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text(
+            json.dumps({"schema": "knowledge-journal/v1", "status": "in_progress"}),
+            encoding="utf-8",
+            newline="\n",
+        )
+        before_journal = journal.read_bytes()
+        try:
+            recovery = support.workspace.doctor_workspace(
+                recovery_delivery,
+                root=self.registry,
+                work_id=recovery_work,
+            )
+            self.assertIn(
+                "RECOVERY_REQUIRED",
+                {item["code"] for item in recovery["diagnostics"]},
+            )
+            self.assertEqual(before_journal, journal.read_bytes())
+        finally:
+            shutil.rmtree(knowledge_repo_root, ignore_errors=True)
+
+    def test_invalid_input_environment_failure_and_cli_exit_codes(self) -> None:
+        import _delivery_doctor as delivery_doctor
+
+        repo = self.make_repo("doctor-exits")
+        invalid = support.workspace.doctor_workspace(
+            repo,
+            root=self.registry,
+            work_id="INVALID WORK ID",
+        )
+        self.assertEqual("invalid", invalid["outcome"])
+        self.assertEqual(2, support.workspace.doctor_exit_code(invalid))
+
+        with mock.patch.object(
+            delivery_doctor,
+            "probe_repository",
+            side_effect=support.workspace.DeliveryError(
+                "git unavailable",
+                code="GIT_COMMAND_FAILED",
+            ),
+        ):
+            unavailable = support.workspace.doctor_workspace(repo, root=self.registry)
+        self.assertEqual("unavailable", unavailable["outcome"])
+        self.assertIn(
+            "ENVIRONMENT_UNAVAILABLE",
+            {item["code"] for item in unavailable["diagnostics"]},
+        )
+        self.assertEqual(4, support.workspace.doctor_exit_code(unavailable))
+
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            exit_code = support.workspace.main(
+                [
+                    "doctor",
+                    "--repo",
+                    str(repo),
+                    "--registry-root",
+                    str(self.registry),
+                ]
+            )
+        cli_report = json.loads(stdout.getvalue())
+        self.assertEqual(3, exit_code)
+        self.assertEqual("delivery-doctor/v1", cli_report["schema"])
+        self.assertIn("NO_ACTIVE_RUN", {item["code"] for item in cli_report["diagnostics"]})
+
+    def test_process_metrics_count_returns_and_leave_open_phases_unavailable(self) -> None:
+        import _delivery_doctor as delivery_doctor
+
+        events = [
+            {
+                "at": "2026-09-06T00:00:00Z",
+                "from_phase": None,
+                "to_phase": "workspace",
+            },
+            {
+                "at": "2026-09-06T00:00:10Z",
+                "from_phase": "workspace",
+                "to_phase": "requirements",
+            },
+            {
+                "at": "2026-09-06T00:00:20Z",
+                "from_phase": "requirements",
+                "to_phase": "planning",
+            },
+            {
+                "at": "2026-09-06T00:00:30Z",
+                "from_phase": "planning",
+                "to_phase": "requirements",
+            },
+        ]
+        report = delivery_doctor.summarize_process_metrics(events)
+        self.assertEqual("delivery-process-metrics/v1", report["schema"])
+        self.assertEqual(1, report["phase_return_count"])
+        self.assertEqual(10.0, report["phase_durations_seconds"]["workspace"])
+        self.assertEqual(10.0, report["phase_durations_seconds"]["planning"])
+        self.assertIsNone(report["phase_durations_seconds"]["requirements"])
+        self.assertIn(
+            "phase_durations_seconds.requirements",
+            report["unavailable_fields"],
+        )
+        self.assertIsNone(report["phase_durations_seconds"]["implementation"])
+        self.assertIn(
+            "phase_durations_seconds.implementation",
+            report["unavailable_fields"],
+        )
+
+
 TEST_CASES = (
     DeliverySafetyTests,
     DeliveryTransitionTests,
@@ -255,6 +680,8 @@ TEST_CASES = (
     DeliveryWorktreeTests,
     UnifiedEntryAuthorizationTests,
     DeliveryPerformanceTests,
+    DeliveryTransitionArchitectureTests,
+    DeliveryDoctorTests,
 )
 
 

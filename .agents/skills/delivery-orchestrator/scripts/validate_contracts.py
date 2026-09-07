@@ -46,6 +46,7 @@ REQUIRED_FILES = {
     "scripts/_delivery_git.py",
     "scripts/_delivery_record.py",
     "scripts/_delivery_authorization.py",
+    "scripts/_delivery_doctor.py",
     "scripts/delivery_workspace.py",
     "scripts/_delivery_test_support.py",
     "scripts/test_delivery_worktree.py",
@@ -101,6 +102,7 @@ def _load_module(path: Path, name: str) -> Any:
             "_delivery_git",
             "_delivery_record",
             "_delivery_authorization",
+            "_delivery_doctor",
         ):
             sys.modules.pop(private, None)
         spec = importlib.util.spec_from_file_location(name, path)
@@ -234,6 +236,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         scripts / "_delivery_git.py",
         scripts / "_delivery_record.py",
         scripts / "_delivery_authorization.py",
+        scripts / "_delivery_doctor.py",
     ]
     sources = {path.name: path.read_text(encoding="utf-8") for path in runtime_paths}
     aggregate = "\n".join(sources.values())
@@ -401,6 +404,50 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
             f"{unsafe_authorization_calls}"
         )
 
+    doctor_source = sources["_delivery_doctor.py"]
+    doctor_tree = trees["_delivery_doctor.py"]
+    for fragment in (
+        'DOCTOR_SCHEMA = "delivery-doctor/v1"',
+        '"repository_identity"',
+        '"registry"',
+        '"record"',
+        '"generation"',
+        '"artifacts"',
+        '"evidence"',
+        '"recovery"',
+        "def doctor_workspace(",
+        "def doctor_exit_code(",
+    ):
+        if fragment not in doctor_source:
+            errors.append(f"doctor authority missing semantic primitive {fragment!r}")
+    forbidden_doctor_calls = {
+        "_atomic_create_json",
+        "_atomic_write_json",
+        "_exclusive_lock",
+        "_materialize_approved_upstream",
+        "recover_repository",
+        "start_workspace",
+        "transition_record",
+        "write_bytes",
+        "write_text",
+        "mkdir",
+        "unlink",
+    }
+    observed_doctor_calls = {
+        node.func.id
+        for node in ast.walk(doctor_tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    } | {
+        node.func.attr
+        for node in ast.walk(doctor_tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    unsafe_doctor_calls = sorted(forbidden_doctor_calls & observed_doctor_calls)
+    if unsafe_doctor_calls:
+        errors.append(f"doctor authority invokes mutation primitive: {unsafe_doctor_calls}")
+    if "os.replace(" in doctor_source:
+        errors.append("doctor authority invokes mutation primitive: os.replace")
+
     authorization_contract = (
         bundle / "references/stage-authorization.md"
     ).read_text(encoding="utf-8")
@@ -472,7 +519,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         None,
     )
     commands = set(action.choices) if action is not None else set()
-    if commands != {"probe", "start", "locate", "authorize", "transition"}:
+    if commands != {"probe", "start", "locate", "authorize", "doctor", "transition"}:
         errors.append(f"public CLI commands drifted: {sorted(commands)}")
     if helper.probe_repository.__module__ != "_delivery_git":
         errors.append("probe_repository is not owned by _delivery_git")
@@ -482,6 +529,8 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
         errors.append("locate_workspace is not owned by _delivery_authorization")
     if helper.authorize_stage.__module__ != "_delivery_authorization":
         errors.append("authorize_stage is not owned by _delivery_authorization")
+    if helper.doctor_workspace.__module__ != "_delivery_doctor":
+        errors.append("doctor_workspace is not owned by _delivery_doctor")
 
     completed = subprocess.CompletedProcess(
         ["git"],

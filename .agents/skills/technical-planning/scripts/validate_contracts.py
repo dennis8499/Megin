@@ -15,6 +15,13 @@ from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
 
+SHARED_SCRIPTS = Path(__file__).resolve().parents[2] / "_shared"
+if str(SHARED_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SHARED_SCRIPTS))
+
+from schema_subset import schema_keyword_errors, validate_instance
+
+
 AUTHORITY_FILES = {
     "planning-entrypoint": "technical-planning/SKILL.md",
     "ready-plan": "technical-planning/references/ready-plan-contract.md",
@@ -161,113 +168,6 @@ def partial_safeguard_prose_errors(safeguards: Any) -> list[str]:
                 errors.append(
                     f"partial follow_up[{index}] lacks an explicit verification action (overclaim risk)"
                 )
-    return errors
-
-
-def _type_matches(value: Any, expected: str) -> bool:
-    return {
-        "object": isinstance(value, dict),
-        "array": isinstance(value, list),
-        "string": isinstance(value, str),
-        "integer": isinstance(value, int) and not isinstance(value, bool),
-        "boolean": isinstance(value, bool),
-        "null": value is None,
-    }.get(expected, True)
-
-
-def validate_instance(instance: Any, schema: dict[str, Any], definition: str | None = None) -> list[str]:
-    """Validate the JSON-Schema subset used by these contracts without dependencies."""
-    root = schema
-    node = schema["$defs"][definition] if definition else schema
-    errors: list[str] = []
-
-    def check(value: Any, rule: dict[str, Any], location: str) -> None:
-        if "$ref" in rule:
-            try:
-                check(value, _pointer(root, rule["$ref"]), location)
-            except KeyError as exc:
-                errors.append(f"{location}: {exc}")
-            return
-
-        for keyword in ("allOf",):
-            for child in rule.get(keyword, []):
-                check(value, child, location)
-
-        for keyword in ("anyOf", "oneOf"):
-            if keyword not in rule:
-                continue
-            matches = 0
-            branch_messages: list[list[str]] = []
-            for child in rule[keyword]:
-                before = len(errors)
-                check(value, child, location)
-                branch_messages.append(errors[before:])
-                del errors[before:]
-                if not branch_messages[-1]:
-                    matches += 1
-            required_matches = 1 if keyword == "oneOf" else None
-            if matches == 0 or (required_matches is not None and matches != required_matches):
-                errors.append(f"{location}: {keyword} matched {matches} branches")
-
-        if "if" in rule:
-            before = len(errors)
-            check(value, rule["if"], location)
-            condition_matches = len(errors) == before
-            del errors[before:]
-            branch = rule.get("then" if condition_matches else "else")
-            if branch:
-                check(value, branch, location)
-
-        if "const" in rule and value != rule["const"]:
-            errors.append(f"{location}: expected const {rule['const']!r}")
-        if "enum" in rule and value not in rule["enum"]:
-            errors.append(f"{location}: value {value!r} is outside enum")
-
-        expected_types = rule.get("type")
-        if expected_types:
-            choices = [expected_types] if isinstance(expected_types, str) else expected_types
-            if not any(_type_matches(value, choice) for choice in choices):
-                errors.append(f"{location}: expected type {choices}, got {type(value).__name__}")
-                return
-
-        if isinstance(value, dict):
-            for name in rule.get("required", []):
-                if name not in value:
-                    errors.append(f"{location}: missing required property {name}")
-            properties = rule.get("properties", {})
-            if rule.get("additionalProperties") is False:
-                for name in value.keys() - properties.keys():
-                    errors.append(f"{location}: unexpected property {name}")
-            additional_rule = rule.get("additionalProperties")
-            for name, child in value.items():
-                child_rule = properties.get(name)
-                if child_rule is None and isinstance(additional_rule, dict):
-                    child_rule = additional_rule
-                if child_rule:
-                    check(child, child_rule, f"{location}.{name}")
-            if len(value) < rule.get("minProperties", 0):
-                errors.append(f"{location}: too few properties")
-
-        if isinstance(value, list):
-            if len(value) < rule.get("minItems", 0):
-                errors.append(f"{location}: too few items")
-            if "maxItems" in rule and len(value) > rule["maxItems"]:
-                errors.append(f"{location}: too many items")
-            if "items" in rule:
-                for index, child in enumerate(value):
-                    check(child, rule["items"], f"{location}[{index}]")
-
-        if isinstance(value, str):
-            if len(value) < rule.get("minLength", 0):
-                errors.append(f"{location}: string is too short")
-            if "pattern" in rule and not re.search(rule["pattern"], value):
-                errors.append(f"{location}: does not match {rule['pattern']}")
-
-        if isinstance(value, int) and not isinstance(value, bool) and "minimum" in rule:
-            if value < rule["minimum"]:
-                errors.append(f"{location}: below minimum {rule['minimum']}")
-
-    check(instance, node, definition or "$")
     return errors
 
 

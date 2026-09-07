@@ -20,6 +20,8 @@ import unittest
 from pathlib import Path
 from typing import Any, Sequence
 
+from _delivery_git import _run_captured_process
+
 
 SCRIPT = Path(__file__).with_name("delivery_workspace.py")
 SPEC = importlib.util.spec_from_file_location("delivery_workspace", SCRIPT)
@@ -39,7 +41,13 @@ PLANNING_SPEC.loader.exec_module(planning_fixture)
 REQUEST_SHA = hashlib.sha256(b"original delivery request").hexdigest()
 
 
-def run(command: Sequence[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[bytes]:
+def run(
+    command: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    check: bool = True,
+    input_bytes: bytes | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     environment = os.environ.copy()
     environment.update(
         {
@@ -50,13 +58,11 @@ def run(command: Sequence[str], *, cwd: Path | None = None, check: bool = True) 
             "GIT_CONFIG_NOSYSTEM": "1",
         }
     )
-    completed = subprocess.run(
-        list(command),
+    completed = _run_captured_process(
+        command,
         cwd=cwd,
-        env=environment,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
+        environment=environment,
+        input_bytes=input_bytes,
     )
     if check and completed.returncode != 0:
         raise AssertionError(

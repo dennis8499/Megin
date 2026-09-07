@@ -233,6 +233,7 @@ class DeliveryWorktreeTests(DeliveryFixture):
             "_delivery_git.py",
             "_delivery_record.py",
             "_delivery_authorization.py",
+            "_delivery_doctor.py",
         ):
             self.assertTrue(SCRIPT.with_name(name).is_file(), name)
         parser = workspace._parser()
@@ -240,12 +241,13 @@ class DeliveryWorktreeTests(DeliveryFixture):
             action for action in parser._actions if action.__class__.__name__ == "_SubParsersAction"
         )
         self.assertEqual(
-            {"probe", "start", "locate", "authorize", "transition"},
+            {"probe", "start", "locate", "authorize", "doctor", "transition"},
             set(subparsers.choices),
         )
         self.assertEqual("_delivery_git", workspace.probe_repository.__module__)
         self.assertEqual("_delivery_record", workspace.validate_record.__module__)
         self.assertEqual("_delivery_authorization", workspace.authorize_stage.__module__)
+        self.assertEqual("_delivery_doctor", workspace.doctor_workspace.__module__)
         self.assertEqual("delivery_workspace", workspace.start_workspace.__module__)
 
     def test_authorize_stage_is_read_only_and_fail_closed(self) -> None:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -146,6 +147,68 @@ def _git_failure_error(
     return DeliveryError(fallback_message, code=fallback_code)
 
 
+def _run_captured_process(
+    command: Sequence[str],
+    *,
+    environment: dict[str, str],
+    cwd: str | Path | None = None,
+    input_bytes: bytes | None = None,
+    use_regular_files: bool | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run a command while avoiding Git for Windows' pipe startup race."""
+    regular_files = os.name == "nt" if use_regular_files is None else use_regular_files
+    if not regular_files:
+        return subprocess.run(
+            list(command),
+            cwd=cwd,
+            env=environment,
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            shell=False,
+        )
+
+    with (
+        tempfile.TemporaryFile(mode="w+b") as stdout_stream,
+        tempfile.TemporaryFile(mode="w+b") as stderr_stream,
+    ):
+        if input_bytes is None:
+            completed = subprocess.run(
+                list(command),
+                cwd=cwd,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout_stream,
+                stderr=stderr_stream,
+                check=False,
+                shell=False,
+            )
+        else:
+            with tempfile.TemporaryFile(mode="w+b") as stdin_stream:
+                stdin_stream.write(input_bytes)
+                stdin_stream.flush()
+                stdin_stream.seek(0)
+                completed = subprocess.run(
+                    list(command),
+                    cwd=cwd,
+                    env=environment,
+                    stdin=stdin_stream,
+                    stdout=stdout_stream,
+                    stderr=stderr_stream,
+                    check=False,
+                    shell=False,
+                )
+        stdout_stream.seek(0)
+        stderr_stream.seek(0)
+        return subprocess.CompletedProcess(
+            args=completed.args,
+            returncode=completed.returncode,
+            stdout=stdout_stream.read(),
+            stderr=stderr_stream.read(),
+        )
+
+
 def _git(
     repo: str | Path,
     args: Sequence[str],
@@ -165,13 +228,10 @@ def _git(
     environment["GIT_NO_LAZY_FETCH"] = "1"
     environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     environment["GIT_TERMINAL_PROMPT"] = "0"
-    completed = subprocess.run(
+    completed = _run_captured_process(
         command,
-        env=environment,
-        input=input_bytes,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
+        environment=environment,
+        input_bytes=input_bytes,
     )
     if check and completed.returncode != 0:
         raise _git_failure_error(

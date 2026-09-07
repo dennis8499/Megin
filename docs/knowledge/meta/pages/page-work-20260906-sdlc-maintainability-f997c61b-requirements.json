@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260906-sdlc-maintainability-f997c61b-requirements",
+      "content_anchor": "requirements-claim",
+      "contradicts": [],
+      "evidence_class": "required",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "13103b970648fdb4230fe4872e8b0cdb42dcbbc300876a5ebca70c163816d6b7",
+          "locator": {
+            "end_line": 23,
+            "start_line": 23
+          },
+          "path": "docs/work/work-20260906-sdlc-maintainability-f997c61b/requirements.md",
+          "sha256": "74c90df50b27d23486256c902e40ea80d3ed96a04118895021db6cadff1732ff"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260906-sdlc-maintainability-f997c61b-requirements.md",
+  "content_sha256": "40a6751e0ef169f727297c7b2ff2bde6ed80e426a14b24f5a195099cddb0478f",
+  "lifecycle": "current",
+  "page_id": "page-work-20260906-sdlc-maintainability-f997c61b-requirements",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "requirements"
+  ],
+  "title": "SDLC 專案可維護性、診斷與量測需求"
+}

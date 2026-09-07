@@ -27,6 +27,7 @@ class DeliveryContractMutationTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory(prefix="delivery-validator-")
         self.skills = Path(self.temporary.name) / "skills"
         for name in (
+            "_shared",
             "delivery-orchestrator",
             "technical-planning",
             "implementation-execution",

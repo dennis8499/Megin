@@ -1,0 +1,195 @@
+{
+  "schema": "search-quality-cases/v1",
+  "minimum_top5_hit_rate": 1.0,
+  "cases": [
+    {
+      "case_id": "SQ-001",
+      "category": "zh",
+      "stage": "implementation",
+      "query": "本機優先 專案知識系統",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260831-project-knowledge-system-19202d78/implementation/outcome.md", "sha256": "7ec949892f506854f4077389e034090c4d9c4a3fd3767af2c8db8c275791efa3", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-002",
+      "category": "zh",
+      "stage": "implementation",
+      "query": "可追溯索引 知識晉升",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260831-project-knowledge-system-19202d78/implementation/outcome.md", "sha256": "7ec949892f506854f4077389e034090c4d9c4a3fd3767af2c8db8c275791efa3", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-003",
+      "category": "zh",
+      "stage": "implementation",
+      "query": "混合索引搜尋 50k 檔案基準",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/implementation/outcome.md", "sha256": "99598422741c2654902517ec499335a0806dac02d58d069325dc4bcfaccbb079", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-004",
+      "category": "zh",
+      "stage": "planning",
+      "query": "統一 Skill 入口 流程授權",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md", "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721", "locator": {"start_line": 54, "end_line": 54}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-005",
+      "category": "zh",
+      "stage": "planning",
+      "query": "單一 active phase 安全邊界",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md", "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721", "locator": {"start_line": 54, "end_line": 54}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-006",
+      "category": "zh",
+      "stage": "requirements",
+      "query": "階段授權 雜湊綁定 原子寫入",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260906-sdlc-maintainability-f997c61b/requirements.md", "sha256": "74c90df50b27d23486256c902e40ea80d3ed96a04118895021db6cadff1732ff", "locator": {"start_line": 23, "end_line": 23}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-007",
+      "category": "zh",
+      "stage": "planning",
+      "query": "六個工作包 Schema Doctor 量測",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260906-sdlc-maintainability-f997c61b/plan/plan.md", "sha256": "d13b241613b889d187cefd59cf4a970e7efbf36a477c18356eab428fb850b380", "locator": {"start_line": 13, "end_line": 13}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-008",
+      "category": "zh",
+      "stage": "requirements",
+      "query": "完整且不可變 審閱 payload",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260905-gate-file-summary-chat-cc5ef02c/requirements.md", "sha256": "0be355804ca7ca0e0ddd3f7ef08b55d48342b41024d608fb2ef0e3bcc58db960", "locator": {"start_line": 105, "end_line": 105}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-009",
+      "category": "en",
+      "stage": "implementation",
+      "query": "Unified governed SDLC sole mutating workflow entry",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-3.md", "sha256": "0fce1d0af4e2c19174d104ed8ae71142403a5eef31eb8b1bba92836553ef4992", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-010",
+      "category": "en",
+      "stage": "implementation",
+      "query": "exact active phase matching Work ID identity",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-3.md", "sha256": "0fce1d0af4e2c19174d104ed8ae71142403a5eef31eb8b1bba92836553ef4992", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-011",
+      "category": "en",
+      "stage": "implementation",
+      "query": "immutable File-first review bundles Summary-only Chat",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260905-gate-file-summary-chat-cc5ef02c/implementation/outcome-3.md", "sha256": "9609d54f692f12dfd41579305198089c71ed2d300c97f368f1a92329b10e7e41", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-012",
+      "category": "en",
+      "stage": "planning",
+      "query": "sealed Candidate create-only postimage store",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260905-gate-file-summary-chat-cc5ef02c/plan/plan.md", "sha256": "015a049d822ff16200ec485feeeb8757589c132b826877d1bcaa76c253241298", "locator": {"start_line": 62, "end_line": 62}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-013",
+      "category": "en",
+      "stage": "implementation",
+      "query": "Delivery-authorized terminal capability evidence",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-3.md", "sha256": "0fce1d0af4e2c19174d104ed8ae71142403a5eef31eb8b1bba92836553ef4992", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-014",
+      "category": "en",
+      "stage": "implementation",
+      "query": "cold warm samples cross-platform parity gate",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/implementation/outcome.md", "sha256": "99598422741c2654902517ec499335a0806dac02d58d069325dc4bcfaccbb079", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-015",
+      "category": "mixed",
+      "stage": "planning",
+      "query": "人工 Gate File-first review",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260905-gate-file-summary-chat-cc5ef02c/plan/plan.md", "sha256": "015a049d822ff16200ec485feeeb8757589c132b826877d1bcaa76c253241298", "locator": {"start_line": 62, "end_line": 62}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-016",
+      "category": "mixed",
+      "stage": "planning",
+      "query": "Delivery facade 唯讀 authorize seam",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/plan/plan.md", "sha256": "24df9dad9c6580a3f13b2bb69590e8698f02f44d0e542a08215196070a518721", "locator": {"start_line": 54, "end_line": 54}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-017",
+      "category": "mixed",
+      "stage": "implementation",
+      "query": "Project Knowledge 混合索引 50k",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/implementation/outcome.md", "sha256": "99598422741c2654902517ec499335a0806dac02d58d069325dc4bcfaccbb079", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-018",
+      "category": "mixed",
+      "stage": "planning",
+      "query": "Schema Doctor 量測 improvements",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260906-sdlc-maintainability-f997c61b/plan/plan.md", "sha256": "d13b241613b889d187cefd59cf4a970e7efbf36a477c18356eab428fb850b380", "locator": {"start_line": 13, "end_line": 13}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-019",
+      "category": "exact-id",
+      "stage": "implementation",
+      "query": "work-20260903-unified-skill-entry-198002a2",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260903-unified-skill-entry-198002a2/implementation/outcome-3.md", "sha256": "0fce1d0af4e2c19174d104ed8ae71142403a5eef31eb8b1bba92836553ef4992", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-020",
+      "category": "exact-id",
+      "stage": "implementation",
+      "query": "work-20260902-skill-script-performance-0ae7b62a",
+      "query_derivation": null,
+      "expected_sources": [{"path": "docs/work/work-20260902-skill-script-performance-0ae7b62a/implementation/outcome.md", "sha256": "99598422741c2654902517ec499335a0806dac02d58d069325dc4bcfaccbb079", "locator": {"start_line": 7, "end_line": 7}}],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    },
+    {
+      "case_id": "SQ-021",
+      "category": "no-valid-source",
+      "stage": "implementation",
+      "query": null,
+      "query_derivation": "sha256-case-id",
+      "expected_sources": [],
+      "excluded_paths": ["docs/knowledge/index.md", "docs/knowledge/log.md"]
+    }
+  ]
+}

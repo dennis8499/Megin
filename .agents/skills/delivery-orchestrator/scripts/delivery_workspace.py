@@ -106,6 +106,7 @@ from _delivery_authorization import (  # noqa: E402
     authorize_stage,
     locate_workspace,
 )
+from _delivery_doctor import doctor_exit_code, doctor_workspace  # noqa: E402
 
 
 def start_workspace(
@@ -573,6 +574,14 @@ def _parser() -> argparse.ArgumentParser:
     locate.add_argument("--work-id")
     locate.add_argument("--registry-root")
 
+    doctor = subparsers.add_parser(
+        "doctor",
+        help="Diagnose delivery continuity without mutation",
+    )
+    doctor.add_argument("--repo", required=True)
+    doctor.add_argument("--work-id")
+    doctor.add_argument("--registry-root")
+
     authorize = subparsers.add_parser(
         "authorize",
         help="Read-only authorization for a governed child phase",
@@ -638,6 +647,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        exit_code = 0
         if args.command == "probe":
             result = probe_command(args)
         elif args.command == "start":
@@ -663,6 +673,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 root=registry_root(args.registry_root),
                 work_id=args.work_id,
             )
+        elif args.command == "doctor":
+            result = doctor_workspace(
+                args.repo,
+                root=args.registry_root,
+                work_id=args.work_id,
+            )
+            exit_code = doctor_exit_code(result)
         else:
             result = transition_record(
                 args.repo,
@@ -716,7 +733,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 known_secret_values=_known_secret_values_from_env(args.known_secret_env),
             )
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2))
-        return 0
+        return exit_code
     except DeliveryError as exc:
         payload: dict[str, Any] = {"error": exc.code, "message": str(exc)}
         if exc.details is not None:

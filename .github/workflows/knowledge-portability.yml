@@ -4,18 +4,48 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - ".agents/skills/project-knowledge/**"
-      - ".agents/skills/requirements-discovery/**"
-      - ".agents/skills/technical-planning/**"
-      - ".agents/skills/implementation-execution/**"
-      - ".agents/skills/bug-diagnosis/**"
-      - ".agents/skills/delivery-orchestrator/**"
+      - ".agents/skills/**"
+      - "docs/**"
+      - "README.md"
+      - "OPERATIONS.md"
+      - ".gitattributes"
       - ".github/workflows/knowledge-portability.yml"
       - ".gitignore"
 
 jobs:
+  quick:
+    name: Quick contracts and knowledge checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Ensure ripgrep
+        shell: bash
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            cargo install ripgrep --locked
+          fi
+          git --version
+          rg --version
+      - name: Syntax, schemas, owner contracts, and knowledge sources
+        shell: bash
+        run: >-
+          python -X utf8 -B
+          .agents/skills/project-knowledge/scripts/run_quick_checks.py
+          > knowledge-quick.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: knowledge-quick
+          path: knowledge-quick.json
+          if-no-files-found: error
+
   platform:
     name: ${{ matrix.os_name }}
+    needs: quick
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -54,6 +84,7 @@ jobs:
           python -X utf8 -B
           .agents/skills/project-knowledge/scripts/run_full_suite.py
           --scope all --fixture-root .knowledge-test-tmp
+          --metrics-output knowledge-suite-metrics-${{ matrix.os_name }}.json
           > knowledge-suite-${{ matrix.os_name }}.json
       - uses: actions/upload-artifact@v4
         if: always()
@@ -62,6 +93,7 @@ jobs:
           path: |
             knowledge-portability-${{ matrix.os_name }}.json
             knowledge-suite-${{ matrix.os_name }}.json
+            knowledge-suite-metrics-${{ matrix.os_name }}.json
           if-no-files-found: error
 
   compare:

@@ -34,6 +34,7 @@ QUERY_TOKENS = (
 # This oracle is intentionally fixed after the first reviewed fixture run. A
 # platform-specific path, newline, encoding, or ordering change must alter it.
 EXPECTED_FUNCTIONAL_SHA256 = "bae0d3eee98a4ba39967ca26e3b60fd1d2f5f1d781b7dca8e00b8d385c615f83"
+_WINDOWS = os.name == "nt"
 
 
 def _write(path: Path, value: bytes) -> None:
@@ -48,12 +49,19 @@ def _safe_remove_fixture(root: Path) -> None:
     if not resolved.exists():
         return
 
-    def make_writable_and_retry(function: Callable[..., object], path: str, _: object) -> None:
-        os.chmod(path, stat.S_IWRITE)
-        function(path)
+    if _WINDOWS:
+        def make_writable_and_retry(
+            function: Callable[..., object],
+            path: str,
+            _: object,
+        ) -> None:
+            os.chmod(path, stat.S_IWRITE)
+            function(path)
 
-    os.chmod(resolved, stat.S_IWRITE)
-    shutil.rmtree(resolved, onexc=make_writable_and_retry)
+        os.chmod(resolved, stat.S_IWRITE)
+        shutil.rmtree(resolved, onexc=make_writable_and_retry)
+    else:
+        shutil.rmtree(resolved)
 
 
 def _source_bytes(index: int) -> tuple[bytes, int, bytes]:

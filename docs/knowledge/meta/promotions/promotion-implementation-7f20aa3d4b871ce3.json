@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "knowledge-owner",
+    "evidence": "conversation:implementation-knowledge-work-20260906-sdlc-maintainability-f997c61b-candidate-1"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-7f20aa3d4b871ce3/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "ea0f14d4b72da3bb69011f8600159978f9df604125bc47369a00d72ec4e24ce6",
+  "promotion_id": "promotion-implementation-7f20aa3d4b871ce3",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260906-sdlc-maintainability-f997c61b"
+}

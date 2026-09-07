@@ -12,9 +12,15 @@ import re
 import stat
 import sys
 import unicodedata
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+
+SHARED_SCRIPTS = Path(__file__).resolve().parents[2] / "_shared"
+if str(SHARED_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SHARED_SCRIPTS))
+
+from schema_subset import schema_keyword_errors, validate_instance
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -221,128 +227,6 @@ def sha256_bytes(value: bytes) -> str:
 
 def _json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _pointer(document: Any, ref: str) -> Any:
-    if not ref.startswith("#/"):
-        raise KeyError(f"unsupported non-local ref: {ref}")
-    node = document
-    for raw in ref[2:].split("/"):
-        token = raw.replace("~1", "/").replace("~0", "~")
-        node = node[int(token)] if isinstance(node, list) else node[token]
-    return node
-
-
-def _type_matches(value: Any, expected: str) -> bool:
-    return {
-        "object": isinstance(value, dict),
-        "array": isinstance(value, list),
-        "string": isinstance(value, str),
-        "integer": isinstance(value, int) and not isinstance(value, bool),
-        "boolean": isinstance(value, bool),
-        "null": value is None,
-    }.get(expected, True)
-
-
-def validate_instance(instance: Any, schema: dict[str, Any], definition: str | None = None) -> list[str]:
-    """Validate the JSON Schema subset used by the BUG contract without dependencies."""
-    root = schema
-    node = schema["$defs"][definition] if definition else schema
-    errors: list[str] = []
-
-    def check(value: Any, rule: dict[str, Any], location: str) -> None:
-        if "$ref" in rule:
-            try:
-                check(value, _pointer(root, rule["$ref"]), location)
-            except KeyError as exc:
-                errors.append(f"{location}: {exc}")
-            return
-
-        for child in rule.get("allOf", []):
-            check(value, child, location)
-
-        for keyword in ("anyOf", "oneOf"):
-            if keyword not in rule:
-                continue
-            matches = 0
-            for child in rule[keyword]:
-                before = len(errors)
-                check(value, child, location)
-                branch_errors = errors[before:]
-                del errors[before:]
-                if not branch_errors:
-                    matches += 1
-            if matches == 0 or (keyword == "oneOf" and matches != 1):
-                errors.append(f"{location}: {keyword} matched {matches} branches")
-
-        if "if" in rule:
-            before = len(errors)
-            check(value, rule["if"], location)
-            condition_matches = len(errors) == before
-            del errors[before:]
-            branch = rule.get("then" if condition_matches else "else")
-            if branch:
-                check(value, branch, location)
-
-        if "const" in rule and value != rule["const"]:
-            errors.append(f"{location}: expected const {rule['const']!r}")
-        if "enum" in rule and value not in rule["enum"]:
-            errors.append(f"{location}: value {value!r} is outside enum")
-
-        expected_types = rule.get("type")
-        if expected_types:
-            choices = [expected_types] if isinstance(expected_types, str) else expected_types
-            if not any(_type_matches(value, choice) for choice in choices):
-                errors.append(f"{location}: expected type {choices}, got {type(value).__name__}")
-                return
-
-        if isinstance(value, dict):
-            for name in rule.get("required", []):
-                if name not in value:
-                    errors.append(f"{location}: missing required property {name}")
-            properties = rule.get("properties", {})
-            if rule.get("additionalProperties") is False:
-                for name in value.keys() - properties.keys():
-                    errors.append(f"{location}: unexpected property {name}")
-            for name, child in value.items():
-                child_rule = properties.get(name)
-                if child_rule:
-                    check(child, child_rule, f"{location}.{name}")
-
-        if isinstance(value, list):
-            if len(value) < rule.get("minItems", 0):
-                errors.append(f"{location}: too few items")
-            if "maxItems" in rule and len(value) > rule["maxItems"]:
-                errors.append(f"{location}: too many items")
-            if rule.get("uniqueItems"):
-                encoded = [json.dumps(item, ensure_ascii=False, sort_keys=True) for item in value]
-                if len(encoded) != len(set(encoded)):
-                    errors.append(f"{location}: duplicate items")
-            if "items" in rule:
-                for index, child in enumerate(value):
-                    check(child, rule["items"], f"{location}[{index}]")
-
-        if isinstance(value, str):
-            if len(value) < rule.get("minLength", 0):
-                errors.append(f"{location}: string is too short")
-            if "pattern" in rule and not re.search(rule["pattern"], value):
-                errors.append(f"{location}: does not match {rule['pattern']}")
-            if rule.get("format") == "date-time":
-                try:
-                    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                    if parsed.tzinfo is None:
-                        raise ValueError("timezone missing")
-                except ValueError:
-                    errors.append(f"{location}: invalid RFC 3339 date-time")
-
-        if isinstance(value, int) and not isinstance(value, bool):
-            if "minimum" in rule and value < rule["minimum"]:
-                errors.append(f"{location}: below minimum {rule['minimum']}")
-            if "maximum" in rule and value > rule["maximum"]:
-                errors.append(f"{location}: above maximum {rule['maximum']}")
-
-    check(instance, node, definition or "$")
-    return errors
 
 
 def expected_paths(bug_id: str, revision: int) -> tuple[str, str]:

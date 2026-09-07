@@ -42,8 +42,10 @@ GROUP_SCENARIOS: dict[str, tuple[str, ...]] = {
     "delivery": ("BDD-008", "BDD-010", "BDD-011", "BDD-016"),
     "performance": ("BDD-018", "BDD-020"),
     "presentation": ("BDD-021", "BDD-022", "BDD-023", "BDD-024", "BDD-025"),
+    "maintenance": ("BDD-026", "BDD-027", "BDD-028", "BDD-029", "BDD-030", "BDD-031"),
 }
 OCCURRENCE_REASON_SENTINEL = "OCCURRENCE_REASON_SENTINEL_BDD_023_742ac129"
+_WINDOWS = os.name == "nt"
 
 
 def scenario(identifier: str, group: str) -> Callable[[Scenario], Scenario]:
@@ -52,6 +54,173 @@ def scenario(identifier: str, group: str) -> Callable[[Scenario], Scenario]:
         return function
 
     return register
+
+
+@scenario("BDD-026", "maintenance")
+def ci_changes_use_a_fast_gate_before_the_cross_platform_matrix(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    workflow = (Path.cwd() / ".github/workflows/knowledge-portability.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '".agents/skills/**"' in workflow
+    assert '"docs/**"' in workflow
+    assert '".gitattributes"' in workflow
+    assert '"README.md"' in workflow
+    assert '"OPERATIONS.md"' in workflow
+    assert re.search(r"(?m)^  quick:\s*$", workflow)
+    assert re.search(r"(?ms)^  platform:.*?needs: quick", workflow)
+    assert "run_quick_checks.py" in workflow
+    quick_runner = (
+        Path.cwd()
+        / ".agents/skills/project-knowledge/scripts/run_quick_checks.py"
+    ).read_text(encoding="utf-8")
+    assert "QUICK-DOCUMENTATION" in quick_runner
+    assert "DocumentationAndCiImprovementTests" in quick_runner
+
+
+@scenario("BDD-027", "maintenance")
+def maintainers_have_one_documented_entrypoint_for_operations(
+    fixture_root: Path,
+) -> None:
+    repo = Path.cwd()
+    readme = repo / "README.md"
+    operations = repo / "OPERATIONS.md"
+    assert readme.is_file()
+    assert operations.is_file()
+    combined = readme.read_text(encoding="utf-8") + operations.read_text(
+        encoding="utf-8"
+    )
+    for fragment in (
+        "delivery_workspace.py probe",
+        "run_full_suite.py --scope all",
+        "stage-authorization.md",
+        ".knowledge-test-tmp/final-metrics.json",
+        "human gate",
+    ):
+        assert fragment in combined
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/project-knowledge/scripts/test_workflow.py",
+            "DocumentationAndCiImprovementTests",
+            "--fixture-root",
+            str(fixture_root),
+        ],
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-028", "maintenance")
+def delivery_transitions_are_routed_through_explicit_phase_handlers(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+            "DeliveryTransitionArchitectureTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-029", "maintenance")
+def unsupported_schema_rules_fail_closed_without_misreading_property_names(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+            "SchemaSubsetContractTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-030", "maintenance")
+def delivery_doctor_explains_resume_blockers_without_writing(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+            "DeliveryDoctorTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-031", "maintenance")
+def suite_metrics_and_search_quality_are_independent_and_reproducible(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/project-knowledge/scripts/test_workflow.py",
+            "SuiteMetricsTests",
+            "SearchQualityBaselineTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
 
 
 def _sha256(value: bytes) -> str:
@@ -343,12 +512,19 @@ def _remove_fixture(root: Path) -> None:
     if not resolved.exists():
         return
 
-    def make_writable_and_retry(function: Callable[..., object], path: str, _: object) -> None:
-        os.chmod(path, stat.S_IWRITE)
-        function(path)
+    if _WINDOWS:
+        def make_writable_and_retry(
+            function: Callable[..., object],
+            path: str,
+            _: object,
+        ) -> None:
+            os.chmod(path, stat.S_IWRITE)
+            function(path)
 
-    os.chmod(resolved, stat.S_IWRITE)
-    shutil.rmtree(resolved, onexc=make_writable_and_retry)
+        os.chmod(resolved, stat.S_IWRITE)
+        shutil.rmtree(resolved, onexc=make_writable_and_retry)
+    else:
+        shutil.rmtree(resolved)
     if resolved.exists():
         raise AssertionError(f"fixture cleanup failed: {resolved}")
 

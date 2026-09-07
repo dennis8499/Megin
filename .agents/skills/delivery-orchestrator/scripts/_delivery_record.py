@@ -7,12 +7,10 @@ Authority: delivery-record
 from __future__ import annotations
 
 import copy
-import importlib.util
 import json
 import os
 import re
 import stat
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Sequence
@@ -63,23 +61,25 @@ from _delivery_runtime import (
     validate_work_id,
     workspace_label,
 )
+from _delivery_transition_handlers import (
+    OptionalBinding,
+    TransitionContext,
+    TransitionRequest,
+    apply_transition_handlers,
+    validate_transition_route,
+)
+from _delivery_validator_adapter import OwnerValidatorAdapter
 
 
-_CONTRACT_VALIDATOR: Any | None = None
-_EXECUTION_VALIDATOR: Any | None = None
-_READY_PLAN_SCHEMA: dict[str, Any] | None = None
-_DELIVERY_RUN_SCHEMA: dict[str, Any] | None = None
-_EXECUTION_RECORDS_SCHEMA: dict[str, Any] | None = None
-_BUG_CONTRACT_VALIDATOR: Any | None = None
+VALIDATOR_ADAPTER = OwnerValidatorAdapter(Path(__file__).resolve().parents[2])
+
+
 KNOWLEDGE_CANDIDATE_RE = re.compile(
     r"^knowledge:candidates/(promotion-[a-z0-9]+(?:-[a-z0-9]+)*)/candidate\.json$"
 )
 PRELIMINARY_REVIEW_REPORT_RE = re.compile(
     r"^reviews/[a-z0-9][a-z0-9._-]{2,127}/report\.json$"
 )
-
-
-_KNOWLEDGE_DELIVERY_MODULE: Any | None = None
 
 
 def _lock_epoch(path: Path) -> str:
@@ -149,29 +149,13 @@ def _validate_repository_state_evidence(
 
 
 def _knowledge_delivery_module() -> Any:
-    global _KNOWLEDGE_DELIVERY_MODULE
-    if _KNOWLEDGE_DELIVERY_MODULE is not None:
-        return _KNOWLEDGE_DELIVERY_MODULE
-    scripts = Path(__file__).resolve().parents[2] / "project-knowledge" / "scripts"
-    path = scripts / "knowledge_delivery.py"
-    if str(scripts) not in sys.path:
-        sys.path.insert(0, str(scripts))
-    spec = importlib.util.spec_from_file_location("delivery_project_knowledge", path)
-    if spec is None or spec.loader is None:
-        raise DeliveryError(
-            "project-knowledge delivery verifier is unavailable",
-            code="INVALID_KNOWLEDGE_REVIEW",
-        )
-    module = importlib.util.module_from_spec(spec)
     try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError, RuntimeError) as exc:
+        return VALIDATOR_ADAPTER.validator("knowledge")
+    except DeliveryError as exc:
         raise DeliveryError(
             "project-knowledge delivery verifier cannot be loaded",
             code="INVALID_KNOWLEDGE_REVIEW",
         ) from exc
-    _KNOWLEDGE_DELIVERY_MODULE = module
-    return module
 
 
 def _verified_knowledge_snapshot(
@@ -292,118 +276,27 @@ def _strict_bug_json_object(
 
 
 def _contract_validator() -> Any:
-    """Load the producer-owned standard-library contract validator once."""
-    global _CONTRACT_VALIDATOR
-    if _CONTRACT_VALIDATOR is not None:
-        return _CONTRACT_VALIDATOR
-    module_path = (
-        Path(__file__).resolve().parents[2]
-        / "technical-planning"
-        / "scripts"
-        / "validate_contracts.py"
-    )
-    spec = importlib.util.spec_from_file_location("delivery_contract_validator", module_path)
-    if spec is None or spec.loader is None:
-        raise DeliveryError("contract validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE")
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError, SyntaxError) as exc:
-        raise DeliveryError("contract validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE") from exc
-    _CONTRACT_VALIDATOR = module
-    return module
+    return VALIDATOR_ADAPTER.validator("planning")
 
 
 def _bug_contract_validator() -> Any:
-    """Load the diagnosis-owned assessment validator once."""
-    global _BUG_CONTRACT_VALIDATOR
-    if _BUG_CONTRACT_VALIDATOR is not None:
-        return _BUG_CONTRACT_VALIDATOR
-    module_path = (
-        Path(__file__).resolve().parents[2]
-        / "bug-diagnosis"
-        / "scripts"
-        / "validate_contracts.py"
-    )
-    spec = importlib.util.spec_from_file_location("delivery_bug_contract_validator", module_path)
-    if spec is None or spec.loader is None:
-        raise DeliveryError("BUG assessment validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE")
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError, SyntaxError) as exc:
-        raise DeliveryError("BUG assessment validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE") from exc
-    _BUG_CONTRACT_VALIDATOR = module
-    return module
+    return VALIDATOR_ADAPTER.validator("bug")
 
 
 def _execution_validator() -> Any:
-    """Load the consumer-owned execution validator for terminal evidence."""
-    global _EXECUTION_VALIDATOR
-    if _EXECUTION_VALIDATOR is not None:
-        return _EXECUTION_VALIDATOR
-    module_path = (
-        Path(__file__).resolve().parents[2]
-        / "implementation-execution"
-        / "scripts"
-        / "validate_contracts.py"
-    )
-    spec = importlib.util.spec_from_file_location("delivery_execution_validator", module_path)
-    if spec is None or spec.loader is None:
-        raise DeliveryError("execution validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE")
-    module = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(module)
-    except (OSError, ImportError, SyntaxError) as exc:
-        raise DeliveryError("execution validator cannot be loaded", code="CONTRACT_VALIDATOR_UNAVAILABLE") from exc
-    _EXECUTION_VALIDATOR = module
-    return module
-
-
-def _load_schema(path: Path, *, label: str) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise DeliveryError(f"{label} schema cannot be loaded", code="CONTRACT_SCHEMA_UNAVAILABLE") from exc
-    if not isinstance(value, dict):
-        raise DeliveryError(f"{label} schema is not an object", code="CONTRACT_SCHEMA_UNAVAILABLE")
-    return value
+    return VALIDATOR_ADAPTER.validator("implementation")
 
 
 def _ready_plan_schema() -> dict[str, Any]:
-    global _READY_PLAN_SCHEMA
-    if _READY_PLAN_SCHEMA is None:
-        _READY_PLAN_SCHEMA = _load_schema(
-            Path(__file__).resolve().parents[2]
-            / "technical-planning"
-            / "references"
-            / "ready-plan.schema.json",
-            label="ready-plan/v1",
-        )
-    return _READY_PLAN_SCHEMA
+    return VALIDATOR_ADAPTER.schema("ready-plan/v1")
 
 
 def _delivery_run_schema() -> dict[str, Any]:
-    global _DELIVERY_RUN_SCHEMA
-    if _DELIVERY_RUN_SCHEMA is None:
-        _DELIVERY_RUN_SCHEMA = _load_schema(
-            Path(__file__).resolve().parents[1] / "references" / "delivery-run.schema.json",
-            label=SCHEMA,
-        )
-    return _DELIVERY_RUN_SCHEMA
+    return VALIDATOR_ADAPTER.schema("delivery-run/v1")
 
 
 def _execution_records_schema() -> dict[str, Any]:
-    global _EXECUTION_RECORDS_SCHEMA
-    if _EXECUTION_RECORDS_SCHEMA is None:
-        _EXECUTION_RECORDS_SCHEMA = _load_schema(
-            Path(__file__).resolve().parents[2]
-            / "implementation-execution"
-            / "references"
-            / "execution-records.schema.json",
-            label="implementation-records",
-        )
-    return _EXECUTION_RECORDS_SCHEMA
+    return VALIDATOR_ADAPTER.schema("implementation-records")
 
 
 def _schema_errors(value: Any, schema: dict[str, Any]) -> list[str]:
@@ -2878,131 +2771,13 @@ def _result(record: dict[str, Any], record_path: Path, *, outcome: str) -> dict[
     }
 
 
-def _transition_record_unlocked(
-    repo: str | Path,
-    work_id: str,
-    phase: str,
-    status: str,
-    event: str,
-    evidence_refs: Sequence[str],
-    *,
-    root: Path | None = None,
-    requirements_path: str | None = None,
-    requirements_sha256: str | None = None,
-    requirements_approval_refs: Sequence[str] = (),
-    bug_assessment_id: str | None = None,
-    bug_assessment_path: str | None = None,
-    bug_assessment_sha256: str | None = None,
-    bug_assessment_markdown_path: str | None = None,
-    bug_assessment_markdown_sha256: str | None = None,
-    deferred_bug_id: str | None = None,
-    deferred_bug_relation: str | None = None,
-    deferred_bug_status: str | None = None,
-    deferred_bug_evidence_refs: Sequence[str] = (),
-    deferred_bug_sensitive: bool = False,
-    deferred_bug_redacted_summary: str | None = None,
-    deferred_bug_human_reviewer: str | None = None,
-    deferred_bug_assessment_path: str | None = None,
-    deferred_bug_assessment_sha256: str | None = None,
-    deferred_bug_assessment_markdown_path: str | None = None,
-    deferred_bug_assessment_markdown_sha256: str | None = None,
-    handoff_path: str | None = None,
-    candidate_revision: str | None = None,
-    payload_sha256: str | None = None,
-    plan_approval_refs: Sequence[str] = (),
-    implementation_run_id: str | None = None,
-    implementation_ledger_ref: str | None = None,
-    implementation_status: str | None = None,
-    bug_verification_path: str | None = None,
-    bug_verification_sha256: str | None = None,
-    bug_verification_result: str | None = None,
-    enable_knowledge: bool = False,
-    knowledge_candidate_ref: str | None = None,
-    knowledge_candidate_payload_sha256: str | None = None,
-    knowledge_snapshot_before: str | None = None,
-    knowledge_snapshot_after: str | None = None,
-    knowledge_product_snapshot_id: str | None = None,
-    knowledge_outcome_path: str | None = None,
-    knowledge_outcome_sha256: str | None = None,
-    knowledge_promotion_id: str | None = None,
-    knowledge_receipt_path: str | None = None,
-    knowledge_receipt_sha256: str | None = None,
-    knowledge_approval_evidence: str | None = None,
-    known_secret_values: tuple[str, ...] = (),
-    probe_evidence: RepositoryStateEvidence | None = None,
-    lock_epoch: str | None = None,
-) -> dict[str, Any]:
-    root = _validate_registry_root(root or default_registry_root())
-    validate_work_id(work_id)
-    if (
-        probe_evidence is not None
-        and probe_evidence.lock_epoch == lock_epoch
-        and canonical_path_text(repo)
-        == canonical_path_text(probe_evidence.identity.requested_path)
-    ):
-        probe = probe_evidence.as_probe()
-    else:
-        probe = probe_repository(repo)
-        probe_evidence = None
-    path = _record_path(run_directory(root, probe["repo_id"], work_id))
-    record = load_record(path)
-    if record["status"] == "complete":
-        raise DeliveryError("Complete delivery records are frozen", code="COMPLETE_FROZEN")
-    if record["generations"][-1]["status"] == "ready":
-        _validate_ready_generation(
-            record,
-            probe,
-            evidence=probe_evidence,
-            lock_epoch=lock_epoch,
-        )
-    if record["generations"][-1]["status"] != "ready" and status != "blocked":
-        raise DeliveryError("current generation is not ready", code="WORKSPACE_NOT_READY")
-    current_phase = record["phase"]
-    current_status = record["status"]
-    if phase not in PHASE_TRANSITIONS.get(current_phase, set()):
-        raise DeliveryError(f"illegal phase transition {current_phase} -> {phase}", code="ILLEGAL_TRANSITION")
-    if status not in STATUS_TRANSITIONS.get(current_status, set()):
-        raise DeliveryError(f"illegal status transition {current_status} -> {status}", code="ILLEGAL_TRANSITION")
-    if current_status == "blocked" and status == "active" and phase != current_phase:
-        raise DeliveryError("blocked recovery must remain in the same phase", code="ILLEGAL_TRANSITION")
-    if status == "awaiting_user" and phase not in {"requirements", "planning", "knowledge"}:
-        raise DeliveryError(
-            "awaiting_user is only valid for requirements, planning, or knowledge",
-            code="ILLEGAL_TRANSITION",
-        )
-    if (phase == "complete") != (status == "complete"):
-        raise DeliveryError("complete phase and status must be paired", code="ILLEGAL_TRANSITION")
-
-    known_secrets = tuple(
-        value
-        for value in known_secret_values
-        if isinstance(value, str) and value
-    )
-    metadata_values = (
-        *evidence_refs,
-        *requirements_approval_refs,
-        *plan_approval_refs,
-        *deferred_bug_evidence_refs,
-        deferred_bug_redacted_summary or "",
-        deferred_bug_human_reviewer or "",
-        implementation_ledger_ref or "",
-        knowledge_candidate_ref or "",
-        knowledge_outcome_path or "",
-        knowledge_receipt_path or "",
-        knowledge_approval_evidence or "",
-    )
-    if any(
-        secret in value
-        for value in metadata_values
-        if isinstance(value, str)
-        for secret in known_secrets
-    ):
-        raise DeliveryError(
-            "transition metadata contains a known secret value",
-            code="INVALID_EVIDENCE_REF",
-        )
-    known_secret_values = known_secrets
-
+def _prepare_transition_bindings(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    current_phase = context.request.current_phase
+    phase = context.request.phase
+    status = context.request.status
+    enable_knowledge = values["enable_knowledge"]
     knowledge_gate = record.get("knowledge_gate")
     if enable_knowledge:
         if knowledge_gate is not None:
@@ -3034,38 +2809,33 @@ def _transition_record_unlocked(
             "legacy delivery has no knowledge overlay",
             code="MISSING_KNOWLEDGE_GATE",
         )
+    context.state["knowledge_gate"] = knowledge_gate
 
-    review_values = (
-        knowledge_snapshot_before,
-        knowledge_snapshot_after,
-        knowledge_product_snapshot_id,
-        knowledge_outcome_path,
-        knowledge_outcome_sha256,
-    )
-    review_supplied = any(value is not None for value in review_values)
-    if review_supplied and (
-        not all(value is not None for value in review_values)
-        or knowledge_candidate_ref is None
-        or knowledge_candidate_payload_sha256 is None
-    ):
-        raise DeliveryError(
-            "knowledge review requires Candidate, dual snapshots, product snapshot, and outcome",
-            code="INCOMPLETE_KNOWLEDGE_REVIEW",
-        )
-    promotion_values = (
-        knowledge_promotion_id,
-        knowledge_receipt_path,
-        knowledge_receipt_sha256,
-        knowledge_approval_evidence,
-    )
-    promotion_supplied = any(value is not None for value in promotion_values)
-    if promotion_supplied and not all(value is not None for value in promotion_values):
-        raise DeliveryError(
-            "knowledge promotion requires ID, receipt path/hash, and approval evidence",
-            code="INCOMPLETE_KNOWLEDGE_PROMOTION",
-        )
-    promotion_consumed = False
 
+def _bind_bug_transition(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    current_phase = context.request.current_phase
+    phase = context.request.phase
+    status = context.request.status
+    implementation_status = values["implementation_status"]
+    bug_assessment_id = values["bug_assessment_id"]
+    bug_assessment_path = values["bug_assessment_path"]
+    bug_assessment_sha256 = values["bug_assessment_sha256"]
+    bug_assessment_markdown_path = values["bug_assessment_markdown_path"]
+    bug_assessment_markdown_sha256 = values["bug_assessment_markdown_sha256"]
+    deferred_bug_id = values["deferred_bug_id"]
+    deferred_bug_relation = values["deferred_bug_relation"]
+    deferred_bug_status = values["deferred_bug_status"]
+    deferred_bug_evidence_refs = values["deferred_bug_evidence_refs"]
+    deferred_bug_sensitive = values["deferred_bug_sensitive"]
+    deferred_bug_redacted_summary = values["deferred_bug_redacted_summary"]
+    deferred_bug_human_reviewer = values["deferred_bug_human_reviewer"]
+    deferred_bug_assessment_path = values["deferred_bug_assessment_path"]
+    deferred_bug_assessment_sha256 = values["deferred_bug_assessment_sha256"]
+    deferred_bug_assessment_markdown_path = values["deferred_bug_assessment_markdown_path"]
+    deferred_bug_assessment_markdown_sha256 = values["deferred_bug_assessment_markdown_sha256"]
+    known_secret_values = values["known_secret_values"]
     pending_inbox: tuple[str, list[str], bool, str | None, str | None] | None = None
 
     if (current_phase, phase) == ("planning", "requirements"):
@@ -3233,12 +3003,35 @@ def _transition_record_unlocked(
                 "inbox_ref": history[0].get("inbox_ref"),
             }
         bugs["deferred"].append(entry)
+    context.state["pending_inbox"] = pending_inbox
+    context.state["bug_assessment_supplied"] = bug_assessment_supplied
 
-    if any(value is not None for value in (requirements_path, requirements_sha256)) or requirements_approval_refs:
-        if requirements_path is None or requirements_sha256 is None or not requirements_approval_refs:
-            raise DeliveryError("Ready requirements require path, hash, and approval evidence", code="INCOMPLETE_ARTIFACT_REF")
-        if (phase, status) != ("planning", "active"):
-            raise DeliveryError("Ready requirements must atomically advance to planning/active", code="MISSING_GATE")
+
+def _bind_requirements_transition(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    transition_request = context.request
+    requirements_path = values["requirements_path"]
+    requirements_sha256 = values["requirements_sha256"]
+    requirements_approval_refs = values["requirements_approval_refs"]
+    bug_assessment_id = values["bug_assessment_id"]
+    bug_assessment_path = values["bug_assessment_path"]
+    bug_assessment_sha256 = values["bug_assessment_sha256"]
+    bug_assessment_markdown_path = values["bug_assessment_markdown_path"]
+    bug_assessment_markdown_sha256 = values["bug_assessment_markdown_sha256"]
+    known_secret_values = values["known_secret_values"]
+    knowledge_candidate_ref = values["knowledge_candidate_ref"]
+    knowledge_candidate_payload_sha256 = values["knowledge_candidate_payload_sha256"]
+    knowledge_promotion_id = values["knowledge_promotion_id"]
+    knowledge_receipt_path = values["knowledge_receipt_path"]
+    knowledge_receipt_sha256 = values["knowledge_receipt_sha256"]
+    knowledge_approval_evidence = values["knowledge_approval_evidence"]
+    evidence_refs = values["evidence_refs"]
+    knowledge_gate = context.state["knowledge_gate"]
+    promotion_supplied = context.state["promotion_supplied"]
+    promotion_consumed = context.state["promotion_consumed"]
+    bug_assessment_supplied = context.state["bug_assessment_supplied"]
+    if transition_request.requirements.supplied:
         requirements_path = _normalized_repo_path(requirements_path)
         revision = _requirements_revision(requirements_path, record["artifact_root"])
         if revision is None:
@@ -3331,12 +3124,29 @@ def _transition_record_unlocked(
 
     elif bug_assessment_supplied:
         raise DeliveryError("BUG assessment must be bound with Requirements approval", code="MISSING_GATE")
+    context.state["promotion_consumed"] = promotion_consumed
 
-    if any(value is not None for value in (handoff_path, candidate_revision, payload_sha256)) or plan_approval_refs:
-        if handoff_path is None or candidate_revision is None or payload_sha256 is None or not plan_approval_refs:
-            raise DeliveryError("Ready plan requires handoff, revision, payload hash, and approval evidence", code="INCOMPLETE_ARTIFACT_REF")
-        if (phase, status) != ("implementation", "active"):
-            raise DeliveryError("Ready plan must atomically advance to implementation/active", code="MISSING_GATE")
+
+def _bind_planning_transition(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    transition_request = context.request
+    handoff_path = values["handoff_path"]
+    candidate_revision = values["candidate_revision"]
+    payload_sha256 = values["payload_sha256"]
+    plan_approval_refs = values["plan_approval_refs"]
+    knowledge_candidate_ref = values["knowledge_candidate_ref"]
+    knowledge_candidate_payload_sha256 = values["knowledge_candidate_payload_sha256"]
+    knowledge_promotion_id = values["knowledge_promotion_id"]
+    knowledge_receipt_path = values["knowledge_receipt_path"]
+    knowledge_receipt_sha256 = values["knowledge_receipt_sha256"]
+    knowledge_approval_evidence = values["knowledge_approval_evidence"]
+    known_secret_values = values["known_secret_values"]
+    evidence_refs = values["evidence_refs"]
+    knowledge_gate = context.state["knowledge_gate"]
+    promotion_supplied = context.state["promotion_supplied"]
+    promotion_consumed = context.state["promotion_consumed"]
+    if transition_request.plan.supplied:
         handoff_path = _normalized_repo_path(handoff_path)
         revision = _plan_revision(handoff_path, record["artifact_root"])
         if revision is None:
@@ -3488,15 +3298,26 @@ def _transition_record_unlocked(
             knowledge_gate["current_promotion_id"] = promotion["promotion_id"]
             knowledge_gate["promotions"].append(promotion)
             promotion_consumed = True
+    context.state["promotion_consumed"] = promotion_consumed
 
-    verification_values = (
-        bug_verification_path,
-        bug_verification_sha256,
-        bug_verification_result,
-    )
-    verification_supplied = any(value is not None for value in verification_values)
-    if verification_supplied and not all(value is not None for value in verification_values):
-        raise DeliveryError("BUG verification requires path, hash, and result", code="INCOMPLETE_ARTIFACT_REF")
+
+def _bind_implementation_transition(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    transition_request = context.request
+    current_phase = transition_request.current_phase
+    phase = transition_request.phase
+    status = transition_request.status
+    implementation_run_id = values["implementation_run_id"]
+    implementation_ledger_ref = values["implementation_ledger_ref"]
+    implementation_status = values["implementation_status"]
+    bug_verification_path = values["bug_verification_path"]
+    bug_verification_sha256 = values["bug_verification_sha256"]
+    bug_verification_result = values["bug_verification_result"]
+    known_secret_values = values["known_secret_values"]
+    knowledge_gate = context.state["knowledge_gate"]
+    verification_supplied = transition_request.bug_verification.supplied
+    verification_supplied = transition_request.bug_verification.supplied
     if verification_supplied:
         if record.get("work_kind", "standard") == "bug" and bug_verification_result == "failed":
             raise DeliveryError(
@@ -3520,16 +3341,12 @@ def _transition_record_unlocked(
                 code="INVALID_BUG_VERIFICATION",
             )
 
-    if any(value is not None for value in (implementation_run_id, implementation_ledger_ref, implementation_status)):
-        if implementation_run_id is None or implementation_ledger_ref is None or implementation_status is None:
-            raise DeliveryError("implementation ref requires run ID, Ledger ref, and status", code="INCOMPLETE_ARTIFACT_REF")
+    if transition_request.implementation.supplied:
         validate_sha256(implementation_run_id, "implementation_run_id")
         try:
             implementation_ledger_ref = _logical_refs([implementation_ledger_ref], "implementation Ledger")[0]
         except DeliveryError as exc:
             raise DeliveryError(str(exc), code="INVALID_IMPLEMENTATION_REF") from exc
-        if implementation_status not in {"Active", "Complete", "Awaiting upstream reapproval", "Blocked"}:
-            raise DeliveryError("invalid implementation status", code="INVALID_IMPLEMENTATION_REF")
         entry = {
             "run_id": implementation_run_id,
             "ledger_ref": implementation_ledger_ref,
@@ -3595,7 +3412,34 @@ def _transition_record_unlocked(
                 "review": None,
             }
         )
+    context.state["verification_supplied"] = verification_supplied
 
+
+def _bind_knowledge_transition(context: TransitionContext) -> None:
+    record = context.record
+    values = context.values
+    current_phase = context.request.current_phase
+    current_status = context.request.current_status
+    phase = context.request.phase
+    status = context.request.status
+    implementation_status = values["implementation_status"]
+    knowledge_candidate_ref = values["knowledge_candidate_ref"]
+    knowledge_candidate_payload_sha256 = values["knowledge_candidate_payload_sha256"]
+    knowledge_snapshot_before = values["knowledge_snapshot_before"]
+    knowledge_snapshot_after = values["knowledge_snapshot_after"]
+    knowledge_product_snapshot_id = values["knowledge_product_snapshot_id"]
+    knowledge_outcome_path = values["knowledge_outcome_path"]
+    knowledge_outcome_sha256 = values["knowledge_outcome_sha256"]
+    knowledge_promotion_id = values["knowledge_promotion_id"]
+    knowledge_receipt_path = values["knowledge_receipt_path"]
+    knowledge_receipt_sha256 = values["knowledge_receipt_sha256"]
+    knowledge_approval_evidence = values["knowledge_approval_evidence"]
+    known_secret_values = values["known_secret_values"]
+    evidence_refs = values["evidence_refs"]
+    knowledge_gate = context.state["knowledge_gate"]
+    review_supplied = context.state["review_supplied"]
+    promotion_supplied = context.state["promotion_supplied"]
+    promotion_consumed = context.state["promotion_consumed"]
     if review_supplied:
         if (
             not isinstance(knowledge_gate, dict)
@@ -3753,11 +3597,226 @@ def _transition_record_unlocked(
             "knowledge promotion is not valid for this phase transition",
             code="INVALID_KNOWLEDGE_PROMOTION",
         )
+    context.state["promotion_consumed"] = promotion_consumed
 
-    if phase == "planning" and current_phase == "requirements" and requirements_path is None:
-        raise DeliveryError("planning requires a newly persisted Ready requirements revision", code="MISSING_GATE")
-    if phase == "implementation" and current_phase == "planning" and handoff_path is None:
-        raise DeliveryError("implementation requires the newly Ready plan and may not ask a third approval", code="MISSING_GATE")
+def _transition_record_unlocked(
+    repo: str | Path,
+    work_id: str,
+    phase: str,
+    status: str,
+    event: str,
+    evidence_refs: Sequence[str],
+    *,
+    root: Path | None = None,
+    requirements_path: str | None = None,
+    requirements_sha256: str | None = None,
+    requirements_approval_refs: Sequence[str] = (),
+    bug_assessment_id: str | None = None,
+    bug_assessment_path: str | None = None,
+    bug_assessment_sha256: str | None = None,
+    bug_assessment_markdown_path: str | None = None,
+    bug_assessment_markdown_sha256: str | None = None,
+    deferred_bug_id: str | None = None,
+    deferred_bug_relation: str | None = None,
+    deferred_bug_status: str | None = None,
+    deferred_bug_evidence_refs: Sequence[str] = (),
+    deferred_bug_sensitive: bool = False,
+    deferred_bug_redacted_summary: str | None = None,
+    deferred_bug_human_reviewer: str | None = None,
+    deferred_bug_assessment_path: str | None = None,
+    deferred_bug_assessment_sha256: str | None = None,
+    deferred_bug_assessment_markdown_path: str | None = None,
+    deferred_bug_assessment_markdown_sha256: str | None = None,
+    handoff_path: str | None = None,
+    candidate_revision: str | None = None,
+    payload_sha256: str | None = None,
+    plan_approval_refs: Sequence[str] = (),
+    implementation_run_id: str | None = None,
+    implementation_ledger_ref: str | None = None,
+    implementation_status: str | None = None,
+    bug_verification_path: str | None = None,
+    bug_verification_sha256: str | None = None,
+    bug_verification_result: str | None = None,
+    enable_knowledge: bool = False,
+    knowledge_candidate_ref: str | None = None,
+    knowledge_candidate_payload_sha256: str | None = None,
+    knowledge_snapshot_before: str | None = None,
+    knowledge_snapshot_after: str | None = None,
+    knowledge_product_snapshot_id: str | None = None,
+    knowledge_outcome_path: str | None = None,
+    knowledge_outcome_sha256: str | None = None,
+    knowledge_promotion_id: str | None = None,
+    knowledge_receipt_path: str | None = None,
+    knowledge_receipt_sha256: str | None = None,
+    knowledge_approval_evidence: str | None = None,
+    known_secret_values: tuple[str, ...] = (),
+    probe_evidence: RepositoryStateEvidence | None = None,
+    lock_epoch: str | None = None,
+) -> dict[str, Any]:
+    root = _validate_registry_root(root or default_registry_root())
+    validate_work_id(work_id)
+    if (
+        probe_evidence is not None
+        and probe_evidence.lock_epoch == lock_epoch
+        and canonical_path_text(repo)
+        == canonical_path_text(probe_evidence.identity.requested_path)
+    ):
+        probe = probe_evidence.as_probe()
+    else:
+        probe = probe_repository(repo)
+        probe_evidence = None
+    path = _record_path(run_directory(root, probe["repo_id"], work_id))
+    record = load_record(path)
+    if record["status"] == "complete":
+        raise DeliveryError("Complete delivery records are frozen", code="COMPLETE_FROZEN")
+    if record["generations"][-1]["status"] == "ready":
+        _validate_ready_generation(
+            record,
+            probe,
+            evidence=probe_evidence,
+            lock_epoch=lock_epoch,
+        )
+    if record["generations"][-1]["status"] != "ready" and status != "blocked":
+        raise DeliveryError("current generation is not ready", code="WORKSPACE_NOT_READY")
+    current_phase = record["phase"]
+    current_status = record["status"]
+    transition_request = TransitionRequest(
+        current_phase=current_phase,
+        current_status=current_status,
+        phase=phase,
+        status=status,
+        requirements=OptionalBinding(
+            (requirements_path, requirements_sha256, requirements_approval_refs)
+        ),
+        plan=OptionalBinding(
+            (handoff_path, candidate_revision, payload_sha256, plan_approval_refs)
+        ),
+        implementation=OptionalBinding(
+            (implementation_run_id, implementation_ledger_ref, implementation_status)
+        ),
+        knowledge_review=OptionalBinding(
+            (
+                knowledge_snapshot_before,
+                knowledge_snapshot_after,
+                knowledge_product_snapshot_id,
+                knowledge_outcome_path,
+                knowledge_outcome_sha256,
+            )
+        ),
+        promotion=OptionalBinding(
+            (
+                knowledge_promotion_id,
+                knowledge_receipt_path,
+                knowledge_receipt_sha256,
+                knowledge_approval_evidence,
+            )
+        ),
+        bug_verification=OptionalBinding(
+            (bug_verification_path, bug_verification_sha256, bug_verification_result)
+        ),
+    )
+    phase, status = validate_transition_route(transition_request)
+
+    known_secrets = tuple(
+        value
+        for value in known_secret_values
+        if isinstance(value, str) and value
+    )
+    metadata_values = (
+        *evidence_refs,
+        *requirements_approval_refs,
+        *plan_approval_refs,
+        *deferred_bug_evidence_refs,
+        deferred_bug_redacted_summary or "",
+        deferred_bug_human_reviewer or "",
+        implementation_ledger_ref or "",
+        knowledge_candidate_ref or "",
+        knowledge_outcome_path or "",
+        knowledge_receipt_path or "",
+        knowledge_approval_evidence or "",
+    )
+    if any(
+        secret in value
+        for value in metadata_values
+        if isinstance(value, str)
+        for secret in known_secrets
+    ):
+        raise DeliveryError(
+            "transition metadata contains a known secret value",
+            code="INVALID_EVIDENCE_REF",
+        )
+    known_secret_values = known_secrets
+
+    transition_context = TransitionContext(
+        request=transition_request,
+        record=record,
+        values={
+            "requirements_path": requirements_path,
+            "requirements_sha256": requirements_sha256,
+            "requirements_approval_refs": requirements_approval_refs,
+            "bug_assessment_id": bug_assessment_id,
+            "bug_assessment_path": bug_assessment_path,
+            "bug_assessment_sha256": bug_assessment_sha256,
+            "bug_assessment_markdown_path": bug_assessment_markdown_path,
+            "bug_assessment_markdown_sha256": bug_assessment_markdown_sha256,
+            "deferred_bug_id": deferred_bug_id,
+            "deferred_bug_relation": deferred_bug_relation,
+            "deferred_bug_status": deferred_bug_status,
+            "deferred_bug_evidence_refs": deferred_bug_evidence_refs,
+            "deferred_bug_sensitive": deferred_bug_sensitive,
+            "deferred_bug_redacted_summary": deferred_bug_redacted_summary,
+            "deferred_bug_human_reviewer": deferred_bug_human_reviewer,
+            "deferred_bug_assessment_path": deferred_bug_assessment_path,
+            "deferred_bug_assessment_sha256": deferred_bug_assessment_sha256,
+            "deferred_bug_assessment_markdown_path": deferred_bug_assessment_markdown_path,
+            "deferred_bug_assessment_markdown_sha256": deferred_bug_assessment_markdown_sha256,
+            "handoff_path": handoff_path,
+            "candidate_revision": candidate_revision,
+            "payload_sha256": payload_sha256,
+            "plan_approval_refs": plan_approval_refs,
+            "implementation_run_id": implementation_run_id,
+            "implementation_ledger_ref": implementation_ledger_ref,
+            "implementation_status": implementation_status,
+            "bug_verification_path": bug_verification_path,
+            "bug_verification_sha256": bug_verification_sha256,
+            "bug_verification_result": bug_verification_result,
+            "enable_knowledge": enable_knowledge,
+            "knowledge_candidate_ref": knowledge_candidate_ref,
+            "knowledge_candidate_payload_sha256": knowledge_candidate_payload_sha256,
+            "knowledge_snapshot_before": knowledge_snapshot_before,
+            "knowledge_snapshot_after": knowledge_snapshot_after,
+            "knowledge_product_snapshot_id": knowledge_product_snapshot_id,
+            "knowledge_outcome_path": knowledge_outcome_path,
+            "knowledge_outcome_sha256": knowledge_outcome_sha256,
+            "knowledge_promotion_id": knowledge_promotion_id,
+            "knowledge_receipt_path": knowledge_receipt_path,
+            "knowledge_receipt_sha256": knowledge_receipt_sha256,
+            "knowledge_approval_evidence": knowledge_approval_evidence,
+            "known_secret_values": known_secret_values,
+            "evidence_refs": evidence_refs,
+        },
+        state={
+            "knowledge_gate": record.get("knowledge_gate"),
+            "review_supplied": transition_request.knowledge_review.supplied,
+            "promotion_supplied": transition_request.promotion.supplied,
+            "promotion_consumed": False,
+            "verification_supplied": transition_request.bug_verification.supplied,
+            "pending_inbox": None,
+            "bug_assessment_supplied": False,
+        },
+        operations={
+            "prepare": _prepare_transition_bindings,
+            "bugs": _bind_bug_transition,
+            "requirements": _bind_requirements_transition,
+            "planning": _bind_planning_transition,
+            "implementation": _bind_implementation_transition,
+            "knowledge": _bind_knowledge_transition,
+        },
+    )
+    apply_transition_handlers(transition_context)
+    knowledge_gate = transition_context.state["knowledge_gate"]
+    pending_inbox = transition_context.state["pending_inbox"]
+    verification_supplied = transition_context.state["verification_supplied"]
     if phase == "complete":
         _approved_upstream_materialization(record)
         deferred_histories: dict[str, list[dict[str, Any]]] = {}

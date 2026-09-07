@@ -90,6 +90,127 @@ def bug_ready_example(target: str = "verified") -> dict:
     return example
 
 
+class SchemaSubsetContractTests(unittest.TestCase):
+    def keyword_errors(self, schema: dict) -> list[str]:
+        self.assertTrue(
+            hasattr(validator, "schema_keyword_errors"),
+            "the supported Schema subset is not exposed",
+        )
+        return validator.schema_keyword_errors(schema)
+
+    def test_all_five_repository_schemas_use_only_the_supported_subset(self) -> None:
+        paths = sorted(SKILLS_ROOT.glob("**/*schema.json"))
+        self.assertEqual(5, len(paths), [path.as_posix() for path in paths])
+        for path in paths:
+            with self.subTest(path=path):
+                schema = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual([], self.keyword_errors(schema))
+
+    def test_unknown_validation_keyword_fails_with_location_without_data_value(self) -> None:
+        secret_value = "PRIVATE_VALUE_MUST_NOT_APPEAR"
+        schema = {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string",
+                    "unevaluatedProperties": False,
+                }
+            },
+        }
+        errors = validator.validate_instance({"display_name": secret_value}, schema)
+        self.assertTrue(
+            any(
+                "$.properties.display_name" in error
+                and "unevaluatedProperties" in error
+                for error in errors
+            ),
+            errors,
+        )
+        self.assertNotIn(secret_value, "\n".join(errors))
+
+    def test_property_names_are_not_misclassified_as_schema_keywords(self) -> None:
+        schema = {
+            "type": "object",
+            "required": ["unknownBusinessKeyword"],
+            "additionalProperties": False,
+            "properties": {
+                "unknownBusinessKeyword": {"type": "string", "minLength": 1}
+            },
+        }
+        self.assertEqual([], self.keyword_errors(schema))
+        self.assertEqual(
+            [],
+            validator.validate_instance(
+                {"unknownBusinessKeyword": "valid"}, schema
+            ),
+        )
+
+    def test_pattern_property_names_are_schema_map_keys_and_rules_are_enforced(self) -> None:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "patternProperties": {
+                r"^feature_[a-z]+$": {"type": "integer", "minimum": 1}
+            },
+        }
+        self.assertEqual([], self.keyword_errors(schema))
+        self.assertEqual([], validator.validate_instance({"feature_alpha": 1}, schema))
+        self.assertTrue(
+            any(
+                "below minimum" in error
+                for error in validator.validate_instance({"feature_alpha": 0}, schema)
+            )
+        )
+        self.assertTrue(
+            any(
+                "unexpected property" in error
+                for error in validator.validate_instance({"other": 1}, schema)
+            )
+        )
+        invalid_pattern = copy.deepcopy(schema)
+        invalid_pattern["patternProperties"] = {"[": {"type": "integer"}}
+        self.assertTrue(
+            any("invalid regular expression" in error for error in self.keyword_errors(invalid_pattern))
+        )
+
+    def test_type_composition_required_extra_and_boundaries_are_enforced(self) -> None:
+        schema = {
+            "type": "object",
+            "required": ["kind", "values", "created_at"],
+            "additionalProperties": False,
+            "properties": {
+                "kind": {"oneOf": [{"const": "a"}, {"const": "b"}]},
+                "values": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 2,
+                    "uniqueItems": True,
+                    "items": {"type": "integer", "minimum": 1, "maximum": 3},
+                },
+                "created_at": {"type": "string", "format": "date-time"},
+            },
+        }
+        valid = {
+            "kind": "a",
+            "values": [1, 3],
+            "created_at": "2026-09-06T12:00:00Z",
+        }
+        self.assertEqual([], validator.validate_instance(valid, schema))
+        invalid_values = (
+            {},
+            {**valid, "extra": True},
+            {**valid, "kind": "c"},
+            {**valid, "values": []},
+            {**valid, "values": [1, 1]},
+            {**valid, "values": [0]},
+            {**valid, "values": [4]},
+            {**valid, "created_at": "2026-09-06"},
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                self.assertTrue(validator.validate_instance(value, schema))
+
+
 class ReadyPlanContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

@@ -15,6 +15,12 @@
 
 `handoff.json.schema` 固定為 `ready-plan/v1`。consumer 只接受明確支援的版本；無版本、版本不支援或缺少 handoff 的舊計畫，唯一交接路由是重新規劃、封存新版完整 bundle、以摘要和直接連結呈現並重新核准。
 
+### 受支援的 JSON Schema 子集合
+
+專案使用 standard library 驗證器執行受限的 JSON Schema 2020-12 子集合。驗證規則包含 `$ref`（僅限本機）、`type`、`const`、`enum`、`allOf`、`anyOf`、`oneOf`、`if`／`then`／`else`、物件的 `required`／`properties`／`patternProperties`／`additionalProperties`／`minProperties`／`maxProperties`、陣列的 `items`／`minItems`／`maxItems`／`uniqueItems`、字串的 `minLength`／`maxLength`／`pattern`／`format: date-time`，以及數值的 `minimum`／`maximum`。`$schema`、`$id`、`$comment`、`title`、`description`、`default`、`examples`、`deprecated`、`readOnly`、`writeOnly` 與 `x-*` 是可忽略的註解或專案擴充。
+
+驗證器會依 Schema 位置巡覽，`properties`、`patternProperties` 與 `$defs` 下的名稱視為 map 識別碼。任何其他 Schema 關鍵字、型別或 format 都會在資料驗證前以位置明確的契約錯誤失敗；錯誤不得包含 instance 的原始值。新增契約規則前，必須先擴充驗證器與有效／無效對照測試。
+
 Artifact 只使用兩個正交欄位：
 
 - `role`: `primary | supporting | handoff`
