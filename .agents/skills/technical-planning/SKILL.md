@@ -76,6 +76,8 @@ Bug run另讀取current approved `bug-assessment/v1` JSON與Markdown並重算has
 
 依三者形成 current／target state、設計決策、Modules／Interfaces／Seams、可執行的 `BDD-FWK-*`／`BDD-*`、必要的 `BOOT-*`、內層 `TEST-*`、`CMD-*`、`WP-*` DAG、revision impact map、來源 manifest 與 `handoff.json`。Current state 只使用 `Observed`；新路徑、介面與架構使用 `Proposed`。
 
+新 Candidate 另建立 `validation-plan/v1`：日常完成綁定實際 local 環境，發布與跨平台條件分列；required obligations 與 full-suite child inventory 建立可驗證 coverage edges，並列出 final review 的 terminal-only additions 與所有 executable input globs。相同命令不得因同時出現在 BDD、build、test 或治理義務而要求重複執行；只有完整 passed inventory 才能覆蓋。
+
 Bug Candidate另包含唯一`kind: bug` source、`purpose: bug-reproduction` command與conditional `bug_context`。可重現分支以original symptom與regression red為`verified` target；無法重現只可在reason、proxy red→green、residual risks與staging／人工follow-up完整時選`partial`。
 
 模板內容完整、所有適用驗收可雙向追溯、`handoff.json` 符合 `ready-plan/v1`，且沒有阻塞未知時，本階段完成。

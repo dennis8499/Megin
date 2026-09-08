@@ -67,9 +67,9 @@ BUG plan 另須先重跑原始症狀 oracle，再取得 regression red；只做�
 
 ## 3. Verifying／Reviewing
 
-完整讀取 [Reviewer 契約](references/reviewer-contract.md)。主代理 fresh 跑全部 full commands；失敗走 Fixing，使 affected WP 與必要 downstream 依序 Invalidated → Executing → Verified。
+完整讀取 [Reviewer 契約](references/reviewer-contract.md)。主代理依 Ready validation plan fresh 跑一次全部 logical obligations；經完整 child inventory 證明的 coverage edge 不重複執行相同 physical command，並自動保存原始 evidence bundle。失敗走 Fixing，使 affected WP 與必要 downstream 依序 Invalidated → Executing → Verified。
 
-全量通過後先由 fresh read-only Reviewer 完成不含outcome／Candidate binding的preliminary product review；主代理把report與每個raw output create-only保存於current run，並以report logical ref、path與SHA-256建立create-only `implementation-outcome/v1`。Required delivery接著封存knowledge Candidate並建立product／knowledge雙snapshot，再由另一個 fresh read-only Reviewer核對包含outcome的product bytes、Candidate與雙snapshot，回傳final `implementation-review/v1`。兩份report使用連續round且不同path；同一份preliminary report不能兼任final review。Blocking finding 走 Fixing 與另一位 Reviewer；任一snapshot drift 保存invalid report後回Verifying；breaker仍由Reviewer契約判定。
+全量通過後先由 fresh read-only Reviewer 完成六項便宜 precheck；若可審才 fresh 執行一次全量驗證與不含outcome／Candidate binding的preliminary product review。主代理把report與每個raw output create-only保存於current run，並以report logical ref、path與SHA-256建立create-only `implementation-outcome/v1`。Required delivery接著封存knowledge Candidate並建立product／knowledge雙snapshot，再由另一個 fresh read-only Reviewer核對包含outcome的product bytes、Candidate與雙snapshot，回傳final `implementation-review/v1`。Final 只有在所有執行輸入未變且差異只含本 Work ID 的連續 create-only terminal additions時可驗證並引用preliminary commands；其餘情況 fresh 全量執行。兩份report使用連續round且不同path；同一份preliminary report不能兼任final review。Blocking finding 走 Fixing 與另一位 Reviewer；任一snapshot drift 保存invalid report後回Verifying；breaker仍由Reviewer契約判定。
 
 完成條件：preliminary report已實體保存並與Outcome逐command一致；final Reviewer的required commands passed、coverage完整、沒有blocking finding，report product before／after與目前snapshot相同；required overlay的knowledge before／after亦相同且Candidate ref／digest精確一致。
 

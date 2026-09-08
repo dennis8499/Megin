@@ -35,7 +35,7 @@ _validate_schema_refs = _shared._validate_schema_refs
 partial_overclaim = _shared.partial_overclaim
 partial_safeguard_prose_errors = _shared.partial_safeguard_prose_errors
 
-EXECUTION_SCHEMA_SHA256 = "3ccb5203e141068d0d68bb9b58f528d2d342ef52f682bf88557cc5acea5c54f3"
+EXECUTION_SCHEMA_SHA256 = "1aa61dbfefc2d1f7398bd8f5c6512feb49601a55e223aa809f85dc743b8b1959"
 AUTHORITY_FILES = {
     "implementation-entrypoint": "implementation-execution/SKILL.md",
     "execution-ledger": "implementation-execution/references/preflight-and-ledger.md",
@@ -83,6 +83,20 @@ EXECUTION_DEF_REQUIRED = {
         "findings",
         "summary",
     },
+    "commandProvenance": {
+        "mode",
+        "producer_review_ref",
+        "producer_index_ref",
+        "producer_output_ref",
+        "verifier_output_ref",
+        "command_contract_sha256",
+        "execution_input_identity",
+        "environment_identity",
+        "ready_payload_sha256",
+        "test_inventory_sha256",
+    },
+    "reviewPrecheckCheck": {"check_id", "outcome", "evidence_refs"},
+    "reviewPrecheck": {"schema", "outcome", "checks", "blocking_findings"},
     "bugAssessmentBinding": {"path", "sha256", "markdown_path", "markdown_sha256"},
     "bugVerificationPlan": {"handoff_path", "candidate_revision", "verification_target"},
     "symptomEvidence": {"command_ref", "status", "evidence_refs"},
@@ -1222,6 +1236,79 @@ def validate_execution_record_semantics(
                 errors.append(f"review: {outcome.get('command_id')} output_ref is absent from raw_output_refs")
             if outcome.get("outcome") == "passed" and output_ref is None:
                 errors.append(f"review: {outcome.get('command_id')} passed without a raw output ref")
+        review_stage = data.get("review_stage")
+        if review_stage is not None:
+            precheck = data.get("precheck", {})
+            checks = precheck.get("checks", [])
+            required_check_ids = {
+                "source_requirement_coverage",
+                "diff_manifest",
+                "test_oracles",
+                "ready_evidence",
+                "snapshot",
+                "environment",
+            }
+            check_ids = [item.get("check_id") for item in checks]
+            if set(check_ids) != required_check_ids or len(check_ids) != len(
+                required_check_ids
+            ):
+                errors.append("review: staged precheck must contain each required check exactly once")
+            blocking_findings = precheck.get("blocking_findings", [])
+            if precheck.get("outcome") == "passed" and (
+                any(item.get("outcome") != "passed" for item in checks)
+                or blocking_findings
+            ):
+                errors.append("review: passed precheck contains a blocker")
+            if precheck.get("outcome") == "blocked" and not blocking_findings:
+                errors.append("review: blocked precheck must aggregate blocking findings")
+            provenance_values = [item.get("provenance") for item in outcomes]
+            if any(not isinstance(item, dict) for item in provenance_values):
+                errors.append("review: staged command outcomes require provenance")
+            else:
+                if review_stage == "preliminary" and any(
+                    item.get("mode") == "referenced" for item in provenance_values
+                ):
+                    errors.append("review: preliminary commands cannot be referenced")
+                referenced = [
+                    (outcome, provenance)
+                    for outcome, provenance in zip(outcomes, provenance_values)
+                    if provenance.get("mode") == "referenced"
+                ]
+                for outcome, provenance in referenced:
+                    if outcome.get("outcome") != "passed":
+                        errors.append("review: referenced command must be a complete pass")
+                    verifier_ref = provenance.get("verifier_output_ref")
+                    if verifier_ref != outcome.get("output_ref") or verifier_ref not in raw_refs:
+                        errors.append("review: referenced command lacks current verifier output")
+                for field in (
+                    "execution_input_identity",
+                    "environment_identity",
+                    "ready_payload_sha256",
+                ):
+                    identities = {item.get(field) for item in provenance_values}
+                    if len(identities) != 1:
+                        errors.append(f"review: command provenance disagrees on {field}")
+            if precheck.get("outcome") == "blocked":
+                if data.get("verdict") not in {"CHANGES_REQUIRED", "BLOCKED"}:
+                    errors.append("review: blocked precheck cannot be approved")
+                if any(
+                    item.get("outcome") != "not_run"
+                    or item.get("not_run_reason") != "precheck_blocked"
+                    for item in outcomes
+                ):
+                    errors.append(
+                        "review: blocked precheck requires precheck_blocked not_run commands"
+                    )
+                precheck_finding_ids = {
+                    item.get("finding_id") for item in blocking_findings
+                }
+                report_finding_ids = {
+                    item.get("finding_id")
+                    for item in data.get("findings", [])
+                    if item.get("blocking") is True
+                }
+                if not precheck_finding_ids.issubset(report_finding_ids):
+                    errors.append("review: precheck blockers are absent from report findings")
         for finding in data.get("findings", []):
             key_inputs = finding.get("key_inputs", {})
             for field in ("source_refs", "affected_loci"):

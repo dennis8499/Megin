@@ -220,16 +220,25 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/run_quick_checks.py
 針對 Project Knowledge retrieval 相關變更，可以先執行較小範圍：
 
 ~~~console
-python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope related --fixture-root .knowledge-test-tmp
+python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope related --profile local --fixture-root .knowledge-test-tmp/fixtures --jobs 4 --evidence-root .knowledge-test-tmp/evidence-related --ready-payload-sha256 <ready-payload-sha256>
 ~~~
 
-完整 release check：
+日常 local completion check：
 
 ~~~console
-python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp
+python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --profile local --fixture-root .knowledge-test-tmp/fixtures --jobs 4 --evidence-root .knowledge-test-tmp/evidence --run-label local-1 --ready-payload-sha256 <ready-payload-sha256>
 ~~~
 
-runner 會循序執行命令並在第一個失敗或 timeout 時停止。all 會涵蓋 BDD、workflow、governance、owner tests、syntax／schema、搜尋品質與 Delivery workspace integration。
+Profile runner 會平行執行明確標示為 parallel-safe 的命令，每個 worker 使用獨立 fixture、temp 與 Delivery registry；performance scenarios 保持循序並最後執行。任一失敗或 timeout 會停止派發新工作，未啟動項目明列 `not_run`。all 涵蓋 BDD、workflow、governance、owner tests、syntax／schema、搜尋品質與 Delivery workspace integration；拆分後的 physical commands 以 logical ID 和完整 child inventory 證明原義務，避免重跑相同 BDD、build 或治理命令。Local profile 不執行需要跨平台 release evidence 的 `BDD-016`；release profile 與未帶 profile 的相容入口仍執行該 50k portability scenario，且 release 完成仍需 Windows／Linux CI reports。
+
+驗證 bundle 可直接重驗或產生 reviewer 閱讀稿：
+
+~~~console
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py verify --index .knowledge-test-tmp/evidence/local-1/index.json
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py render --handoff docs/work/<work-id>/plan/handoff.json --index .knowledge-test-tmp/evidence/local-1/index.json
+~~~
+
+未帶 `--profile` 的舊 runner 仍維持循序相容行為。發布時改用 `--profile release`；跨平台完成仍須 CI 的 Windows／Linux reports，單一本機 release profile 不構成跨平台證據。
 
 ### Metrics 與搜尋品質
 
@@ -239,7 +248,7 @@ runner 會循序執行命令並在第一個失敗或 timeout 時停止。all 會
 python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp --metrics-output .knowledge-test-tmp/final-metrics.json
 ~~~
 
-knowledge-suite-metrics/v1 只記錄 command ID、status、duration、exit code、timeout 與 not_run，不複製原始 stdout／stderr。metrics 目標必須位於 .knowledge-test-tmp/；不要寫入 repository 其他位置。
+舊 `knowledge-suite-metrics/v1` 只記錄 command ID、status、duration、exit code、timeout 與 not_run，不複製原始 stdout／stderr。Profile runner 的 `validation-evidence/v1` 另保存牆鐘時間、physical／logical command、完整原始輸出雜湊與fixture profile；metrics與evidence目標都必須位於 `.knowledge-test-tmp/`，不要寫入repository其他位置。
 
 執行固定搜尋 corpus 的 Top-5 命中與 source-safety 檢查：
 

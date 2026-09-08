@@ -44,7 +44,20 @@ def _write(path: Path, value: bytes) -> None:
 def _safe_remove_fixture(root: Path) -> None:
     resolved = root.resolve(strict=False)
     workspace = Path.cwd().resolve()
-    if resolved.parent != workspace or resolved.name != ".knowledge-test-tmp":
+    approved_root = (workspace / ".knowledge-test-tmp").resolve(strict=False)
+    worker_value = os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+    if worker_value:
+        approved: set[Path] = set()
+        worker_root = Path(worker_value).resolve(strict=False)
+        try:
+            worker_root.relative_to(approved_root)
+        except ValueError:
+            pass
+        else:
+            approved.add((worker_root / "fixture").resolve(strict=False))
+    else:
+        approved = {approved_root}
+    if resolved not in approved:
         raise ValueError(f"fixture root is outside the approved path: {resolved}")
     if not resolved.exists():
         return

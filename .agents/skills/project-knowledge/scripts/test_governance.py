@@ -1137,7 +1137,15 @@ class GovernanceTests(unittest.TestCase):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=(
+            Path(os.environ["KNOWLEDGE_TEST_WORKER_ROOT"]) / "fixture"
+            if os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+            else Path(".knowledge-test-tmp")
+        ),
+    )
     args = parser.parse_args(argv)
     GovernanceTests.fixture_root = args.fixture_root.resolve()
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(GovernanceTests)

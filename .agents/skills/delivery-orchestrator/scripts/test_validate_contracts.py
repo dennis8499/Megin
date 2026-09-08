@@ -8,6 +8,7 @@ import json
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -22,9 +23,23 @@ SPEC.loader.exec_module(validator)
 SOURCE_SKILLS = SCRIPT.resolve().parents[2]
 
 
+class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
+    """Tolerate only short-lived Windows locks while preserving cleanup failures."""
+
+    def cleanup(self) -> None:
+        for attempt in range(6):
+            try:
+                super().cleanup()
+                return
+            except OSError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.05 * (2**attempt))
+
+
 class DeliveryContractMutationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="delivery-validator-")
+        self.temporary = RetryingTemporaryDirectory(prefix="delivery-validator-")
         self.skills = Path(self.temporary.name) / "skills"
         for name in (
             "_shared",
@@ -138,7 +153,7 @@ class DeliveryContractMutationTests(unittest.TestCase):
             ),
         )
         for relative, old, new in variants:
-            with self.subTest(relative=relative), tempfile.TemporaryDirectory(
+            with self.subTest(relative=relative), RetryingTemporaryDirectory(
                 prefix="delivery-routing-variant-"
             ) as temporary:
                 copied = Path(temporary) / "skills"
@@ -176,7 +191,7 @@ class DeliveryContractMutationTests(unittest.TestCase):
             ),
         )
         for relative, old, new in variants:
-            with self.subTest(relative=relative, old=old), tempfile.TemporaryDirectory(
+            with self.subTest(relative=relative, old=old), RetryingTemporaryDirectory(
                 prefix="delivery-observable-variant-"
             ) as temporary:
                 copied = Path(temporary) / "skills"

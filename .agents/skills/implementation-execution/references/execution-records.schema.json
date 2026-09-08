@@ -158,7 +158,8 @@
         "failure_count": {"type": ["integer", "null"], "minimum": 0},
         "skipped_count": {"type": ["integer", "null"], "minimum": 0},
         "output_ref": {"type": ["string", "null"]},
-        "not_run_reason": {"type": ["string", "null"]}
+        "not_run_reason": {"type": ["string", "null"]},
+        "provenance": {"$ref": "#/$defs/commandProvenance"}
       },
       "allOf": [
         {
@@ -203,6 +204,101 @@
           }
         }
       ]
+    },
+    "commandProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "producer_review_ref",
+        "producer_index_ref",
+        "producer_output_ref",
+        "verifier_output_ref",
+        "command_contract_sha256",
+        "execution_input_identity",
+        "environment_identity",
+        "ready_payload_sha256",
+        "test_inventory_sha256"
+      ],
+      "properties": {
+        "mode": {"enum": ["executed", "referenced"]},
+        "producer_review_ref": {"type": ["string", "null"]},
+        "producer_index_ref": {"type": ["string", "null"]},
+        "producer_output_ref": {"type": ["string", "null"]},
+        "verifier_output_ref": {"type": ["string", "null"]},
+        "command_contract_sha256": {"$ref": "#/$defs/sha256"},
+        "execution_input_identity": {"$ref": "#/$defs/sha256"},
+        "environment_identity": {"$ref": "#/$defs/sha256"},
+        "ready_payload_sha256": {"$ref": "#/$defs/sha256"},
+        "test_inventory_sha256": {"$ref": "#/$defs/sha256"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "executed"}}, "required": ["mode"]},
+          "then": {
+            "properties": {
+              "producer_review_ref": {"type": "null"},
+              "producer_index_ref": {"type": "null"},
+              "producer_output_ref": {"type": "null"},
+              "verifier_output_ref": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"mode": {"const": "referenced"}}, "required": ["mode"]},
+          "then": {
+            "properties": {
+              "producer_review_ref": {"type": "string", "minLength": 1},
+              "producer_index_ref": {"type": "string", "minLength": 1},
+              "producer_output_ref": {"type": "string", "minLength": 1},
+              "verifier_output_ref": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "reviewPrecheckCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "outcome", "evidence_refs"],
+      "properties": {
+        "check_id": {
+          "enum": [
+            "source_requirement_coverage",
+            "diff_manifest",
+            "test_oracles",
+            "ready_evidence",
+            "snapshot",
+            "environment"
+          ]
+        },
+        "outcome": {"enum": ["passed", "blocked"]},
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "reviewPrecheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "outcome", "checks", "blocking_findings"],
+      "properties": {
+        "schema": {"const": "review-precheck/v1"},
+        "outcome": {"enum": ["passed", "blocked"]},
+        "checks": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/reviewPrecheckCheck"}
+        },
+        "blocking_findings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/finding"}
+        }
+      }
     },
     "reviewerAttestation": {
       "type": "object",
@@ -502,10 +598,12 @@
         "schema": {"const": "implementation-review/v1"},
         "logical_ref": {"type": "string", "pattern": "^review:fresh-review:[a-z0-9][a-z0-9._-]{2,127}$"},
         "round": {"type": "integer", "minimum": 1},
+        "review_stage": {"enum": ["preliminary", "final"]},
         "verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]},
         "snapshot_before": {"$ref": "#/$defs/sha256"},
         "snapshot_after": {"$ref": "#/$defs/sha256"},
         "attestation": {"$ref": "#/$defs/reviewerAttestation"},
+        "precheck": {"$ref": "#/$defs/reviewPrecheck"},
         "command_outcomes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/commandOutcome"}},
         "raw_output_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
         "requirement_coverage": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/coverage"}},
@@ -519,6 +617,10 @@
         "summary": {"type": "string", "minLength": 1}
       },
       "allOf": [
+        {
+          "if": {"required": ["review_stage"]},
+          "then": {"required": ["precheck"]}
+        },
         {
           "if": {
             "anyOf": [

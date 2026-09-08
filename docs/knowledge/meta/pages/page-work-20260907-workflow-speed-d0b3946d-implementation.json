@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260907-workflow-speed-d0b3946d-implementation",
+      "content_anchor": "implementation-outcome",
+      "contradicts": [],
+      "evidence_class": "observed",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "2c0f489d9207464f9ec067f8db6815afc0a03c50a5406e3b35c433c13215a566",
+          "locator": {
+            "end_line": 3,
+            "start_line": 3
+          },
+          "path": "docs/work/work-20260907-workflow-speed-d0b3946d/implementation/outcome.md",
+          "sha256": "3e22a7d5c35e294a09d3fb51ce81288f154ed55b36133dcda4cbe2b1dd0ff832"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260907-workflow-speed-d0b3946d-implementation.md",
+  "content_sha256": "41910e6dffb38d8c030d69240ce59f70c8181fdc78b67c3140ae67fe245cf8e3",
+  "lifecycle": "current",
+  "page_id": "page-work-20260907-workflow-speed-d0b3946d-implementation",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "implementation"
+  ],
+  "title": "Implementation Outcome"
+}

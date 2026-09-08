@@ -28,9 +28,9 @@
 
 | 檢查 | Pass |
 |---|---|
-| Main verification | 全部 full commands `passed`；任何修正具有合法 Fixing 與 WP invalidation evidence |
+| Main verification | validation plan全部logical obligations `passed`；physical command沒有重複，coverage具完整child inventory；任何修正具有合法Fixing與WP invalidation evidence |
 | Snapshot | `implementation-snapshot/v1` 可重算並涵蓋 Ready／sources、base／HEAD、tracked diff 與 unignored files |
-| Fresh review | attestation、獨立 commands、逐義務 coverage、raw refs、findings 與 stable keys 符合 `implementation-review/v1` |
+| Fresh review | 六項precheck、attestation、executed／referenced provenance、逐義務coverage、raw refs、findings與stable keys符合`implementation-review/v1`；任何輸入漂移強制fresh commands |
 | Verdict | APPROVED 沒有 blocking finding 或未通過 command；advisory、failed／blocked／not_run 均依契約表達 |
 | Terminal order | Reviewer 與主代理的 before／after snapshots 相同，report 保存後才 append `Complete` |
 | Ledger continuity | state／WP histories、commands、diffs、reviews、breaker、resume 與 revision attempts 都可重現且 append-only |

@@ -1986,6 +1986,28 @@ class DocumentationAndCiImprovementTests(unittest.TestCase):
         }
         self.assertEqual(before, after)
 
+    def test_product_snapshot_ignores_parallel_runtime_outputs(self) -> None:
+        fixture_existed = self.fixture_root.exists()
+        self.fixture_root.mkdir(parents=True, exist_ok=True)
+        transient = Path(
+            tempfile.mkdtemp(prefix="snapshot-ignore-", dir=self.fixture_root)
+        )
+        try:
+            (transient / "being-removed.txt").write_text(
+                "runtime output\n", encoding="utf-8", newline="\n"
+            )
+            snapshot = _tree_snapshot(self.workspace)
+            self.assertFalse(
+                any(path.startswith(".knowledge-test-tmp/") for path in snapshot)
+            )
+        finally:
+            shutil.rmtree(transient, ignore_errors=True)
+            if not fixture_existed:
+                try:
+                    self.fixture_root.rmdir()
+                except OSError:
+                    pass
+
 
 class SuiteMetricsTests(unittest.TestCase):
     workspace: Path
@@ -2277,7 +2299,15 @@ TEST_CASES = {
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("test_names", nargs="*", choices=sorted(TEST_CASES))
-    parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=(
+            Path(os.environ["KNOWLEDGE_TEST_WORKER_ROOT"]) / "fixture"
+            if os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+            else Path(".knowledge-test-tmp")
+        ),
+    )
     args = parser.parse_args(argv)
     for test_case in TEST_CASES.values():
         test_case.workspace = Path.cwd().resolve()

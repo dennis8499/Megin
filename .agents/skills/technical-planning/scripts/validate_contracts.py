@@ -27,7 +27,7 @@ AUTHORITY_FILES = {
     "ready-plan": "technical-planning/references/ready-plan-contract.md",
     "planning-state": "technical-planning/references/delivery-protocol.md",
 }
-READY_SCHEMA_SHA256 = "c3e90430e69acb6a06795f1855ab6fd045281ce555627061bd877c00d3f5c13b"
+READY_SCHEMA_SHA256 = "749a01c368ec5e611c2fa07b07be735ad55574644afb4ea6fdc8c0cd9a53cc25"
 READY_ROOT_REQUIRED = {
     "schema",
     "candidate",
@@ -63,6 +63,25 @@ READY_DEF_REQUIRED = {
         "absence_evidence",
     },
     "workPackage": {"wp_id", "blocked_by", "contract_refs", "source_refs", "command_refs"},
+    "validationEnvironment": {"os", "python", "git", "tools"},
+    "validationObligation": {"obligation_id", "command_ref"},
+    "coverageEdge": {
+        "producer_command_ref",
+        "covered_command_ref",
+        "required_child_ids",
+        "inventory",
+    },
+    "releaseRequirements": {"profile", "platforms", "hosted"},
+    "validationReusePolicy": {"terminal_only_paths", "executable_input_globs"},
+    "validationPlan": {
+        "schema",
+        "profile",
+        "target_environment",
+        "required_obligations",
+        "coverage_edges",
+        "release_requirements",
+        "reuse_policy",
+    },
     "allowedWrite": {"path", "kind", "cleanup"},
     "externalEffect": {"target", "effect", "reversible", "authorization"},
     "absenceEvidence": {"probe", "outcome", "source_ref"},
@@ -353,6 +372,82 @@ def validate_ready_cross_references(data: dict[str, Any]) -> list[str]:
         for evidence in command.get("absence_evidence", []):
             if evidence.get("source_ref") not in sources:
                 errors.append(f"ready: command {command['command_id']} absence evidence has unknown source")
+
+    validation = data.get("validation")
+    if isinstance(validation, dict):
+        obligations = validation.get("required_obligations", [])
+        obligation_ids = [item.get("obligation_id") for item in obligations]
+        if len(obligation_ids) != len(set(obligation_ids)):
+            errors.append("ready: validation obligation IDs are not unique")
+        obligation_commands = {
+            item.get("command_ref")
+            for item in obligations
+            if isinstance(item, dict)
+        }
+        for command_ref in obligation_commands:
+            if command_ref not in commands:
+                errors.append(
+                    f"ready: validation obligation references unknown command {command_ref}"
+                )
+
+        covered_refs: set[str] = set()
+        graph: dict[str, list[str]] = {}
+
+        def validation_command_identity(command: dict[str, Any]) -> str:
+            return canonical_sha256(
+                {
+                    "cwd": command.get("cwd"),
+                    "command": command.get("command"),
+                    "environment_prerequisites": command.get(
+                        "environment_prerequisites", []
+                    ),
+                }
+            )
+
+        for edge in validation.get("coverage_edges", []):
+            producer_ref = edge.get("producer_command_ref")
+            covered_ref = edge.get("covered_command_ref")
+            if covered_ref in covered_refs:
+                errors.append(
+                    f"ready: validation coverage repeats covered command {covered_ref}"
+                )
+            covered_refs.add(covered_ref)
+            if producer_ref == covered_ref:
+                errors.append("ready: validation coverage cannot cover itself")
+            if producer_ref not in commands or covered_ref not in commands:
+                errors.append("ready: validation coverage references an unknown command")
+                continue
+            if producer_ref not in obligation_commands or covered_ref not in obligation_commands:
+                errors.append(
+                    "ready: validation coverage endpoints must be required obligations"
+                )
+            if validation_command_identity(commands[producer_ref]) != validation_command_identity(
+                commands[covered_ref]
+            ):
+                errors.append(
+                    f"ready: validation coverage command identity differs for {producer_ref} and {covered_ref}"
+                )
+            graph.setdefault(str(producer_ref), []).append(str(covered_ref))
+
+        visiting_validation: set[str] = set()
+        visited_validation: set[str] = set()
+
+        def visit_validation(command_ref: str) -> None:
+            if command_ref in visiting_validation:
+                errors.append(
+                    f"ready: validation coverage graph contains a cycle at {command_ref}"
+                )
+                return
+            if command_ref in visited_validation:
+                return
+            visiting_validation.add(command_ref)
+            for covered_ref in graph.get(command_ref, []):
+                visit_validation(covered_ref)
+            visiting_validation.remove(command_ref)
+            visited_validation.add(command_ref)
+
+        for command_ref in graph:
+            visit_validation(command_ref)
 
     bug_context = data.get("bug_context")
     bug_sources = [source for source in sources.values() if source.get("kind") == "bug"]

@@ -6,14 +6,9 @@
 
 ## 1. 主代理的全量驗證與 snapshot
 
-從乾淨的命令程序、plan 指定的工作目錄與非秘密環境前提，依序新鮮執行：
+從乾淨的命令程序、plan 指定的工作目錄與非秘密環境前提，主代理新鮮執行 handoff `validation-plan/v1` 的全部 required obligations。每個 physical command 只執行一次；full-suite 只有在實際 child inventory 完整、required child IDs 全部通過且零 failure／skip／timeout／`not_run` 時，才能沿 coverage edge 滿足 build、test、BDD 或治理 logical obligation。BDD／TDD red→green evidence 獨立保留，不因去重而合併。
 
-1. 完整 build／compile command；
-2. 完整 test command；
-3. BDD full-suite command；
-4. plan 與治理列出的 lint、format-check、typecheck、security、codegen consistency 或其他 required commands。
-
-每項依 handoff success／completeness 判定 `passed`，包含 exit 0、零 failure、零 skipped 與完整 discovery；runner 不提供計數時以 raw output 或 machine result 證明 inventory。任何 failure 依[執行迴圈](bdd-tdd-loop.md)走 `Verifying → Fixing`，尚未建立 review snapshot。
+Runner 以 `validation-evidence/v1` create-only bundle 保存完整 stdout／stderr bytes、exit code、耗時、failure／skip counts、physical／logical IDs、child inventory、worker cleanup、fixture profile、執行輸入與環境 identity、Ready payload digest及原始輸出 hash。引用 bundle 必須執行 verifier；遺失、redirect、hash drift、部分 inventory 或 identity mismatch 都不能支持通過。任何 failure 依[執行迴圈](bdd-tdd-loop.md)走 `Verifying → Fixing`，尚未建立 review snapshot。
 
 全量通過後先建立不含Outcome與knowledge Candidate的preliminary product snapshot，交給第一位fresh read-only Reviewer。Preliminary report必須`APPROVED`、含唯一`logical_ref`、穩定的before／after snapshot、完整command outcomes／coverage，且不得預填任何knowledge snapshot或Candidate欄位。主代理將report與它宣告的每份raw output create-only保存於current run；只填logical ref、未保存bytes或report hash漂移都不構成review。
 
@@ -42,6 +37,8 @@ Required delivery overlay另建立`knowledge-snapshot/v1`：綁sealed Candidate 
 - 可執行 plan 的驗證命令；命令只可產生 plan 已允許且被忽略的 build／test artifacts 或 host-temp 輸出。若命令會改變 tracked／未忽略內容，回報 `BLOCKED`；
 - 命令前後自行重算 snapshot，證明 reviewed bytes 未改變。
 
+每位 Reviewer 在任何昂貴命令前先完成六項 precheck：source／requirement coverage、完整 diff manifest、test oracle、Ready evidence、snapshot 與 environment。每項保存 evidence refs。任一項 blocked 時，一次彙整所有已發現的 blocking findings，所有昂貴命令記為 `not_run`／`precheck_blocked`；只有 precheck 全部 passed 才能執行或引用驗證。
+
 Attestation 的 `write_actions: false` 表示 Reviewer 沒有直接編輯或未宣告寫入；驗證命令產生且僅產生 contract 允許的 ignored／host-temp outputs 不視為 Reviewer 寫入責任，仍須在 command outcome 與 snapshot probes 中揭露。
 
 不得只交付 diff 摘要或主代理整理的選段。Reviewer 應自行讀取完整 tracked diff、所有未忽略新檔及原始來源。
@@ -50,7 +47,7 @@ Reviewer 沒有 Ledger 寫入責任：所有 command raw output、logical refs �
 
 ## 3. 獨立驗證面向
 
-Reviewer 必須自行重跑全量 build、test、BDD 與治理命令，並獨立檢查：
+Preliminary Reviewer 必須新鮮執行一次全量 validation plan。Final Reviewer仍獨立檢查全部面向；只有 preliminary 之後的差異全是同一 Work ID、連續編號、plan 明列的 create-only terminal additions，而且 command contract、test inventory、execution input identity、environment identity、Ready digest與 producer bundle bytes完全相同時，才可逐 command 引用 preliminary pass。Final verifier 自身的新 raw output 與 producer refs 一併保存。任何產品、測試、Skill、Schema、既有 Markdown、環境或未分類輸入改變，或 terminal artifact 被修改／跨 Work ID／跳號，final 必須新鮮重跑全量命令。兩位 Reviewer都獨立檢查：
 
 - 每項規格需求與驗收的實作、BDD、TDD 與 WP 完成證據；
 - 邊界、失敗、復原、相容、安全、隱私與適用品質限制；
@@ -74,6 +71,8 @@ Command outcome 語義：
 - `failed`：命令執行但任一判定失敗；可取得的 counts 為整數，不可取得者為 `null`。
 - `blocked`：命令已啟動，但因環境、權限、side-effect 或可靠性阻塞而無法完成可信判定；不可取得欄位為 `null`。
 - `not_run`：命令未啟動；無論原因是前置能力／權限不成立、外部取消或其他可定位事件，counts 與 exit 均為 `null`，`not_run_reason` 必填。`blocked` 或 `not_run` 都不能支持 APPROVED。
+
+新版 staged report 另有 `review_stage`、六項 `review-precheck/v1` 與每個 command 的 provenance。`mode: executed` 綁本輪 raw output；`mode: referenced` 綁 preliminary report、producer index／output、current verifier output、command contract、test inventory、execution input、environment 與 Ready digest。歷史 report 沒有 staged 欄位時維持原契約，不回填 provenance。
 
 每個已執行command outcome使用不同且非空的raw output ref；`raw_output_refs`自身也不得重複。共用同一output或只改路徑不能冒充多個獨立command證據。
 

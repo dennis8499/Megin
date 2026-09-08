@@ -43,8 +43,22 @@ GROUP_SCENARIOS: dict[str, tuple[str, ...]] = {
     "performance": ("BDD-018", "BDD-020"),
     "presentation": ("BDD-021", "BDD-022", "BDD-023", "BDD-024", "BDD-025"),
     "maintenance": ("BDD-026", "BDD-027", "BDD-028", "BDD-029", "BDD-030", "BDD-031"),
+    "workflow-speed": (
+        "BDD-101",
+        "BDD-102",
+        "BDD-103",
+        "BDD-201",
+        "BDD-202",
+        "BDD-203",
+        "BDD-301",
+        "BDD-302",
+        "BDD-401",
+        "BDD-501",
+    ),
 }
 OCCURRENCE_REASON_SENTINEL = "OCCURRENCE_REASON_SENTINEL_BDD_023_742ac129"
+SEQUENTIAL_PERFORMANCE_SCENARIOS = frozenset({"BDD-016", "BDD-018", "BDD-020"})
+RELEASE_ONLY_SCENARIOS = frozenset({"BDD-016"})
 _WINDOWS = os.name == "nt"
 
 
@@ -54,6 +68,256 @@ def scenario(identifier: str, group: str) -> Callable[[Scenario], Scenario]:
         return function
 
     return register
+
+
+def functional_shard_scenarios(index: int, count: int) -> list[str]:
+    """Return one deterministic, disjoint shard of all non-performance scenarios."""
+
+    if count < 1 or count > 16 or index < 1 or index > count:
+        raise ValueError("functional shard must be INDEX/TOTAL with 1 <= INDEX <= TOTAL <= 16")
+    functional = [
+        identifier
+        for identifier in SCENARIOS
+        if identifier not in SEQUENTIAL_PERFORMANCE_SCENARIOS
+    ]
+    return functional[index - 1 :: count]
+
+
+def validation_profile_scenarios(
+    selected: list[str], profile: str | None
+) -> list[str]:
+    """Keep hosted/cross-platform obligations in release and legacy runs."""
+
+    if profile not in {None, "local", "release"}:
+        raise ValueError("validation profile must be local or release")
+    if profile == "local":
+        return [
+            identifier
+            for identifier in selected
+            if identifier not in RELEASE_ONLY_SCENARIOS
+        ]
+    return list(selected)
+
+
+def _functional_shard(value: str) -> tuple[int, int]:
+    matched = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", value)
+    if matched is None:
+        raise argparse.ArgumentTypeError("functional shard must use INDEX/TOTAL")
+    index, count = (int(part) for part in matched.groups())
+    try:
+        functional_shard_scenarios(index, count)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+    return index, count
+
+
+@scenario("BDD-101", "workflow-speed")
+def full_suite_coverage_executes_each_physical_child_once(fixture_root: Path) -> None:
+    del fixture_root
+    focused = (
+        Path.cwd()
+        / ".agents/skills/implementation-execution/scripts/test_validation_evidence.py"
+    )
+    assert focused.is_file(), "validation evidence focused tests are absent"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            str(focused),
+            "CoverageAndBundleTests.test_full_suite_coverage_executes_each_child_once",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-102", "workflow-speed")
+def partial_coverage_and_validation_profiles_remain_separate(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    schema_path = (
+        Path.cwd()
+        / ".agents/skills/technical-planning/references/ready-plan.schema.json"
+    )
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert "validation" in schema["properties"], (
+        "ready-plan/v1 has no additive validation capability"
+    )
+    commands = (
+        (
+            ".agents/skills/implementation-execution/scripts/test_validation_evidence.py",
+            "CoverageAndBundleTests.test_partial_coverage_runs_only_the_missing_obligation",
+        ),
+        (
+            ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+            "ValidationProfileContractTests",
+        ),
+    )
+    for script, selected in commands:
+        completed = subprocess.run(
+            [sys.executable, "-X", "utf8", "-B", script, selected],
+            cwd=Path.cwd(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            shell=False,
+        )
+        assert completed.returncode == 0, completed.stderr.decode(
+            "utf-8", errors="replace"
+        )
+
+
+@scenario("BDD-103", "workflow-speed")
+def validation_bundles_are_atomic_and_fail_closed_on_drift(
+    fixture_root: Path,
+) -> None:
+    del fixture_root
+    implementation = (
+        Path.cwd()
+        / ".agents/skills/implementation-execution/scripts/validation_evidence.py"
+    )
+    source = implementation.read_text(encoding="utf-8")
+    assert "def write_bundle(" in source, "atomic evidence bundle seam is absent"
+    runner_source = (
+        Path.cwd()
+        / ".agents/skills/project-knowledge/scripts/run_full_suite.py"
+    ).read_text(encoding="utf-8")
+    for option in ("--profile", "--jobs", "--evidence-root"):
+        assert option in runner_source, f"full-suite runner lacks {option}"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/implementation-execution/scripts/test_validation_evidence.py",
+            "CoverageAndBundleTests.test_atomic_bundle_and_reference_fail_closed",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+def _run_review_pipeline_scenario(selected: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/implementation-execution/scripts/test_validation_evidence.py",
+            selected,
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-201", "workflow-speed")
+def blocking_review_precheck_stops_expensive_commands(fixture_root: Path) -> None:
+    del fixture_root
+    _run_review_pipeline_scenario(
+        "ReviewPipelineTests.test_blocking_precheck_aggregates_findings_without_running_commands"
+    )
+
+
+@scenario("BDD-202", "workflow-speed")
+def final_review_reuses_only_verified_terminal_additions(fixture_root: Path) -> None:
+    del fixture_root
+    _run_review_pipeline_scenario(
+        "ReviewPipelineTests.test_preliminary_executes_and_final_references_terminal_only_additions"
+    )
+
+
+@scenario("BDD-203", "workflow-speed")
+def review_input_drift_requires_fresh_execution(fixture_root: Path) -> None:
+    del fixture_root
+    _run_review_pipeline_scenario(
+        "ReviewPipelineTests.test_reuse_requires_fresh_execution_for_every_nonterminal_drift_class"
+    )
+
+
+@scenario("BDD-301", "workflow-speed")
+def rendered_review_and_archive_are_deterministic(fixture_root: Path) -> None:
+    del fixture_root
+    _run_review_pipeline_scenario(
+        "EvidenceOperationsTests.test_render_and_archive_are_deterministic_and_fail_closed"
+    )
+
+
+@scenario("BDD-302", "workflow-speed")
+def activity_metrics_and_benchmark_use_complete_samples(fixture_root: Path) -> None:
+    del fixture_root
+    _run_review_pipeline_scenario(
+        "EvidenceOperationsTests.test_activity_categories_and_benchmark_threshold"
+    )
+
+
+@scenario("BDD-401", "workflow-speed")
+def chinese_workflow_questions_return_owner_contracts(fixture_root: Path) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/project-knowledge/scripts/test_query.py",
+            "ChineseWorkflowQueryTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
+
+
+@scenario("BDD-501", "workflow-speed")
+def parallel_workers_are_isolated_and_profiled(fixture_root: Path) -> None:
+    del fixture_root
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-B",
+            ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+            "WorkflowSpeedFixtureTests",
+        ],
+        cwd=Path.cwd(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        shell=False,
+    )
+    assert completed.returncode == 0, completed.stderr.decode(
+        "utf-8", errors="replace"
+    )
 
 
 @scenario("BDD-026", "maintenance")
@@ -498,16 +762,34 @@ def _git(repo: Path, *arguments: str) -> None:
 def _tree_snapshot(repo: Path) -> dict[str, str]:
     snapshot: dict[str, str] = {}
     for path in sorted(repo.rglob("*"), key=lambda item: item.as_posix().encode("utf-8")):
-        if not path.is_file() or ".git" in path.relative_to(repo).parts:
+        relative = path.relative_to(repo)
+        if (
+            ".git" in relative.parts
+            or relative.parts[:1] == (".knowledge-test-tmp",)
+            or not path.is_file()
+        ):
             continue
-        snapshot[path.relative_to(repo).as_posix()] = _sha256(path.read_bytes())
+        snapshot[relative.as_posix()] = _sha256(path.read_bytes())
     return snapshot
 
 
 def _remove_fixture(root: Path) -> None:
     resolved = root.resolve(strict=False)
     workspace = Path.cwd().resolve()
-    if resolved.parent != workspace or resolved.name != ".knowledge-test-tmp":
+    approved_root = (workspace / ".knowledge-test-tmp").resolve(strict=False)
+    worker_value = os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+    if worker_value:
+        approved: set[Path] = set()
+        worker_root = Path(worker_value).resolve(strict=False)
+        try:
+            worker_root.relative_to(approved_root)
+        except ValueError:
+            pass
+        else:
+            approved.add((worker_root / "fixture").resolve(strict=False))
+    else:
+        approved = {approved_root}
+    if resolved not in approved:
         raise AssertionError(f"fixture root is outside the approved path: {resolved}")
     if not resolved.exists():
         return
@@ -3569,14 +3851,46 @@ def _run(selected: list[str], fixture_root: Path) -> tuple[int, dict[str, object
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--list-scenarios", action="store_true")
-    parser.add_argument("--group", choices=sorted(GROUP_SCENARIOS))
-    parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
-    args = parser.parse_args(argv)
-    selected = (
-        list(SCENARIOS)
-        if args.group is None
-        else list(GROUP_SCENARIOS[args.group])
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--group", choices=sorted(GROUP_SCENARIOS))
+    target.add_argument("--functional-shard", type=_functional_shard)
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=(
+            Path(os.environ["KNOWLEDGE_TEST_WORKER_ROOT"]) / "fixture"
+            if os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+            else Path(".knowledge-test-tmp")
+        ),
     )
+    parser.add_argument("--validation-profile", choices=["local", "release"])
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--exclude-performance", action="store_true")
+    selection.add_argument("--performance-only", action="store_true")
+    args = parser.parse_args(argv)
+    if args.functional_shard is not None:
+        if args.exclude_performance or args.performance_only:
+            parser.error("functional shard cannot be combined with performance selection")
+        selected = functional_shard_scenarios(*args.functional_shard)
+    else:
+        selected = (
+            list(SCENARIOS)
+            if args.group is None
+            else list(GROUP_SCENARIOS[args.group])
+        )
+    if args.exclude_performance:
+        selected = [
+            identifier
+            for identifier in selected
+            if identifier not in SEQUENTIAL_PERFORMANCE_SCENARIOS
+        ]
+    elif args.performance_only:
+        selected = [
+            identifier
+            for identifier in selected
+            if identifier in SEQUENTIAL_PERFORMANCE_SCENARIOS
+        ]
+    selected = validation_profile_scenarios(selected, args.validation_profile)
     missing = sorted(set(selected) - set(SCENARIOS))
     if missing:
         parser.error(f"scenario group references unknown IDs: {', '.join(missing)}")

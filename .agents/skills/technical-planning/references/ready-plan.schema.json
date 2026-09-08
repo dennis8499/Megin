@@ -94,6 +94,7 @@
       "minItems": 1,
       "items": {"$ref": "#/$defs/workPackage"}
     },
+    "validation": {"$ref": "#/$defs/validationPlan"},
     "revision_impact": {
       "type": "object",
       "additionalProperties": false,
@@ -298,6 +299,114 @@
         "contract_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contractId"}},
         "source_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/srcId"}},
         "command_refs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/commandId"}}
+      }
+    },
+    "validationEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "python", "git", "tools"],
+      "properties": {
+        "os": {"type": "string", "minLength": 1},
+        "python": {"type": "string", "minLength": 1},
+        "git": {"type": "string", "minLength": 1},
+        "tools": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "validationObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligation_id", "command_ref"],
+      "properties": {
+        "obligation_id": {"$ref": "#/$defs/commandId"},
+        "command_ref": {"$ref": "#/$defs/commandId"}
+      }
+    },
+    "coverageEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "producer_command_ref",
+        "covered_command_ref",
+        "required_child_ids",
+        "inventory"
+      ],
+      "properties": {
+        "producer_command_ref": {"$ref": "#/$defs/commandId"},
+        "covered_command_ref": {"$ref": "#/$defs/commandId"},
+        "required_child_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "inventory": {"const": "complete"}
+      }
+    },
+    "releaseRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "platforms", "hosted"],
+      "properties": {
+        "profile": {"const": "release"},
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "hosted": {"type": "boolean"}
+      }
+    },
+    "validationReusePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminal_only_paths", "executable_input_globs"],
+      "properties": {
+        "terminal_only_paths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "executable_input_globs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "validationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "profile",
+        "target_environment",
+        "required_obligations",
+        "coverage_edges",
+        "release_requirements",
+        "reuse_policy"
+      ],
+      "properties": {
+        "schema": {"const": "validation-plan/v1"},
+        "profile": {"enum": ["local", "release"]},
+        "target_environment": {"$ref": "#/$defs/validationEnvironment"},
+        "required_obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/validationObligation"}
+        },
+        "coverage_edges": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/coverageEdge"}
+        },
+        "release_requirements": {"$ref": "#/$defs/releaseRequirements"},
+        "reuse_policy": {"$ref": "#/$defs/validationReusePolicy"}
       }
     },
     "bugAssessmentBinding": {

@@ -86,6 +86,26 @@ def _new_report() -> dict[str, Any]:
             "event_count": 0,
             "phase_durations_seconds": {phase: None for phase in PHASES},
             "phase_return_count": None,
+            "activity_durations_seconds": {
+                category: None
+                for category in (
+                    "commands",
+                    "review",
+                    "human_wait",
+                    "interruption",
+                    "active_work",
+                )
+            },
+            "activity_unavailable_reasons": {
+                category: "events_unavailable"
+                for category in (
+                    "commands",
+                    "review",
+                    "human_wait",
+                    "interruption",
+                    "active_work",
+                )
+            },
             "unavailable_fields": ["events"],
         },
     }
@@ -192,6 +212,164 @@ def _parse_time(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo is not None else None
 
 
+def _coerce_intervals(values: Any) -> tuple[list[tuple[datetime, datetime]], bool]:
+    if not isinstance(values, list):
+        return [], False
+    intervals: list[tuple[datetime, datetime]] = []
+    valid = True
+    for value in values:
+        if not isinstance(value, dict):
+            valid = False
+            continue
+        started = _parse_time(value.get("started_at"))
+        ended = _parse_time(value.get("ended_at"))
+        if started is None or ended is None or ended < started:
+            valid = False
+            continue
+        intervals.append((started, ended))
+    return intervals, valid
+
+
+def _merge_intervals(
+    intervals: list[tuple[datetime, datetime]],
+) -> list[tuple[datetime, datetime]]:
+    merged: list[list[datetime]] = []
+    for started, ended in sorted(intervals, key=lambda item: item[0]):
+        if not merged or started > merged[-1][1]:
+            merged.append([started, ended])
+        elif ended > merged[-1][1]:
+            merged[-1][1] = ended
+    return [(started, ended) for started, ended in merged]
+
+
+def _interval_seconds(intervals: list[tuple[datetime, datetime]]) -> float:
+    return sum((ended - started).total_seconds() for started, ended in intervals)
+
+
+def _intersection_seconds(
+    left: list[tuple[datetime, datetime]],
+    right: list[tuple[datetime, datetime]],
+) -> float:
+    total = 0.0
+    for left_start, left_end in left:
+        for right_start, right_end in right:
+            started = max(left_start, right_start)
+            ended = min(left_end, right_end)
+            if ended > started:
+                total += (ended - started).total_seconds()
+    return total
+
+
+def summarize_activity_durations(
+    events: Any,
+    *,
+    command_intervals: list[dict[str, Any]] | None = None,
+    review_intervals: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Attribute closed delivery intervals without inventing unavailable time."""
+
+    categories = ("commands", "review", "human_wait", "interruption", "active_work")
+    result: dict[str, Any] = {
+        "schema": "delivery-activity-metrics/v1",
+        "activity_durations_seconds": {category: None for category in categories},
+        "unavailable_fields": [],
+        "unavailable_reasons": {},
+    }
+
+    event_intervals: dict[str, list[tuple[datetime, datetime]]] = {
+        "active": [],
+        "awaiting_user": [],
+        "blocked": [],
+    }
+    events_valid = isinstance(events, list) and bool(events)
+    if events_valid:
+        for current, following in zip(events, events[1:]):
+            if not isinstance(current, dict) or not isinstance(following, dict):
+                events_valid = False
+                continue
+            status = current.get("to_status")
+            started = _parse_time(current.get("at"))
+            ended = _parse_time(following.get("at"))
+            if status not in event_intervals or started is None or ended is None or ended < started:
+                events_valid = False
+                continue
+            event_intervals[status].append((started, ended))
+    if not events_valid:
+        for category in ("human_wait", "interruption", "active_work"):
+            result["unavailable_fields"].append(
+                f"activity_durations_seconds.{category}"
+            )
+            result["unavailable_reasons"][category] = "delivery_events_incomplete"
+    else:
+        human_open = events[-1].get("to_status") == "awaiting_user"
+        blocked_open = events[-1].get("to_status") == "blocked"
+        active_open = events[-1].get("to_status") == "active"
+        for category, status, open_interval in (
+            ("human_wait", "awaiting_user", human_open),
+            ("interruption", "blocked", blocked_open),
+        ):
+            if open_interval:
+                result["unavailable_fields"].append(
+                    f"activity_durations_seconds.{category}"
+                )
+                result["unavailable_reasons"][category] = "open_delivery_interval"
+            else:
+                result["activity_durations_seconds"][category] = round(
+                    _interval_seconds(_merge_intervals(event_intervals[status])), 6
+                )
+        if active_open:
+            result["unavailable_fields"].append(
+                "activity_durations_seconds.active_work"
+            )
+            result["unavailable_reasons"]["active_work"] = "open_delivery_interval"
+
+    evidence_intervals: dict[str, list[tuple[datetime, datetime]]] = {}
+    for category, values in (
+        ("commands", command_intervals),
+        ("review", review_intervals),
+    ):
+        intervals, valid = _coerce_intervals(values)
+        if values is None or not valid:
+            result["unavailable_fields"].append(
+                f"activity_durations_seconds.{category}"
+            )
+            result["unavailable_reasons"][category] = "evidence_intervals_unavailable"
+        else:
+            merged = _merge_intervals(intervals)
+            evidence_intervals[category] = merged
+            result["activity_durations_seconds"][category] = round(
+                _interval_seconds(merged), 6
+            )
+
+    if (
+        events_valid
+        and not events[-1].get("to_status") == "active"
+        and set(evidence_intervals) == {"commands", "review"}
+    ):
+        active = _merge_intervals(event_intervals["active"])
+        attributable = _merge_intervals(
+            [*evidence_intervals["commands"], *evidence_intervals["review"]]
+        )
+        result["activity_durations_seconds"]["active_work"] = round(
+            max(0.0, _interval_seconds(active) - _intersection_seconds(active, attributable)),
+            6,
+        )
+        result["unavailable_reasons"].pop("active_work", None)
+        result["unavailable_fields"] = [
+            field
+            for field in result["unavailable_fields"]
+            if field != "activity_durations_seconds.active_work"
+        ]
+    elif "active_work" not in result["unavailable_reasons"]:
+        result["unavailable_fields"].append(
+            "activity_durations_seconds.active_work"
+        )
+        result["unavailable_reasons"]["active_work"] = "evidence_intervals_unavailable"
+
+    result["unavailable_fields"] = sorted(set(result["unavailable_fields"]))
+    return result
+
+
 def summarize_process_metrics(events: Any) -> dict[str, Any]:
     result: dict[str, Any] = {
         "schema": PROCESS_METRICS_SCHEMA,
@@ -202,6 +380,13 @@ def summarize_process_metrics(events: Any) -> dict[str, Any]:
         "unavailable_fields": [],
     }
     if not isinstance(events, list) or not events:
+        activity = summarize_activity_durations(events)
+        result["activity_durations_seconds"] = activity[
+            "activity_durations_seconds"
+        ]
+        result["activity_unavailable_reasons"] = activity[
+            "unavailable_reasons"
+        ]
         result["unavailable_fields"] = ["events"]
         return result
 
@@ -244,6 +429,12 @@ def summarize_process_metrics(events: Any) -> dict[str, Any]:
     ]
     if result["phase_return_count"] is None:
         result["unavailable_fields"].append("phase_return_count")
+    activity = summarize_activity_durations(events)
+    result["activity_durations_seconds"] = activity[
+        "activity_durations_seconds"
+    ]
+    result["activity_unavailable_reasons"] = activity["unavailable_reasons"]
+    result["unavailable_fields"].extend(activity["unavailable_fields"])
     result["outcome"] = "calculated" if not result["unavailable_fields"] else "partially_calculable"
     return result
 

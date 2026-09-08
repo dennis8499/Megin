@@ -93,6 +93,8 @@ Bug plan在本節前加入「BUG diagnosis與verification target」：列出asse
 | CMD-BUILD-FULL-001 | build-full | 〔狀態〕 | 〔build〕 |
 | CMD-TEST-FULL-001 | test-full | 〔狀態〕 | 〔tests〕 |
 
+`validation-plan/v1`：〔local target environment〕；〔required obligations〕；〔producer → covered command／required child inventory〕；〔release platforms／hosted evidence〕；〔terminal-only additions／executable input globs〕。完整 machine shape 只放在 `handoff.json`。
+
 順序：目前 BDD（必要時先驗證 BOOT）正確 red → 映射 TEST red／minimal green／refactor-with-green → focused BDD 與 related green；scenario green 後才進下一個。全部 WP 完成後 fresh 執行 full build、test、BDD 與治理 commands。
 
 ## 5. 工作包

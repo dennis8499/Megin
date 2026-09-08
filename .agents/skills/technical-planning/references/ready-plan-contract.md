@@ -99,6 +99,17 @@ Primary／supporting bytes、revision、payload digest、paths 與其 hashes 保
 
 Bundle 必須包含獨立的 `purpose: bdd-discovery` 命令；它只列出／發現 BDD scenarios，不以執行 full suite 代替。需要額外安裝的 Proposed framework 另有 `bdd-install`；由 target runtime 內建者以一手 source evidence 記錄「無獨立安裝」及其 availability probe。其餘依適用性包含 focused BDD、full BDD、focused TDD、related、full build、full test、治理、CI 及 `BOOT-*` 命令。
 
+## Validation profile 與覆蓋關係
+
+新工作的 handoff 必須包含 `validation-plan/v1`；既有 Ready bundle 與已建立的 run 可省略並沿用舊契約，不回填或重寫。Validation plan 固定：
+
+- `profile` 與 `target_environment`：日常完成使用 plan 明列的 `local` OS、Python、Git 與工具版本。跨平台矩陣、hosted CI 與發布限定證據列在 `release_requirements`；來源需求明訂跨平台行為時，該平台仍是本工作的 required obligation。
+- `required_obligations`：列出本工作必須滿足的 build、test、BDD、治理及其他 command refs。
+- `coverage_edges`：只有 producer 的完整 child inventory 可滿足 covered command。`required_child_ids` 必須全部實際通過，failure、timeout、skip、缺失或 `not_run` 均不構成覆蓋。
+- `reuse_policy`：列出 final review 唯一可接受的 create-only terminal additions 與所有 executable input globs。Skill、Schema、測試、產品、環境、Markdown 或未分類輸入都視為可執行輸入，除非它是本 Work ID、連續 revision、plan 明列且只新增的 terminal artifact。
+
+同一 physical execution 可經已驗證的 coverage edge 滿足多個 logical obligations；report 必須分開保存 physical command ID、logical obligation、完整測試 inventory 與實際來源。BDD／TDD 的 red→green 證據仍各自保存，不能以 full-suite 覆蓋冒充開發順序。引用既有證據時標示 `referenced` 及 producer／verifier refs，不可標成新執行。
+
 ## Consumer 不變量
 
 ## Conditional `bug_context`
@@ -122,5 +133,6 @@ Implementation Preflight 在任何產品寫入前驗證：
 4. execution base SHA 與 planning baseline 相同。
 5. 每個必要 command 的 cwd、timeout、network、允許寫入、外部副作用、成功／完整性及 Proposed absence evidence 完整。
 6. BDD discovery 命令存在，且其輸出可建立預期 scenario inventory。
+7. 新工作含完整 local／release validation profile、required obligations、無環且可判定的 coverage edges，以及 terminal-only／executable-input reuse policy。
 
 任一項失敗時唯一狀態是 `Awaiting upstream reapproval` 或無法取得必要證據時的 `Blocked`；產品 diff 保持為零。

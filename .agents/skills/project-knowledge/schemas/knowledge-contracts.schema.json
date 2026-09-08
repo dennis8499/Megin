@@ -107,7 +107,7 @@
         "source_refs"
       ],
       "properties": {
-        "authority": {"enum": ["canonical", "raw"]},
+        "authority": {"enum": ["canonical", "owner-contract", "raw"]},
         "lifecycle": {"const": "current"},
         "match_reasons": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "path": {"$ref": "#/$defs/normalizedPath"},

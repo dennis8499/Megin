@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from typing import Any, Sequence
@@ -39,6 +40,28 @@ planning_fixture = importlib.util.module_from_spec(PLANNING_SPEC)
 PLANNING_SPEC.loader.exec_module(planning_fixture)
 
 REQUEST_SHA = hashlib.sha256(b"original delivery request").hexdigest()
+
+
+class RetryingTemporaryDirectory(tempfile.TemporaryDirectory):
+    """Retry short-lived Windows cleanup locks without hiding persistent errors."""
+
+    def cleanup(self) -> None:
+        for attempt in range(6):
+            try:
+                super().cleanup()
+                return
+            except OSError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.05 * (2**attempt))
+
+
+def _fixture_prefix() -> str:
+    """Keep nested Git paths short inside a profile worker namespace."""
+
+    if os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT"):
+        return "d-"
+    return "delivery-orchestrator-test-"
 
 
 def run(
@@ -116,12 +139,18 @@ def primary_snapshot(repo: Path) -> dict[str, Any]:
 
 class DeliveryFixture(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="delivery-orchestrator-test-")
+        fixture_started = time.perf_counter()
+        self.temporary = RetryingTemporaryDirectory(prefix=_fixture_prefix())
         self.root = Path(self.temporary.name)
         self.registry = self.root / "registry"
         self.implementation_run_dirs: list[Path] = []
+        self._repository_setup_seconds = 0.0
+        self._fixture_setup_seconds = time.perf_counter() - fixture_started
+        self._fixture_body_started = time.perf_counter()
 
     def tearDown(self) -> None:
+        body_total = time.perf_counter() - self._fixture_body_started
+        cleanup_started = time.perf_counter()
         runs_root = (
             Path(tempfile.gettempdir()).resolve()
             / "implementation-execution"
@@ -131,17 +160,82 @@ class DeliveryFixture(unittest.TestCase):
             if run_dir.parent == runs_root and re.fullmatch(r"[0-9a-f]{64}", run_dir.name):
                 shutil.rmtree(run_dir, ignore_errors=True)
         self.temporary.cleanup()
+        cleanup_seconds = time.perf_counter() - cleanup_started
+        self._write_fixture_profile(
+            setup_seconds=self._fixture_setup_seconds,
+            repository_setup_seconds=self._repository_setup_seconds,
+            body_seconds=max(0.0, body_total - self._repository_setup_seconds),
+            cleanup_seconds=cleanup_seconds,
+        )
+
+    def _write_fixture_profile(
+        self,
+        *,
+        setup_seconds: float,
+        repository_setup_seconds: float,
+        body_seconds: float,
+        cleanup_seconds: float,
+    ) -> None:
+        raw_path = os.environ.get("DELIVERY_FIXTURE_PROFILE")
+        if not raw_path:
+            return
+        path = Path(raw_path)
+        if not path.is_absolute() or not path.parent.is_dir():
+            raise AssertionError("DELIVERY_FIXTURE_PROFILE must name an existing absolute parent")
+        sample = {
+            "test_id": self.id(),
+            "setup_seconds": round(setup_seconds, 6),
+            "repository_setup_seconds": round(repository_setup_seconds, 6),
+            "body_seconds": round(body_seconds, 6),
+            "cleanup_seconds": round(cleanup_seconds, 6),
+        }
+        if path.exists():
+            report = json.loads(path.read_text(encoding="utf-8"))
+            if report.get("schema") != "delivery-fixture-profile/v1":
+                raise AssertionError("Delivery fixture profile schema drifted")
+        else:
+            report = {"schema": "delivery-fixture-profile/v1", "tests": []}
+        report["tests"].append(sample)
+        report["tests"].sort(key=lambda item: item["test_id"])
+        report["summary"] = {
+            field: round(sum(item[field] for item in report["tests"]), 6)
+            for field in (
+                "setup_seconds",
+                "repository_setup_seconds",
+                "body_seconds",
+                "cleanup_seconds",
+            )
+        }
+        payload = json.dumps(
+            report, ensure_ascii=False, sort_keys=True, indent=2
+        ).encode("utf-8") + b"\n"
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def make_repo(self, name: str = "project") -> Path:
-        repo = self.root / name
-        run(["git", "init", "-b", "main", str(repo)])
-        git(repo, "config", "core.autocrlf", "false")
-        git(repo, "config", "user.name", "Delivery Test")
-        git(repo, "config", "user.email", "delivery@example.invalid")
-        (repo / "app.txt").write_text("baseline\n", encoding="utf-8", newline="\n")
-        git(repo, "add", "app.txt")
-        git(repo, "commit", "-m", "baseline")
-        return repo
+        started = time.perf_counter()
+        try:
+            repo = self.root / name
+            run(["git", "init", "-b", "main", str(repo)])
+            git(repo, "config", "core.autocrlf", "false")
+            git(repo, "config", "user.name", "Delivery Test")
+            git(repo, "config", "user.email", "delivery@example.invalid")
+            (repo / "app.txt").write_text("baseline\n", encoding="utf-8", newline="\n")
+            git(repo, "add", "app.txt")
+            git(repo, "commit", "-m", "baseline")
+            return repo
+        finally:
+            self._repository_setup_seconds += time.perf_counter() - started
 
     def start(self, repo: Path, work_id: str = "work-test-001", generation: int = 1) -> dict[str, Any]:
         return workspace.start_workspace(

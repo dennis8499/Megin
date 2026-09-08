@@ -60,16 +60,28 @@ Complete record 已凍結。可用 `locate --work-id` 與 `doctor --work-id` 唯
 
 ## 驗證與量測
 
-完整 runner 保持循序執行及遇錯停止；指定 `--metrics-output` 後，獨立 `knowledge-suite-metrics/v1` 會列出所有預定命令，未執行者為 `not_run`，timeout 也不會被誤報為通過。metrics 目標必須位於 repository 的實體目錄；唯一可安全重建的例外是同一次 runner 明示的 `.knowledge-test-tmp` fixture root。
+未帶profile的舊runner保持循序執行及遇錯停止。新工作使用local profile：parallel-safe commands在有界worker pool中執行，每個worker有私有fixture、temp及Delivery registry；performance scenarios等所有parallel work完成後才循序執行。Fail-fast保留完整預定inventory，未啟動者為`not_run`，timeout不會被誤報為通過。Local profile排除要求跨平台release evidence的`BDD-016`；`--profile release`及未帶profile的相容入口仍執行50k portability scenario。Release完成仍以Windows／Linux CI reports為準。
 
 ```console
+python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --profile local --fixture-root .knowledge-test-tmp/fixtures --jobs 4 --evidence-root .knowledge-test-tmp/evidence --run-label local-1 --ready-payload-sha256 <ready-payload-sha256>
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py verify --index .knowledge-test-tmp/evidence/local-1/index.json
 python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --fixture-root .knowledge-test-tmp --metrics-output .knowledge-test-tmp/final-metrics.json
 python -X utf8 -B .agents/skills/project-knowledge/scripts/measure_search_quality.py --repo .
 ```
 
-指定 `--metrics-output` 會寫入 sidecar。執行前須由操作者以 human gate 確認目的地位於已忽略的 `.knowledge-test-tmp/`，測試會驗證移除 sidecar 後產品檔案位元組完全不變。
+`validation-evidence/v1` create-only bundle保存執行時Git／Markdown輸入、Ready digest、環境、physical／logical command inventory、stdout／stderr、exit、failure／skip counts、牆鐘、worker cleanup與fixture建立／操作／清理耗時。相同logical obligation只由完整passed child inventory滿足。第三個命令示範舊runner的獨立`knowledge-suite-metrics/v1` sidecar。Evidence與metrics都只能位於已忽略的`.knowledge-test-tmp/`或正式Ledger；測試會驗證移除sidecar／worker fixture後產品bytes不變。
 
-搜尋報告不輸出原始 excerpt；Top-5 hit rate 與 `source_safety` 都必須通過。階段耗時與回流次數由 `doctor` 的 `process_metrics` 從既有 append-only events 計算，缺少閉合事件的欄位維持 `null` 並列入 `unavailable_fields`。
+搜尋報告不輸出原始 excerpt；Top-5 hit rate 與 `source_safety` 都必須通過。中文流程問題會加入有界2／3-gram與domain aliases，owner contract只有在恰有一個authority marker且原始bytes可重驗時進入Top-5。階段耗時與回流次數由`doctor.process_metrics`從既有append-only events計算；activity另拆成commands、review、human wait、interruption與扣除已歸因區間的active work。缺少或仍開啟的區間維持`null`並附`activity_unavailable_reasons`，不推測時間。
+
+### Evidence 保存與復原
+
+```console
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py archive export --run-root <implementation-ledger-root> --output <new-archive.zip>
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py archive verify --archive <archive.zip> --run-id <sha256> --repo-id <sha256> --worktree-key <sha256>
+python -X utf8 -B .agents/skills/implementation-execution/scripts/validation_evidence.py archive import --archive <archive.zip> --imports-root <quarantine-root> --run-id <sha256> --repo-id <sha256> --worktree-key <sha256>
+```
+
+Archive是deterministic、create-only，manifest逐檔保存hash與run／repo／worktree identity。Import只進quarantine且固定`approval_inherited: false`；續跑仍須重新authorization、Ready／source／workspace preflight與Ledger continuity。Active run不自動prune，Complete evidence至少保留30天；prune必須明確執行，且不可刪除active run、未驗證archive或唯一證據副本。
 
 ## 安全復原與重建
 
@@ -79,6 +91,6 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/measure_search_qualit
    ```console
    python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py recover --repo .
    ```
-3. **registry、record 或正式 evidence 遺失：** 保留舊 worktree 與未提交修改，另建新 Work ID，從 Requirements 重新驗證。安全重建不自動複製產品差異，也不繼承舊核准。
+3. **registry、record 或正式 evidence 遺失：** 先驗證綁定同一run／repo／worktree的archive並匯入quarantine；成功只提供resume evidence，不繼承approval。沒有完整可信archive時，保留舊worktree與未提交修改，另建新Work ID，從Requirements重新驗證。安全重建不自動複製產品差異，也不繼承舊核准。
 
-本專案不提供自動備份還原、跨機遷移、核准流程重設或歷史 record 批次修補。
+本專案不提供核准流程重設或歷史record批次修補；archive也不能把不同identity或不完整run變成可續跑狀態。

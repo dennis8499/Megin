@@ -98,6 +98,7 @@ class SchemaSubsetContractTests(unittest.TestCase):
         )
         return validator.schema_keyword_errors(schema)
 
+
     def test_all_five_repository_schemas_use_only_the_supported_subset(self) -> None:
         paths = sorted(SKILLS_ROOT.glob("**/*schema.json"))
         self.assertEqual(5, len(paths), [path.as_posix() for path in paths])
@@ -209,6 +210,104 @@ class SchemaSubsetContractTests(unittest.TestCase):
         for value in invalid_values:
             with self.subTest(value=value):
                 self.assertTrue(validator.validate_instance(value, schema))
+
+
+class ValidationProfileContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.ready_schema = json.loads(
+            (
+                SKILLS_ROOT
+                / "technical-planning/references/ready-plan.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+
+    @staticmethod
+    def validation(profile: str = "local") -> dict:
+        return {
+            "schema": "validation-plan/v1",
+            "profile": profile,
+            "target_environment": {
+                "os": "windows" if profile == "local" else "github",
+                "python": "3.14.6",
+                "git": "2.51.0.windows.1",
+                "tools": ["rg 15.2.0"],
+            },
+            "required_obligations": [
+                {"obligation_id": value, "command_ref": value}
+                for value in (
+                    "CMD-BDD-FULL-001",
+                    "CMD-BUILD-FULL-001",
+                    "CMD-TEST-FULL-001",
+                )
+            ],
+            "coverage_edges": [
+                {
+                    "producer_command_ref": "CMD-TEST-FULL-001",
+                    "covered_command_ref": value,
+                    "required_child_ids": [child],
+                    "inventory": "complete",
+                }
+                for value, child in (
+                    ("CMD-BDD-FULL-001", "BDD-FULL"),
+                    ("CMD-BUILD-FULL-001", "BUILD-FULL"),
+                )
+            ],
+            "release_requirements": {
+                "profile": "release",
+                "platforms": ["windows", "linux"],
+                "hosted": True,
+            },
+            "reuse_policy": {
+                "terminal_only_paths": [
+                    "docs/work/{work_id}/implementation/outcome*.json"
+                ],
+                "executable_input_globs": [
+                    ".agents/skills/**",
+                    "**/*.py",
+                    "**/*.json",
+                    "**/*.md",
+                ],
+            },
+        }
+
+    def ready(self, profile: str = "local") -> dict:
+        value = ready_example()
+        for command in value["commands"]:
+            if command["command_id"] in {
+                "CMD-BDD-FULL-001",
+                "CMD-BUILD-FULL-001",
+                "CMD-TEST-FULL-001",
+            }:
+                command["command"] = "tool full-suite --profile " + profile
+        value["validation"] = self.validation(profile)
+        value["candidate"]["payload_sha256"] = validator.ready_payload_sha256(value)
+        return value
+
+    def test_validation_capability_is_complete_when_present_and_legacy_is_valid(self) -> None:
+        legacy = ready_example()
+        self.assertEqual([], validator.validate_instance(legacy, self.ready_schema))
+        self.assertEqual([], validator.validate_ready_cross_references(legacy))
+        for profile in ("local", "release"):
+            with self.subTest(profile=profile):
+                value = self.ready(profile)
+                self.assertEqual([], validator.validate_instance(value, self.ready_schema))
+                self.assertEqual([], validator.validate_ready_cross_references(value))
+
+    def test_incomplete_profile_and_unproven_coverage_fail_closed(self) -> None:
+        incomplete = self.ready()
+        del incomplete["validation"]["target_environment"]
+        self.assertTrue(validator.validate_instance(incomplete, self.ready_schema))
+
+        mismatched = self.ready()
+        for command in mismatched["commands"]:
+            if command["command_id"] == "CMD-BDD-FULL-001":
+                command["command"] = "tool bdd-only"
+        mismatched["candidate"]["payload_sha256"] = validator.ready_payload_sha256(
+            mismatched
+        )
+        errors = validator.validate_ready_cross_references(mismatched)
+        self.assertTrue(any("coverage command identity" in error for error in errors), errors)
 
 
 class ReadyPlanContractTests(unittest.TestCase):

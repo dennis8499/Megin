@@ -1,0 +1,20 @@
+{
+  "approval": {
+    "actor": "user",
+    "evidence": "conversation:requirements-work-20260907-workflow-speed-d0b3946d-candidate-1"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-requirements-35404d2e5e5f96f2/candidate.json",
+  "decision": "change",
+  "formal_paths": [
+    "docs/work/work-20260907-workflow-speed-d0b3946d/requirements.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "fa93b50234c453484238d4eda7027fbaa6a54ed29bcf57733dd5ddb22c4c24d9",
+  "promotion_id": "promotion-requirements-35404d2e5e5f96f2",
+  "schema": "knowledge-promotion/v1",
+  "stage": "requirements",
+  "status": "Ready",
+  "work_id": "work-20260907-workflow-speed-d0b3946d"
+}

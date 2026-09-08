@@ -83,7 +83,10 @@ jobs:
         run: >-
           python -X utf8 -B
           .agents/skills/project-knowledge/scripts/run_full_suite.py
-          --scope all --fixture-root .knowledge-test-tmp
+          --scope all --profile release
+          --fixture-root .knowledge-test-tmp/fixtures --jobs 4
+          --evidence-root .knowledge-test-tmp/evidence
+          --run-label release-${{ matrix.os_name }}
           --metrics-output knowledge-suite-metrics-${{ matrix.os_name }}.json
           > knowledge-suite-${{ matrix.os_name }}.json
       - uses: actions/upload-artifact@v4
@@ -94,6 +97,7 @@ jobs:
             knowledge-portability-${{ matrix.os_name }}.json
             knowledge-suite-${{ matrix.os_name }}.json
             knowledge-suite-metrics-${{ matrix.os_name }}.json
+            .knowledge-test-tmp/evidence/release-${{ matrix.os_name }}
           if-no-files-found: error
 
   compare:

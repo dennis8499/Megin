@@ -41,8 +41,8 @@ Implementation Ledger `Complete`不等於required delivery Complete。若deliver
 
 - Ready plan path／revision、base SHA 與 run ID；
 - 完成或 `Satisfied by existing implementation` 的 `WP-*` 摘要；
-- 主代理完整 build／test／BDD／治理 commands 的結果；
-- Preliminary與final Reviewer attestation、連續round、各自snapshot-before／after、獨立command outcomes與`APPROVED`；
+- 主代理 validation plan 的 physical execution、logical coverage、完整 build／test／BDD／治理結果與 evidence bundle；
+- Preliminary與final Reviewer attestation、precheck、連續round、各自snapshot-before／after、逐command `executed | referenced` provenance與`APPROVED`；
 - 非 blocking advisories；
 - Ledger 的精確 path。
 - BUG run 的assessment path／hash、`bug-verification/v1` path／hash、implementation verdict與獨立`verified | partial`結果；`partial`明示原始症狀未驗證、殘餘風險及staging／人工follow-up。

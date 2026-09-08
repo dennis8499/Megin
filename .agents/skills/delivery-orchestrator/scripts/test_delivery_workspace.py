@@ -8,10 +8,12 @@ import importlib.util
 import inspect
 import io
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -36,25 +38,42 @@ class DeliveryPerformanceTests(support.DeliveryFixture):
             ["git", "-C", str(primary), "hash-object", "-w", "--stdin"],
             input_bytes=b"fixture\n",
         ).stdout.decode("ascii").strip()
-        index_entries = b"".join(
-            (
-                f"100644 {blob}\tfixture/{index // 100:03d}/path-{index:05d}.txt\n"
-            ).encode("ascii")
+        fixture_paths = [
+            f"fixture/{index // 100:03d}/path-{index:05d}.txt"
             for index in range(49_999)
+        ]
+        index_entries = b"".join(
+            f"100644 {blob}\t{path}\n".encode("ascii") for path in fixture_paths
         )
         support.run(
             ["git", "-C", str(primary), "update-index", "--add", "--index-info"],
             input_bytes=index_entries,
         )
         support.git(primary, "commit", "-m", "50k performance fixture")
-        support.git(primary, "checkout-index", "--all", "--force")
-        support.git(primary, "update-index", "--refresh")
+        local_profile = os.environ.get("SDLC_RUNNER_VALIDATION_PROFILE") == "local"
+        if local_profile:
+            support.run(
+                [
+                    "git",
+                    "-C",
+                    str(primary),
+                    "update-index",
+                    "--skip-worktree",
+                    "-z",
+                    "--stdin",
+                ],
+                input_bytes=("\0".join(fixture_paths) + "\0").encode("ascii"),
+            )
+        else:
+            support.git(primary, "checkout-index", "--all", "--force")
+            support.git(primary, "update-index", "--refresh")
         tracked = [
             item
             for item in support.git(primary, "ls-files", "-z").stdout.split(b"\0")
             if item
         ]
         self.assertEqual(50_000, len(tracked))
+        self.assertEqual(not local_profile, (primary / fixture_paths[0]).exists())
 
         probe_started = time.perf_counter()
         probe = support.workspace.probe_repository(primary)
@@ -63,6 +82,13 @@ class DeliveryPerformanceTests(support.DeliveryFixture):
 
         work_id = "performance-50k-transition"
         delivery = Path(self.start(primary, work_id)["worktree"])
+        delivery_tracked = [
+            item
+            for item in support.git(delivery, "ls-files", "-z").stdout.split(b"\0")
+            if item
+        ]
+        self.assertEqual(50_000, len(delivery_tracked))
+        self.assertTrue((delivery / fixture_paths[0]).is_file())
         transition_started = time.perf_counter()
         transitioned = self.transition(
             delivery,
@@ -672,6 +698,424 @@ class DeliveryDoctorTests(support.DeliveryFixture):
         )
 
 
+class WorkflowSpeedFixtureTests(unittest.TestCase):
+    def _runner(self):
+        path = (
+            Path(__file__).resolve().parents[2]
+            / "project-knowledge/scripts/run_full_suite.py"
+        )
+        spec = importlib.util.spec_from_file_location(
+            "workflow_speed_full_suite_under_test", path
+        )
+        if spec is None or spec.loader is None:
+            raise AssertionError("run_full_suite.py cannot be loaded")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def test_parallel_workers_are_isolated_and_performance_is_last(self) -> None:
+        runner = self._runner()
+        behavior_path = (
+            Path(__file__).resolve().parents[2]
+            / "project-knowledge/scripts/test_behavior.py"
+        )
+        behavior_spec = importlib.util.spec_from_file_location(
+            "workflow_speed_behavior_shards_under_test", behavior_path
+        )
+        if behavior_spec is None or behavior_spec.loader is None:
+            raise AssertionError("test_behavior.py cannot be loaded")
+        behavior = importlib.util.module_from_spec(behavior_spec)
+        sys.modules[behavior_spec.name] = behavior
+        behavior_spec.loader.exec_module(behavior)
+        scenario_shards = [
+            set(behavior.functional_shard_scenarios(index, 4))
+            for index in range(1, 5)
+        ]
+        self.assertEqual(
+            set(behavior.SCENARIOS) - set(behavior.SEQUENTIAL_PERFORMANCE_SCENARIOS),
+            set().union(*scenario_shards),
+        )
+        self.assertEqual(
+            sum(len(values) for values in scenario_shards),
+            len(set().union(*scenario_shards)),
+        )
+        performance_scenarios = list(behavior.SEQUENTIAL_PERFORMANCE_SCENARIOS)
+        self.assertEqual(
+            set(behavior.SEQUENTIAL_PERFORMANCE_SCENARIOS)
+            - set(behavior.RELEASE_ONLY_SCENARIOS),
+            set(behavior.validation_profile_scenarios(performance_scenarios, "local")),
+        )
+        self.assertEqual(
+            set(behavior.SEQUENTIAL_PERFORMANCE_SCENARIOS),
+            set(behavior.validation_profile_scenarios(performance_scenarios, "release")),
+        )
+        self.assertEqual(
+            set(behavior.SEQUENTIAL_PERFORMANCE_SCENARIOS),
+            set(behavior.validation_profile_scenarios(performance_scenarios, None)),
+        )
+
+        bdd_command = {
+            "command_id": "BDD-FULL",
+            "arguments": [sys.executable, str(behavior_path)],
+            "timeout": 900,
+        }
+        profiled_bdd = runner._profile_commands([bdd_command])
+        self.assertEqual(4, sum(
+            item["execution_class"] == "parallel_safe"
+            for item in profiled_bdd
+        ))
+        self.assertEqual(1, sum(
+            item["execution_class"] == "sequential_performance"
+            for item in profiled_bdd
+        ))
+        self.assertTrue(
+            all(item["logical_command_id"] == "BDD-FULL" for item in profiled_bdd)
+        )
+        local_bdd = runner._profile_commands([bdd_command], profile="local")
+        release_bdd = runner._profile_commands([bdd_command], profile="release")
+        local_performance = next(
+            item for item in local_bdd if item["command_id"] == "BDD-PERFORMANCE"
+        )
+        release_performance = next(
+            item for item in release_bdd if item["command_id"] == "BDD-PERFORMANCE"
+        )
+        self.assertEqual(
+            ["--performance-only", "--validation-profile", "local"],
+            local_performance["arguments"][-3:],
+        )
+        self.assertEqual(
+            ["--performance-only", "--validation-profile", "release"],
+            release_performance["arguments"][-3:],
+        )
+        delivery_command = {
+            "command_id": "TEST-OWNER-DELIVERY-WORKSPACE",
+            "arguments": [sys.executable, str(Path(__file__).resolve())],
+            "timeout": 900,
+        }
+        profiled_delivery = runner._profile_commands([delivery_command])
+        functional_shards = [
+            item
+            for item in profiled_delivery
+            if item["execution_class"] == "parallel_safe"
+        ]
+        performance_shards = [
+            item
+            for item in profiled_delivery
+            if item["execution_class"] == "sequential_performance"
+        ]
+        self.assertGreater(len(functional_shards), 1)
+        self.assertEqual(1, len(performance_shards))
+        self.assertEqual(
+            set(runner.DELIVERY_FUNCTIONAL_CASES),
+            {
+                selector
+                for item in functional_shards
+                for selector in item["arguments"][2:]
+            },
+        )
+        self.assertTrue(
+            all(
+                item["logical_command_id"]
+                == "TEST-OWNER-DELIVERY-WORKSPACE"
+                for item in profiled_delivery
+            )
+        )
+        commands = [
+            {
+                "command_id": f"PARALLEL-{index}",
+                "execution_class": "parallel_safe",
+            }
+            for index in range(3)
+        ]
+        commands.append(
+            {
+                "command_id": "PERFORMANCE",
+                "execution_class": "sequential_performance",
+            }
+        )
+        lock = threading.Lock()
+        active = 0
+        maximum_active = 0
+        finished_parallel: set[str] = set()
+        performance_observation: tuple[int, set[str]] | None = None
+
+        def execute(command: dict[str, object]) -> dict[str, object]:
+            nonlocal active, maximum_active, performance_observation
+            if command["execution_class"] == "sequential_performance":
+                with lock:
+                    performance_observation = (active, set(finished_parallel))
+                return {"status": "passed", "command_id": command["command_id"]}
+            with lock:
+                active += 1
+                maximum_active = max(maximum_active, active)
+            time.sleep(0.04)
+            with lock:
+                active -= 1
+                finished_parallel.add(str(command["command_id"]))
+            return {"status": "passed", "command_id": command["command_id"]}
+
+        results = runner.execute_profile_schedule(commands, jobs=3, executor=execute)
+        self.assertGreaterEqual(maximum_active, 2)
+        self.assertEqual(
+            (0, {"PARALLEL-0", "PARALLEL-1", "PARALLEL-2"}),
+            performance_observation,
+        )
+        self.assertTrue(all(item["status"] == "passed" for item in results.values()))
+
+        priority_commands = [
+            {
+                "command_id": "SHORT-A",
+                "execution_class": "parallel_safe",
+                "worker_index": 1,
+                "schedule_priority": 0,
+            },
+            {
+                "command_id": "LONG",
+                "execution_class": "parallel_safe",
+                "worker_index": 2,
+                "schedule_priority": 100,
+            },
+            {
+                "command_id": "SHORT-B",
+                "execution_class": "parallel_safe",
+                "worker_index": 3,
+                "schedule_priority": 0,
+            },
+        ]
+        starts: list[str] = []
+
+        def record_start(command: dict[str, object]) -> dict[str, object]:
+            with lock:
+                starts.append(str(command["command_id"]))
+            return {"status": "passed", "command_id": command["command_id"]}
+
+        serial = runner.execute_profile_schedule(
+            priority_commands,
+            jobs=1,
+            executor=record_start,
+        )
+        self.assertEqual(["LONG", "SHORT-A", "SHORT-B"], starts)
+        starts.clear()
+        parallel_results = runner.execute_profile_schedule(
+            priority_commands,
+            jobs=3,
+            executor=record_start,
+        )
+        self.assertEqual(set(serial), set(parallel_results))
+        self.assertEqual(
+            {key: value["status"] for key, value in serial.items()},
+            {key: value["status"] for key, value in parallel_results.items()},
+        )
+
+        fail_fast_commands = [
+            {
+                "command_id": f"FAILFAST-{index}",
+                "execution_class": "parallel_safe",
+                "worker_index": index,
+            }
+            for index in range(4)
+        ]
+        fail_fast_commands.append(
+            {
+                "command_id": "FAILFAST-PERFORMANCE",
+                "execution_class": "sequential_performance",
+                "worker_index": 5,
+            }
+        )
+        started: list[str] = []
+
+        def fail_first(command: dict[str, object]) -> dict[str, object]:
+            started.append(str(command["command_id"]))
+            if command["command_id"] == "FAILFAST-0":
+                return {"status": "failed", "command_id": command["command_id"]}
+            time.sleep(0.06)
+            return {"status": "passed", "command_id": command["command_id"]}
+
+        fail_fast = runner.execute_profile_schedule(
+            fail_fast_commands,
+            jobs=2,
+            executor=fail_first,
+        )
+        self.assertEqual(["FAILFAST-0", "FAILFAST-1"], sorted(started))
+        self.assertEqual("not_run", fail_fast["FAILFAST-2"]["status"])
+        self.assertEqual("not_run", fail_fast["FAILFAST-3"]["status"])
+        self.assertEqual("not_run", fail_fast["FAILFAST-PERFORMANCE"]["status"])
+
+        with tempfile.TemporaryDirectory(prefix="workflow-worker-test-") as temporary:
+            fixture_root = Path(temporary) / "fixtures"
+            fixture_root.mkdir()
+            environment_command = {
+                "command_id": "ENV-A",
+                "arguments": [
+                    sys.executable,
+                    "-c",
+                    (
+                        "import json,os; "
+                        "print(json.dumps({'environment':{k:os.environ.get(k) "
+                        "for k in ['TMP','TEMP','TMPDIR',"
+                        "'KNOWLEDGE_TEST_WORKER_ROOT',"
+                        "'KNOWLEDGE_TEST_REGISTRY_ROOT',"
+                        "'SDLC_RUNNER_VALIDATION_PROFILE']},"
+                        "'arguments':__import__('sys').argv[1:]}))"
+                    ),
+                    "--fixture-root",
+                    str(Path(".knowledge-test-tmp/fixtures")),
+                ],
+                "timeout": 30,
+                "execution_class": "parallel_safe",
+            }
+            first = runner.execute_profile_item(
+                environment_command,
+                workspace=Path.cwd(),
+                fixture_root=fixture_root,
+                fixture_argument=Path(".knowledge-test-tmp/fixtures"),
+                worker_index=1,
+                validation_profile="local",
+            )
+            environment_command["command_id"] = "ENV-B"
+            second = runner.execute_profile_item(
+                environment_command,
+                workspace=Path.cwd(),
+                fixture_root=fixture_root,
+                fixture_argument=Path(".knowledge-test-tmp/fixtures"),
+                worker_index=2,
+                validation_profile="release",
+            )
+            first_payload = json.loads(first["stdout"].decode("utf-8"))
+            second_payload = json.loads(second["stdout"].decode("utf-8"))
+            first_environment = first_payload["environment"]
+            second_environment = second_payload["environment"]
+            self.assertNotEqual(
+                first_environment["KNOWLEDGE_TEST_WORKER_ROOT"],
+                second_environment["KNOWLEDGE_TEST_WORKER_ROOT"],
+            )
+            self.assertEqual(
+                "001", Path(first_environment["KNOWLEDGE_TEST_WORKER_ROOT"]).name
+            )
+            self.assertEqual(
+                "002", Path(second_environment["KNOWLEDGE_TEST_WORKER_ROOT"]).name
+            )
+            self.assertEqual("t", Path(first_environment["TMP"]).name)
+            self.assertEqual(
+                "local", first_environment["SDLC_RUNNER_VALIDATION_PROFILE"]
+            )
+            self.assertEqual(
+                "release", second_environment["SDLC_RUNNER_VALIDATION_PROFILE"]
+            )
+            self.assertEqual(
+                "r", Path(first_environment["KNOWLEDGE_TEST_REGISTRY_ROOT"]).name
+            )
+            self.assertEqual(
+                Path(first_environment["KNOWLEDGE_TEST_WORKER_ROOT"]) / "fixture",
+                Path(first_payload["arguments"][1]),
+            )
+            self.assertEqual("passed", first["worker_cleanup"])
+            self.assertEqual("passed", second["worker_cleanup"])
+            self.assertEqual([], list(fixture_root.iterdir()))
+
+    def test_delivery_fixture_profile_has_setup_body_and_cleanup(self) -> None:
+        profile_parent = Path(tempfile.mkdtemp(prefix="delivery-profile-test-"))
+        profile_path = profile_parent / "profile.json"
+
+        class ProfiledFixture(support.DeliveryFixture):
+            def runTest(self) -> None:
+                self.make_repo("profiled-project")
+
+        try:
+            with mock.patch.dict(
+                os.environ,
+                {"DELIVERY_FIXTURE_PROFILE": str(profile_path)},
+            ):
+                result = unittest.TestResult()
+                ProfiledFixture().run(result)
+            self.assertTrue(result.wasSuccessful(), result.errors)
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            self.assertEqual("delivery-fixture-profile/v1", profile["schema"])
+            self.assertEqual(1, len(profile["tests"]))
+            sample = profile["tests"][0]
+            for field in (
+                "setup_seconds",
+                "repository_setup_seconds",
+                "body_seconds",
+                "cleanup_seconds",
+            ):
+                self.assertIsInstance(sample[field], float)
+                self.assertGreaterEqual(sample[field], 0.0)
+            self.assertGreater(sample["repository_setup_seconds"], 0.0)
+        finally:
+            shutil.rmtree(profile_parent, ignore_errors=True)
+
+    def test_profile_worker_uses_a_short_nested_git_fixture_prefix(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"KNOWLEDGE_TEST_WORKER_ROOT": str(Path.cwd() / "worker")},
+        ):
+            self.assertEqual("d-", support._fixture_prefix())
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual("delivery-orchestrator-test-", support._fixture_prefix())
+
+    def test_nested_test_entrypoints_keep_their_parent_workers_isolated(self) -> None:
+        runner = self._runner()
+        workspace = Path.cwd()
+        outer_value = os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+        if outer_value:
+            fixture_root = Path(outer_value) / "nested-workers"
+        else:
+            fixture_root = (
+                workspace
+                / ".knowledge-test-tmp"
+                / f"nested-workers-{os.getpid()}-{time.time_ns()}"
+            )
+        fixture_root.mkdir(parents=True)
+        query_script = (
+            Path(__file__).resolve().parents[2]
+            / "project-knowledge/scripts/test_query.py"
+        )
+        commands = [
+            {
+                "command_id": f"NESTED-QUERY-{index}",
+                "logical_command_id": f"NESTED-QUERY-{index}",
+                "arguments": [
+                    sys.executable,
+                    "-X",
+                    "utf8",
+                    "-B",
+                    str(query_script),
+                    "ChineseWorkflowQueryTests",
+                ],
+                "timeout": 60,
+                "execution_class": "parallel_safe",
+                "worker_index": index,
+            }
+            for index in (1, 2)
+        ]
+        try:
+            results = runner.execute_profile_schedule(
+                commands,
+                jobs=2,
+                executor=lambda command: runner.execute_profile_item(
+                    command,
+                    workspace=workspace,
+                    fixture_root=fixture_root,
+                    fixture_argument=Path(".knowledge-test-tmp/fixtures"),
+                    worker_index=int(command["worker_index"]),
+                ),
+            )
+            self.assertTrue(
+                all(item["status"] == "passed" for item in results.values()),
+                {
+                    key: value.get("stderr", b"").decode(
+                        "utf-8", errors="replace"
+                    )
+                    for key, value in results.items()
+                },
+            )
+            self.assertEqual([], list(fixture_root.iterdir()))
+        finally:
+            shutil.rmtree(fixture_root, ignore_errors=True)
+
+
 TEST_CASES = (
     DeliverySafetyTests,
     DeliveryTransitionTests,
@@ -682,6 +1126,7 @@ TEST_CASES = (
     DeliveryPerformanceTests,
     DeliveryTransitionArchitectureTests,
     DeliveryDoctorTests,
+    WorkflowSpeedFixtureTests,
 )
 
 

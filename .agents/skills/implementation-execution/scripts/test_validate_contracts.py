@@ -505,6 +505,172 @@ class ImplementationContractTests(unittest.TestCase):
         self.assertEqual([], validator.validate_instance(blocked, self.execution_schema, "reviewReport"))
         self.assertEqual([], validator.validate_execution_record_semantics(blocked))
 
+    def test_staged_review_precheck_and_command_provenance_are_closed(self) -> None:
+        definitions = self.execution_schema["$defs"]
+        self.assertIn("reviewPrecheck", definitions)
+        self.assertIn("commandProvenance", definitions)
+        key_inputs = {
+            "category": "coverage",
+            "source_refs": ["SRC-001"],
+            "affected_loci": ["REQ-002"],
+            "required_outcome": "Add BDD, TEST, and code evidence.",
+        }
+        finding = {
+            "finding_id": "R-precheck-1",
+            "finding_key": validator.finding_key(key_inputs),
+            "key_inputs": key_inputs,
+            "severity": "high",
+            "blocking": True,
+            "message": "REQ-002 has no complete coverage evidence.",
+            "evidence_refs": ["reviews/precheck/coverage.json"],
+            "wp_refs": ["WP-001"],
+            "bdd_refs": [],
+            "test_refs": [],
+        }
+        checks = [
+            {
+                "check_id": check_id,
+                "outcome": (
+                    "blocked"
+                    if check_id == "source_requirement_coverage"
+                    else "passed"
+                ),
+                "evidence_refs": [f"reviews/precheck/{check_id}.json"],
+            }
+            for check_id in (
+                "source_requirement_coverage",
+                "diff_manifest",
+                "test_oracles",
+                "ready_evidence",
+                "snapshot",
+                "environment",
+            )
+        ]
+        provenance = {
+            "mode": "executed",
+            "producer_review_ref": None,
+            "producer_index_ref": None,
+            "producer_output_ref": None,
+            "verifier_output_ref": None,
+            "command_contract_sha256": "1" * 64,
+            "execution_input_identity": "2" * 64,
+            "environment_identity": "3" * 64,
+            "ready_payload_sha256": "4" * 64,
+            "test_inventory_sha256": "5" * 64,
+        }
+        report = {
+            "schema": "implementation-review/v1",
+            "logical_ref": "review:fresh-review:precheck-contract-r1",
+            "round": 1,
+            "review_stage": "preliminary",
+            "verdict": "CHANGES_REQUIRED",
+            "snapshot_before": HASH,
+            "snapshot_after": HASH,
+            "attestation": {
+                "agent_id": "reviewer-precheck",
+                "fresh_session": True,
+                "read_only": True,
+                "implementation_conversation_received": False,
+                "delegation_used": False,
+                "write_actions": False,
+            },
+            "precheck": {
+                "schema": "review-precheck/v1",
+                "outcome": "blocked",
+                "checks": checks,
+                "blocking_findings": [finding],
+            },
+            "command_outcomes": [
+                {
+                    "command_id": "CMD-TEST-FULL-001",
+                    "outcome": "not_run",
+                    "exit_code": None,
+                    "failure_count": None,
+                    "skipped_count": None,
+                    "output_ref": None,
+                    "not_run_reason": "precheck_blocked",
+                    "provenance": provenance,
+                }
+            ],
+            "raw_output_refs": ["reviews/precheck/coverage.json"],
+            "requirement_coverage": [
+                {
+                    "source_ref": "SRC-001",
+                    "obligation_ref": "REQ-002",
+                    "bdd_refs": [],
+                    "test_refs": [],
+                    "wp_refs": ["WP-001"],
+                    "code_evidence": [],
+                    "result": "blocked",
+                }
+            ],
+            "findings": [finding],
+            "summary": "Precheck found blocking coverage defects before commands ran.",
+        }
+        self.assertEqual(
+            [],
+            validator.validate_instance(report, self.execution_schema, "reviewReport"),
+        )
+        self.assertEqual([], validator.validate_execution_record_semantics(report))
+
+        final = copy.deepcopy(report)
+        final["logical_ref"] = "review:fresh-review:final-contract-r1"
+        final["review_stage"] = "final"
+        final["verdict"] = "APPROVED"
+        final["precheck"]["outcome"] = "passed"
+        final["precheck"]["blocking_findings"] = []
+        for check in final["precheck"]["checks"]:
+            check["outcome"] = "passed"
+        final["command_outcomes"][0].update(
+            {
+                "outcome": "passed",
+                "exit_code": 0,
+                "failure_count": 0,
+                "skipped_count": 0,
+                "output_ref": "reviews/final/verifier.json",
+                "not_run_reason": None,
+                "provenance": {
+                    **provenance,
+                    "mode": "referenced",
+                    "producer_review_ref": "reviews/preliminary/report.json",
+                    "producer_index_ref": "validation/preliminary/index.json",
+                    "producer_output_ref": "validation/preliminary/test.stdout.txt",
+                    "verifier_output_ref": "reviews/final/verifier.json",
+                },
+            }
+        )
+        final["raw_output_refs"] = ["reviews/final/verifier.json"]
+        final["requirement_coverage"][0].update(
+            {
+                "bdd_refs": ["BDD-001"],
+                "test_refs": ["TEST-001"],
+                "code_evidence": ["src/product.py:1"],
+                "result": "covered",
+            }
+        )
+        final["findings"] = []
+        final["summary"] = "Final review verified terminal additions and referenced bound execution evidence."
+        self.assertEqual(
+            [],
+            validator.validate_instance(final, self.execution_schema, "reviewReport"),
+        )
+        self.assertEqual([], validator.validate_execution_record_semantics(final))
+
+        preliminary_reference = copy.deepcopy(final)
+        preliminary_reference["review_stage"] = "preliminary"
+        errors = validator.validate_execution_record_semantics(preliminary_reference)
+        self.assertTrue(any("preliminary" in error and "referenced" in error for error in errors), errors)
+
+        missing_verifier = copy.deepcopy(final)
+        missing_verifier["command_outcomes"][0]["provenance"]["verifier_output_ref"] = None
+        self.assertTrue(
+            validator.validate_instance(
+                missing_verifier,
+                self.execution_schema,
+                "reviewReport",
+            )
+        )
+
     def test_ledger_and_snapshot_shapes_are_representable(self) -> None:
         binding = {
             "repo_id": HASH,

@@ -65,6 +65,10 @@ run_id是 repo_id、worktree_key、initial_base_sha、canonical handoff path與C
 
 WP states只用 Pending／Executing／Verified／Invalidated／Blocked；scenario outcome可用 Red／Green／Satisfied by existing implementation。Ledger append-only且不進review snapshot或repository artifact。
 
+Validation runner 的 create-only bundle 保存在 Ledger evidence，或先寫入 handoff 核准的 ignored temporary root後完整匯入 Ledger。`validation-evidence/v1` index 綁定執行時 HEAD、binary diff、全部未忽略新檔、所有變更 Markdown、精確 command／child inventory、環境與 Ready payload；stdout／stderr、exit、duration、hash與 fixture profile由 runner 自動產生，Agent 不手工拼接或把引用結果冒充重跑。`validation_evidence.py render` 可由 Ready handoff 與已驗證 index重建 command、追溯與 evidence review Markdown。
+
+長期保存使用 `validation_evidence.py archive export` 建立 deterministic、create-only `evidence-archive/v1`，再以 `archive verify` 重驗 manifest、每個檔案 hash與 run／repo／worktree identity。`archive import` 只匯入 quarantine root並回傳 `approval_inherited: false`；續跑前仍須 Delivery authorization、Ready／source／workspace preflight及Ledger連續性。Active run不自動刪除，Complete evidence至少保存30天；prune只能由明確命令觸發，且不得刪除目前 active、未驗證 archive 或唯一證據副本。
+
 每個global state transition的`evidence_refs`至少含一個該transition專用且未被其他transition重用的`integrity/*ready-source.json`重算結果。Complete transition另作terminal index，精確列出`source-manifest.json`、`wp-ledger.json`、`breaker.json`、`commands/full-verification.json`及它宣告的每個`commands/sequence/` stdout／stderr、含canonical snapshot的`diffs/`、current review raw response、report宣告的每個`reviews/<round>/outputs/`與該report；每個Verified WP另列`integrity/<WP-ID>/start-ready-source.json`及`complete-ready-source.json`。另依序列出`terminal/01-review_received.json`至`terminal/06-snapshot_matched_after_persist.json`；每份物件固定含`sequence`、`step`與該步已保存的`evidence_refs`，Ledger的Complete transition本身就是第七步`complete_appended`。
 
 Consumer validator以canonical run root逐一讀取上述bytes，也讀取Ledger宣告的capability／baseline refs。它要求main command index精確涵蓋Ready full commands且每項pass、stdout／stderr集合完整，current review raw output集合與report完全相等，source manifest／WP Ledger等於Ready／Complete attempt，snapshot ID等於review before／after，六個ordering witnesses內容及順序canonical；缺檔、redirect、重用ref或只有成功聲明都不成立。

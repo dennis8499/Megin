@@ -1,0 +1,282 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_doctor.py",
+      "sha256": "f3c0ba6e90b208ade3ef973519c8be5f18fc9555ea787e3eb25ba7259e759fee",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_test_support.py",
+      "sha256": "3d6ab95c7a7278c3372ecd2a16f9cc1e40edf1ecca650f9e4643ea18943d5a5c",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_workspace.py",
+      "sha256": "724faf835c6080af881d18622cde7e491a137c60390abc77fbf67996f06a4d52",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_validate_contracts.py",
+      "sha256": "269380bd2d7e8b0150a2df1ed8a262cb8269903bbf7bc065bc6d18cc621c70f1",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/SKILL.md",
+      "sha256": "01d3fb948c16490ab1c9397835cd1d619d895775122b26ebb58b02a739f8739b",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/delivery-protocol.md",
+      "sha256": "c711e7c4de9d4c519ca207024509827c61798c6cf5630b117832a3a915419c37",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/execution-records.schema.json",
+      "sha256": "1aa61dbfefc2d1f7398bd8f5c6512feb49601a55e223aa809f85dc743b8b1959",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/preflight-and-ledger.md",
+      "sha256": "174fe9e6e2439d27a05edbefcb24448d897cd098260ec141c70391a504caf7d3",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/quality-contract.md",
+      "sha256": "dc3496cea21f8dcd467e4e2b69de39a20978a80c00a6ec78adfa759bc985c216",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/references/reviewer-contract.md",
+      "sha256": "5e741f7601e40b408c6805c4d77813a87e8d20487de0f702b793605f352ff2a8",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/test_validate_contracts.py",
+      "sha256": "be037e1fcab15f61bf80f5ffe874b4d3d6a7b7603c544e175db7d130251e8de0",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/test_validation_evidence.py",
+      "sha256": "0a4329ce5d47f5f4eaba6fdca587ab781768abff4b457c3f010ccfa53320b338",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/validate_contracts.py",
+      "sha256": "50dc08c321b5b5754821b2347a2beb856d9b72547a6a0fae9b7812bb88b88d6c",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/implementation-execution/scripts/validation_evidence.py",
+      "sha256": "7a9ecca0c60f05dfaf4e7b39d5ee4870a3b30059d936a3374d5cb00afec4df2a",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/SKILL.md",
+      "sha256": "53f29e841b85d9bc558e7e7a9fb2896a513e0ee5fadc1234df59574352fc91b5",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/schemas/knowledge-contracts.schema.json",
+      "sha256": "c68868d14e4720d246a4f315913227fe736f4d234e10b7dd45038fed54ed5a6d",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_benchmark.py",
+      "sha256": "9a7a449a2a7f50374cbf393a89b90ce0be8867f83f7c78fce0185c2c2b1eb335",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "sha256": "aed002188a8ddf5e1c4c3f78ff1d3f08125cef177d2c0d2448200b4b62eae7d5",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/run_full_suite.py",
+      "sha256": "cb175db119dd79229f420e8fca3e07784b77938ab258eec3838c67d0a849bbf0",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_behavior.py",
+      "sha256": "bc10c22ad8211d44aafb1dce05f6503e3da8d4f86881f8b192d84967654f2d04",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_governance.py",
+      "sha256": "6f7a1484a65943bc095ffdc8cb1a11fd87d4958e3450d9fc50339dad4366c06b",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_query.py",
+      "sha256": "cc6d6cd5c62c9ed91a09497a0b6ca3bdf3c41e1112e08d09d3ad589f602ea87a",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_workflow.py",
+      "sha256": "0377d1c7167a6a082a98cb72fa19bc95f91d4b816b5172c0e549961202851029",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/SKILL.md",
+      "sha256": "de379fe83b9dc15965102af30c1eda51ca93994a048716a897f5059465a16afd",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/ready-plan-contract.md",
+      "sha256": "40f21dc77533e441804a486f75b116b3eeb850157be233f4f7c6dd5456dd80b2",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/ready-plan.schema.json",
+      "sha256": "749a01c368ec5e611c2fa07b07be735ad55574644afb4ea6fdc8c0cd9a53cc25",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/references/technical-plan-template.md",
+      "sha256": "b5ff86f5bb30fc6479e1a5f4386fc9596a886eb895f9e27004349112d5f5c33b",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+      "sha256": "a0a1202fd19a846ed7171e723a95952c0e601e2a695251d150c0581fc89a75e3",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/validate_contracts.py",
+      "sha256": "cd12b07ff5701df0631b2d48ba42f3ed1fa68b1fbb0af3d907629eee1461b460",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": ".github/workflows/knowledge-portability.yml",
+      "sha256": "e276cee936fe6e6a02e64d85a59b7bd021e1414d5822ff9118b3f0d6cafd5c97",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "OPERATIONS.md",
+      "sha256": "27886ddcf002fef60b0b9a0b48c38fbdac6dc47e5ffba34830bc5ff11840b6f8",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "README.md",
+      "sha256": "b210e5a22b484ba36e58ec7fde534c6501bcadd1d7719c9ce93617ae66504ba4",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "docs/work/work-20260907-workflow-speed-d0b3946d/implementation/outcome.md",
+      "sha256": "3e22a7d5c35e294a09d3fb51ce81288f154ed55b36133dcda4cbe2b1dd0ff832",
+      "summary": "Persisted the implementation outcome summary."
+    },
+    {
+      "path": "docs/work/work-20260907-workflow-speed-d0b3946d/plan/handoff.json",
+      "sha256": "419273e6be9782ffc93502befec03442e249b8d98cf4c7cdf0afc96965a96c27",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "docs/work/work-20260907-workflow-speed-d0b3946d/plan/plan.md",
+      "sha256": "cd880bbb06ddcb6438953dbcb6226806e2eb353d3654cee15ef74f6a4932cfc1",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "docs/work/work-20260907-workflow-speed-d0b3946d/plan/source-evidence.md",
+      "sha256": "b84b385e121f9507608ed4c508ae7aa67d98448733b67f71bdc18687964575bf",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    },
+    {
+      "path": "docs/work/work-20260907-workflow-speed-d0b3946d/requirements.md",
+      "sha256": "f20dfc636613d2a0d8edf29b62b28bb04e13643f3cda5da1a3056c3dddffcc01",
+      "summary": "Implemented the workflow-speed delivery change and its governed evidence."
+    }
+  ],
+  "created_at": "2026-09-08T03:58:15.080844Z",
+  "implementation_run_id": "e69fdebe059aa136f0dd5d26b09a9f3512938e0de78c94e6638f926d67026678",
+  "knowledge_decision": "change",
+  "known_deviations": [
+    "Cross-platform and GitHub release validation remain release-profile obligations.",
+    "Knowledge promotion is sealed as a candidate and awaits the required human gate."
+  ],
+  "markdown": {
+    "path": "docs/work/work-20260907-workflow-speed-d0b3946d/implementation/outcome.md",
+    "sha256": "3e22a7d5c35e294a09d3fb51ce81288f154ed55b36133dcda4cbe2b1dd0ff832"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-round-1"
+    ],
+    "report_ref": "reviews/preliminary-round-1/report.json",
+    "report_sha256": "fbb63ddc4d75a8ebef1102a7d330574cc971acf1b1dc1049c4a4284b45e09f26",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "Completed the workflow-speed optimization with deduplicated local validation, staged review checks, evidence bundles, and local/release profile separation.",
+  "verification": [
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "evidence/validation-bundles/preliminary-reviewer/index.json",
+        "commands/sequence/TEST-PRELIMINARY-REVIEWER-BUNDLE.json",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stderr.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "evidence/validation-bundles/preliminary-reviewer/index.json",
+        "commands/sequence/TEST-PRELIMINARY-REVIEWER-BUNDLE.json",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stderr.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "evidence/validation-bundles/preliminary-reviewer/index.json",
+        "commands/sequence/TEST-PRELIMINARY-REVIEWER-BUNDLE.json",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stderr.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "evidence/validation-bundles/preliminary-reviewer/index.json",
+        "commands/sequence/TEST-PRELIMINARY-REVIEWER-BUNDLE.json",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BDD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-BUILD-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-TEST-FULL-001.stderr.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stdout.txt",
+        "reviews/preliminary-round-1/outputs/CMD-GOVERNANCE-001.stderr.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260907-workflow-speed-d0b3946d",
+  "work_kind": "standard"
+}

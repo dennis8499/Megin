@@ -32,6 +32,45 @@ from test_behavior import (
 )
 
 
+class ChineseWorkflowQueryTests(unittest.TestCase):
+    def test_chinese_workflow_questions_return_bounded_owner_contracts(self) -> None:
+        import knowledge_query
+
+        repo = Path.cwd()
+        cases = {
+            "整段流程的速度": {
+                ".agents/skills/technical-planning/references/ready-plan-contract.md",
+                ".agents/skills/implementation-execution/references/reviewer-contract.md",
+                ".agents/skills/implementation-execution/references/quality-contract.md",
+            },
+            "實作完成後為什麼需要兩次審查": {
+                ".agents/skills/implementation-execution/references/reviewer-contract.md",
+            },
+        }
+        for query, expected_paths in cases.items():
+            with self.subTest(query=query):
+                terms = knowledge_query._query_terms(query)
+                self.assertLessEqual(len(terms), knowledge_query.MAX_QUERY_TERMS)
+                self.assertIn(query, terms)
+                context = knowledge_query.query_repository(
+                    str(repo), stage="implementation", query=query
+                )
+                self.assertLessEqual(len(context["results"]), 5)
+                owner_results = [
+                    item
+                    for item in context["results"]
+                    if item["authority"] == "owner-contract"
+                ]
+                self.assertTrue(owner_results, context["results"])
+                returned_paths = {item["path"] for item in owner_results}
+                self.assertTrue(expected_paths & returned_paths, returned_paths)
+                for item in owner_results:
+                    self.assertIn("owner-contract", item["match_reasons"])
+                    source = item["source_refs"][0]
+                    raw = (repo / source["path"]).read_bytes()
+                    self.assertEqual(hashlib.sha256(raw).hexdigest(), source["sha256"])
+
+
 class QueryCliTests(unittest.TestCase):
     fixture_root: Path
 
@@ -1177,11 +1216,20 @@ class PerformanceTests(unittest.TestCase):
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("test_cases", nargs="*")
-    parser.add_argument("--fixture-root", type=Path, default=Path(".knowledge-test-tmp"))
+    parser.add_argument(
+        "--fixture-root",
+        type=Path,
+        default=(
+            Path(os.environ["KNOWLEDGE_TEST_WORKER_ROOT"]) / "fixture"
+            if os.environ.get("KNOWLEDGE_TEST_WORKER_ROOT")
+            else Path(".knowledge-test-tmp")
+        ),
+    )
     args = parser.parse_args(argv)
     QueryCliTests.fixture_root = args.fixture_root.resolve()
     PerformanceTests.fixture_root = args.fixture_root.resolve()
     test_cases = {
+        "ChineseWorkflowQueryTests": ChineseWorkflowQueryTests,
         "QueryCliTests": QueryCliTests,
         "PerformanceTests": PerformanceTests,
     }

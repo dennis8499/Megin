@@ -31,6 +31,33 @@ MAX_FIXED_PATTERN_BYTES = 8 * 1024 * 1024
 INDEX_SEARCH_MIN_TRACKED_PATHS = 10_000
 INDEX_SEARCH_MAX_DIRTY_PATHS = 256
 INDEX_SEARCH_MAX_DIRTY_BYTES = 24 * 1024
+MAX_QUERY_TERMS = 48
+CJK_RUN_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]+")
+OWNER_CONTRACT_PATH_RE = re.compile(
+    r"^\.agents/skills/[^/]+/references/[^/]+\.md$"
+)
+AUTHORITY_MARKER_RE = re.compile(
+    r"<!--\s*authority:\s*([a-z][a-z0-9._-]*)\s*-->",
+    flags=re.IGNORECASE,
+)
+CJK_DOMAIN_ALIASES_V1: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (
+        "速度",
+        ("驗證", "完整套件", "命令", "本機", "效能", "validation"),
+    ),
+    (
+        "流程",
+        ("交付流程", "執行", "驗證", "workflow"),
+    ),
+    (
+        "審查",
+        ("reviewer", "preliminary", "final", "初審", "終審", "驗證"),
+    ),
+    (
+        "實作完成",
+        ("implementation", "outcome", "candidate", "snapshot"),
+    ),
+)
 SEMANTIC_ATTRIBUTE_PATTERN = re.compile(
     rb"(^|[ \t])(?:filter(?:=|[ \t]|$)|ident(?:[ \t]|$)|working-tree-encoding(?:=|[ \t]|$))",
     flags=re.IGNORECASE | re.MULTILINE,
@@ -307,8 +334,29 @@ def _query_terms(query: str) -> list[str]:
             "query must contain non-whitespace text",
             exit_code=2,
         )
-    terms = list(dict.fromkeys(re.findall(r"[\w.-]+", folded, flags=re.UNICODE)))
-    return terms or [folded]
+    terms: list[str] = []
+    terms.extend(re.findall(r"[a-z0-9_.-]+", folded))
+    for run in CJK_RUN_RE.findall(folded):
+        terms.append(run)
+        for width in (2, 3):
+            if len(run) < width:
+                continue
+            terms.extend(run[index : index + width] for index in range(len(run) - width + 1))
+    for trigger, aliases in CJK_DOMAIN_ALIASES_V1:
+        if trigger in folded:
+            terms.extend(aliases)
+    return list(dict.fromkeys(terms))[:MAX_QUERY_TERMS]
+
+
+def _owner_contract_intent(query: str) -> bool:
+    compact = re.sub(r"\s+", "", query.casefold())
+    return bool(
+        ("流程" in compact and "速度" in compact)
+        or (
+            "審查" in compact
+            and any(token in compact for token in ("兩次", "为什么", "為什麼", "實作完成"))
+        )
+    )
 
 
 def _query_pattern(query: str, terms: list[str]) -> str:
@@ -1500,6 +1548,15 @@ def _raw_results(
         )
         if not reasons:
             continue
+        authority_markers = AUTHORITY_MARKER_RE.findall(text)
+        owner_contract = bool(
+            OWNER_CONTRACT_PATH_RE.fullmatch(path)
+            and len(authority_markers) == 1
+            and _owner_contract_intent(query)
+        )
+        if owner_contract:
+            bonus += 300
+            reasons.append("owner-contract")
         excerpt = match.line_text.encode("utf-8")
         source_ref = {
             "path": path,
@@ -1509,13 +1566,13 @@ def _raw_results(
         }
         results.append(
             {
-                "authority": "raw",
+                "authority": "owner-contract" if owner_contract else "raw",
                 "lifecycle": "current",
                 "match_reasons": reasons,
                 "path": path,
                 "start_line": match.line_number,
                 "claim_id": None,
-                "score": 400 + bonus,
+                "score": (900 if owner_contract else 400) + bonus,
                 "source_refs": [source_ref],
             }
         )
@@ -1665,20 +1722,18 @@ def query_repository(repo_value: str, *, stage: str, query: str) -> dict[str, An
         stage,
         blocked_claims,
     )
-    results = canonical
-    if len(results) < 5:
-        results = [
-            *results,
-            *_raw_results(
-                repo,
-                eligible,
-                matches,
-                query,
-                terms,
-                stage,
-                blocked_sources,
-            ),
-        ]
+    results = [
+        *canonical,
+        *_raw_results(
+            repo,
+            eligible,
+            matches,
+            query,
+            terms,
+            stage,
+            blocked_sources,
+        ),
+    ]
     results.sort(
         key=lambda item: (
             -int(item["score"]),
