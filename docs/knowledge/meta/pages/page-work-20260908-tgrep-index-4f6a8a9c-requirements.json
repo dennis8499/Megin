@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260908-tgrep-index-4f6a8a9c-requirements",
+      "content_anchor": "requirements-claim",
+      "contradicts": [],
+      "evidence_class": "required",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "3edd8968e2abd93582bf48d63b97ffd66b662ae960b5006adc3faa4becafbe1a",
+          "locator": {
+            "end_line": 11,
+            "start_line": 11
+          },
+          "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/requirements.md",
+          "sha256": "22352fc4b1c124e6358b5758b12bb9d1ec900cd6b0dfc142b175878529283b41"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260908-tgrep-index-4f6a8a9c-requirements.md",
+  "content_sha256": "912e77a9c3de3871588b6100196c318b5be9040dfff526a1d894963b190b8b5a",
+  "lifecycle": "current",
+  "page_id": "page-work-20260908-tgrep-index-4f6a8a9c-requirements",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "requirements"
+  ],
+  "title": "將 tgrep.exe 整合至 Project Knowledge 搜尋流程"
+}

@@ -8,7 +8,7 @@ import json
 import os
 import sys
 
-from knowledge_query import KnowledgeError, query_repository
+from knowledge_query import KnowledgeError, query_repository, tgrep_index_repository
 
 BOOTSTRAP_SENTINEL = "BOOTSTRAP_SENTINEL"
 BOOTSTRAP_EXIT = 78
@@ -26,6 +26,13 @@ def _parser() -> argparse.ArgumentParser:
         choices=["requirements", "planning", "implementation", "bug", "ad-hoc"],
     )
     query.add_argument("--query", required=True)
+
+    tgrep_index = subcommands.add_parser(
+        "tgrep-index",
+        help="explicitly build the repository-local Windows tgrep index",
+    )
+    tgrep_index.add_argument("--repo", required=True)
+    tgrep_index.add_argument("--force", action="store_true")
 
     bootstrap = subcommands.add_parser("bootstrap")
     bootstrap.add_argument("--repo", required=True)
@@ -65,6 +72,10 @@ def main(argv: list[str] | None = None) -> int:
                 stage=arguments.stage,
                 query=arguments.query,
             )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        if arguments.command == "tgrep-index":
+            result = tgrep_index_repository(arguments.repo, force=arguments.force)
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 0
         if arguments.command == "bootstrap":

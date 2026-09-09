@@ -10,6 +10,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import Any, Iterable, Sequence
 INELIGIBLE_SEGMENTS = {
     ".git",
     ".knowledge-test-tmp",
+    ".tgrep",
     ".pytest_cache",
     "__pycache__",
     "node_modules",
@@ -32,6 +34,30 @@ INDEX_SEARCH_MIN_TRACKED_PATHS = 10_000
 INDEX_SEARCH_MAX_DIRTY_PATHS = 256
 INDEX_SEARCH_MAX_DIRTY_BYTES = 24 * 1024
 MAX_QUERY_TERMS = 48
+TGREP_STATE_SCHEMA = "tgrep-index-state/v1"
+TGREP_RESULT_SCHEMA = "tgrep-index/v1"
+TGREP_STATE_RELATIVE = ".tgrep/state.json"
+TGREP_INDEX_RELATIVE = ".tgrep"
+TGREP_EXPECTED_VERSION = "1.0.4"
+TGREP_MAX_COMMAND_BYTES = 24 * 1024
+TGREP_INDEX_FILES = (
+    "meta.json",
+    "index.bin",
+    "lookup.bin",
+    "files.bin",
+    "files-extra.bin",
+    "filestamps.json",
+)
+TGREP_INDEX_PARAMETERS: dict[str, Any] = {
+    "exclude": [".git", ".tgrep"],
+    "hidden": True,
+    "root": ".",
+}
+TGREP_STATUS_RE = re.compile(
+    r"(?m)^Index status for .+\r?\n"
+    r"\s+Files:\s+\d+\r?\n"
+    r"\s+Trigrams:\s+\d+\r?$"
+)
 CJK_RUN_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]+")
 OWNER_CONTRACT_PATH_RE = re.compile(
     r"^\.agents/skills/[^/]+/references/[^/]+\.md$"
@@ -195,6 +221,469 @@ def _require_dependencies() -> None:
             f"required executable is unavailable: {', '.join(missing)}",
             exit_code=4,
         )
+
+
+def _canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _tgrep_binary_path(repo: Path) -> Path | None:
+    """Resolve only the repository-bundled Windows executable."""
+
+    if os.name != "nt":
+        return None
+    candidate = repo / "tgrep.exe"
+    try:
+        metadata = candidate.lstat()
+    except OSError:
+        return None
+    if (
+        _metadata_is_redirect(metadata)
+        or not stat.S_ISREG(metadata.st_mode)
+        or _redirected(candidate, repo)
+    ):
+        return None
+    return candidate
+
+
+def _stable_file_sha256(path: Path, repo: Path | None = None) -> str | None:
+    try:
+        before = path.lstat()
+    except OSError:
+        return None
+    if (
+        _metadata_is_redirect(before)
+        or not stat.S_ISREG(before.st_mode)
+        or (repo is not None and _redirected(path, repo))
+    ):
+        return None
+    try:
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError:
+        return None
+    if (
+        _metadata_is_redirect(after)
+        or not stat.S_ISREG(after.st_mode)
+        or _regular_file_fingerprint(before) != _regular_file_fingerprint(after)
+    ):
+        return None
+    return sha256_bytes(raw)
+
+
+def _tgrep_binary_version(binary: Path, repo: Path) -> str | None:
+    try:
+        completed = _run(
+            [str(binary), "--version"],
+            cwd=repo,
+            code="TGREP_UNAVAILABLE",
+        )
+    except (KnowledgeError, OSError):
+        return None
+    try:
+        text = completed.stdout.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return None
+    match = re.search(r"(?:^|\n)tgrep\s+([^\s\r\n]+)", text)
+    return match.group(1) if match else None
+
+
+def _tgrep_state_path(repo: Path) -> Path:
+    return repo / Path(*TGREP_STATE_RELATIVE.split("/"))
+
+
+def _tgrep_index_path(repo: Path) -> Path:
+    return repo / Path(*TGREP_INDEX_RELATIVE.split("/"))
+
+
+def _tgrep_index_fingerprint(index_path: Path) -> str | None:
+    """Hash every index byte except the state sidecar itself."""
+
+    try:
+        metadata = index_path.lstat()
+    except OSError:
+        return None
+    if (
+        _metadata_is_redirect(metadata)
+        or not stat.S_ISDIR(metadata.st_mode)
+        or _redirected(index_path, index_path.parent)
+    ):
+        return None
+    digest = hashlib.sha256()
+    try:
+        files = sorted(index_path.rglob("*"), key=lambda value: value.relative_to(index_path).as_posix().encode("utf-8"))
+    except OSError:
+        return None
+    for path in files:
+        try:
+            relative = path.relative_to(index_path).as_posix()
+            current = path.lstat()
+        except OSError:
+            return None
+        if relative == Path(TGREP_STATE_RELATIVE).name:
+            continue
+        if _metadata_is_redirect(current):
+            return None
+        if stat.S_ISDIR(current.st_mode):
+            continue
+        if not stat.S_ISREG(current.st_mode) or _redirected(path, index_path):
+            return None
+        try:
+            raw = path.read_bytes()
+            after = path.lstat()
+        except OSError:
+            return None
+        if (
+            _metadata_is_redirect(after)
+            or not stat.S_ISREG(after.st_mode)
+            or _regular_file_fingerprint(current) != _regular_file_fingerprint(after)
+        ):
+            return None
+        encoded = relative.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(len(raw).to_bytes(8, "big"))
+        digest.update(hashlib.sha256(raw).digest())
+    return digest.hexdigest()
+
+
+def _tgrep_index_complete(index_path: Path) -> bool:
+    try:
+        if any(not (index_path / relative).is_file() for relative in TGREP_INDEX_FILES):
+            return False
+        meta_path = index_path / "meta.json"
+        if _metadata_is_redirect(meta_path.lstat()):
+            return False
+        metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(metadata, dict)
+        and metadata.get("complete") is True
+        and metadata.get("version") == 2
+    )
+
+
+def _tgrep_index_status(binary: Path, repo: Path, index_path: Path) -> bool:
+    """Require tgrep itself to report a usable index before publishing state."""
+
+    try:
+        completed = _run(
+            [
+                str(binary),
+                "status",
+                "--index-path",
+                str(index_path),
+                ".",
+            ],
+            cwd=repo,
+            code="TGREP_INDEX_STATUS_FAILED",
+        )
+    except (KnowledgeError, OSError):
+        return False
+    try:
+        output = completed.stdout.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return False
+    return TGREP_STATUS_RE.search(output) is not None
+
+
+def _tgrep_control_fingerprint(repo: Path) -> str | None:
+    """Capture repository-local ignore/attribute inputs that affect the walker."""
+
+    try:
+        tracked = _run(
+            [
+                "git",
+                "-c",
+                "core.quotepath=false",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+                "--",
+            ],
+            cwd=repo,
+            code="GIT_UNAVAILABLE",
+        ).stdout
+        configured = _run(
+            ["git", "config", "--path", "--get", "core.excludesfile"],
+            cwd=repo,
+            accepted={0, 1},
+            code="GIT_UNAVAILABLE",
+        ).stdout.strip()
+    except (KnowledgeError, OSError):
+        return None
+    candidates = {
+        ".gitignore",
+        ".gitattributes",
+        ".ignore",
+        ".rgignore",
+        ".git/info/exclude",
+        ".git/info/attributes",
+    }
+    for raw in tracked.split(b"\0"):
+        if not raw:
+            continue
+        try:
+            relative = normalized_path(raw.decode("utf-8"))
+        except (UnicodeDecodeError, KnowledgeError):
+            continue
+        if Path(relative).name in {".gitignore", ".gitattributes", ".ignore", ".rgignore"}:
+            candidates.add(relative)
+    digest = hashlib.sha256()
+    for relative in sorted(candidates, key=lambda value: value.encode("utf-8")):
+        path = repo / Path(*relative.split("/"))
+        raw = b"missing"
+        if path.is_file() and not _redirected(path, repo):
+            try:
+                raw = path.read_bytes()
+            except OSError:
+                return None
+        encoded = relative.encode("utf-8")
+        digest.update(len(encoded).to_bytes(8, "big"))
+        digest.update(encoded)
+        digest.update(hashlib.sha256(raw).digest())
+    digest.update(b"core.excludesfile")
+    digest.update(configured)
+    return digest.hexdigest()
+
+
+def _tgrep_repository_snapshot(repo: Path) -> dict[str, Any] | None:
+    """Return a stable Git/worktree identity plus a full dirty overlay token."""
+
+    try:
+        head = _run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, code="GIT_UNAVAILABLE"
+        ).stdout.decode("ascii").strip()
+        branch_result = _run(
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+            cwd=repo,
+            accepted={0, 1},
+            code="GIT_UNAVAILABLE",
+        )
+        branch = (
+            branch_result.stdout.decode("utf-8", errors="strict").strip()
+            if branch_result.returncode == 0
+            else "HEAD"
+        )
+        staged = _run(
+            [
+                "git",
+                "-c",
+                "core.quotepath=false",
+                "ls-files",
+                "--stage",
+                "-v",
+                "-z",
+                "--",
+            ],
+            cwd=repo,
+            code="GIT_UNAVAILABLE",
+        ).stdout
+        dirty = _match_cache_dirty_inventory(repo)
+        dirty_paths = _normalized_dirty_paths(dirty)
+        dirty_fingerprint = _dirty_fingerprint(repo, dirty)
+        control_fingerprint = _tgrep_control_fingerprint(repo)
+    except (KnowledgeError, UnicodeError, OSError):
+        return None
+    if dirty_paths is None or dirty_fingerprint is None or control_fingerprint is None:
+        return None
+    repository = {
+        "branch": branch,
+        "canonical_worktree": str(repo.resolve()),
+        "dirty_fingerprint": dirty_fingerprint,
+        "git_index_sha256": sha256_bytes(staged),
+        "head": head,
+        "control_fingerprint": control_fingerprint,
+        "dirty_paths": list(dirty_paths),
+    }
+    repository["snapshot_sha256"] = sha256_bytes(
+        _canonical_json_bytes(repository)
+    )
+    return repository
+
+
+def _tgrep_load_state(repo: Path) -> dict[str, Any] | None:
+    path = _tgrep_state_path(repo)
+    try:
+        metadata = path.lstat()
+        if (
+            _metadata_is_redirect(metadata)
+            or not stat.S_ISREG(metadata.st_mode)
+            or _redirected(path, repo)
+        ):
+            return None
+        raw = path.read_bytes()
+        after = path.lstat()
+    except OSError:
+        return None
+    if (
+        _metadata_is_redirect(after)
+        or not stat.S_ISREG(after.st_mode)
+        or _regular_file_fingerprint(metadata) != _regular_file_fingerprint(after)
+    ):
+        return None
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _tgrep_state_is_valid(repo: Path, state: dict[str, Any] | None = None) -> bool:
+    try:
+        return _tgrep_state_is_valid_unchecked(repo, state)
+    except (KnowledgeError, OSError, UnicodeError, TypeError, ValueError):
+        return False
+
+
+def _tgrep_state_is_valid_unchecked(
+    repo: Path,
+    state: dict[str, Any] | None = None,
+) -> bool:
+    """Fail closed without ever exposing tgrep stderr to the query caller."""
+
+    if os.name != "nt":
+        return False
+    state = state if state is not None else _tgrep_load_state(repo)
+    if not isinstance(state, dict) or state.get("schema") != TGREP_STATE_SCHEMA or state.get("ready") is not True:
+        return False
+    binary = _tgrep_binary_path(repo)
+    if binary is None:
+        return False
+    binary_state = state.get("binary")
+    if not isinstance(binary_state, dict):
+        return False
+    if binary_state.get("path") != "tgrep.exe":
+        return False
+    binary_sha = _stable_file_sha256(binary, repo)
+    if binary_sha is None or binary_sha != binary_state.get("sha256"):
+        return False
+    version = _tgrep_binary_version(binary, repo)
+    if version is None or version != binary_state.get("version"):
+        return False
+    index_state = state.get("index")
+    index_path = _tgrep_index_path(repo)
+    if (
+        not isinstance(index_state, dict)
+        or index_state.get("path") != TGREP_INDEX_RELATIVE
+        or not _tgrep_index_complete(index_path)
+    ):
+        return False
+    index_fingerprint = _tgrep_index_fingerprint(index_path)
+    if index_fingerprint is None or index_fingerprint != index_state.get("fingerprint"):
+        return False
+    parameters = state.get("parameters")
+    if parameters != TGREP_INDEX_PARAMETERS:
+        return False
+    repository = state.get("repository_snapshot")
+    if not isinstance(repository, dict):
+        return False
+    stored_snapshot = repository.get("snapshot_sha256")
+    stored_without_digest = {
+        key: value for key, value in repository.items() if key != "snapshot_sha256"
+    }
+    if (
+        not isinstance(stored_snapshot, str)
+        or sha256_bytes(_canonical_json_bytes(stored_without_digest)) != stored_snapshot
+    ):
+        return False
+    current = _tgrep_repository_snapshot(repo)
+    if current is None:
+        return False
+    stable_keys = (
+        "branch",
+        "canonical_worktree",
+        "git_index_sha256",
+        "head",
+        "control_fingerprint",
+    )
+    if any(current.get(key) != repository.get(key) for key in stable_keys):
+        return False
+    if current.get("snapshot_sha256") != stored_snapshot:
+        return False
+    source = state.get("source_fingerprint")
+    if not isinstance(source, dict):
+        return False
+    source_digest = source.get("sha256")
+    source_without_digest = {key: value for key, value in source.items() if key != "sha256"}
+    return (
+        isinstance(source_digest, str)
+        and sha256_bytes(_canonical_json_bytes(source_without_digest)) == source_digest
+        and source.get("repository_snapshot_sha256") == stored_snapshot
+        and source.get("index_fingerprint") == index_fingerprint
+    )
+
+
+def _write_tgrep_state(path: Path, state: dict[str, Any]) -> None:
+    """Publish the ready sidecar only after its complete bytes are durable."""
+
+    if path.name != Path(TGREP_STATE_RELATIVE).name:
+        raise ValueError("unexpected tgrep state path")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="\n",
+            dir=path.parent,
+            prefix=".tgrep-state-",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        temporary = None
+    finally:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+
+
+def _tgrep_search_command(
+    repo: Path,
+    *,
+    patterns: Sequence[str],
+    roots: Sequence[str],
+    fixed_strings: bool,
+    index_path: Path,
+) -> list[str]:
+    binary = _tgrep_binary_path(repo) or (repo / "tgrep.exe")
+    command = [
+        str(binary),
+        "--no-heading",
+        "--line-number",
+        "--with-filename",
+        "--null",
+        "--ignore-case",
+        "--color",
+        "never",
+        "--glob",
+        "!.git/**",
+        "--glob",
+        "!.tgrep/**",
+        "--index-path",
+        str(index_path),
+    ]
+    if fixed_strings:
+        command.extend(["--fixed-strings", "--max-count", "1"])
+    for pattern in patterns:
+        command.extend(["--regexp", pattern])
+    command.extend(["--", *roots])
+    return command
 
 
 def _redirected(path: Path, repo: Path) -> bool:
@@ -719,6 +1208,31 @@ class QuerySearchSession:
         self.dirty_paths = (
             self._snapshot.dirty_paths if self._snapshot is not None else ()
         )
+        self.tgrep_state = _tgrep_load_state(repo)
+        self.tgrep_search_enabled = _tgrep_state_is_valid(repo, self.tgrep_state)
+        state_dirty_paths: tuple[str, ...] = ()
+        if self.tgrep_search_enabled and isinstance(self.tgrep_state, dict):
+            repository = self.tgrep_state.get("repository_snapshot")
+            if isinstance(repository, dict):
+                values = repository.get("dirty_paths", [])
+                if isinstance(values, list):
+                    state_dirty_paths = tuple(
+                        value
+                        for value in values
+                        if isinstance(value, str)
+                    )
+        self.tgrep_dirty_paths = tuple(
+            sorted(
+                set(self.dirty_paths).union(state_dirty_paths),
+                key=lambda value: value.encode("utf-8"),
+            )
+        )
+        self.tgrep_index_path = _tgrep_index_path(repo)
+        self.tgrep_index_fingerprint = (
+            _tgrep_index_fingerprint(self.tgrep_index_path)
+            if self.tgrep_search_enabled
+            else None
+        )
         dirty_path_bytes = sum(len(path.encode("utf-8")) + 1 for path in self.dirty_paths)
         self.index_search_enabled = bool(
             self._snapshot is not None
@@ -762,6 +1276,18 @@ class QuerySearchSession:
                 raise KnowledgeError(
                     "SOURCE_DRIFT",
                     "repository bytes changed during search",
+                    exit_code=3,
+                    recoverable=True,
+                )
+            if (
+                self.tgrep_search_enabled
+                and self.tgrep_index_fingerprint is not None
+                and _tgrep_index_fingerprint(self.tgrep_index_path)
+                != self.tgrep_index_fingerprint
+            ):
+                raise KnowledgeError(
+                    "SOURCE_DRIFT",
+                    "tgrep index changed during search",
                     exit_code=3,
                     recoverable=True,
                 )
@@ -814,6 +1340,276 @@ def _parse_rg_matches(output: bytes) -> list[Match]:
         cursor = record_end + 1
     matches.sort(key=lambda item: (item.path.encode("utf-8"), item.line_number))
     return matches
+
+
+def _parse_tgrep_matches(output: bytes) -> list[Match]:
+    """Parse tgrep's requested NUL format and its v1.0.4 line fallback."""
+
+    # Keep the NUL parser as the preferred wire format.  tgrep 1.0.4 accepts
+    # ``--null`` but, for the ripgrep-compatible CLI, currently emits the
+    # regular ``path:line:text`` representation.  Supporting both keeps the
+    # adapter fail-closed without weakening the command contract.
+    if b"\0" in output:
+        return _parse_rg_matches(output)
+
+    matches: list[Match] = []
+    records = output.split(b"\n")
+    if records and records[-1] == b"":
+        records.pop()
+    for record in records:
+        if not record:
+            raise KnowledgeError(
+                "TGREP_OUTPUT_INVALID",
+                "tgrep emitted an empty line record",
+                exit_code=4,
+            )
+        record = record.rstrip(b"\r")
+        # Use the first path/line separator.  Match text commonly contains
+        # JSON timestamps such as ``:2026-09-01T13:00:00``; a greedy path
+        # expression would incorrectly absorb the real line number.
+        separator = re.match(rb"^(.+?):([0-9]+):(.*)$", record)
+        if separator is None:
+            raise KnowledgeError(
+                "TGREP_OUTPUT_INVALID",
+                "tgrep emitted an invalid line record",
+                exit_code=4,
+            )
+        try:
+            path_text = separator.group(1).decode("utf-8")
+            line_number = int(separator.group(2).decode("ascii"))
+            line_text = separator.group(3).decode("utf-8").rstrip("\r")
+        except (UnicodeDecodeError, ValueError):
+            raise KnowledgeError(
+                "TGREP_OUTPUT_INVALID",
+                "tgrep emitted an invalid UTF-8 match record",
+                exit_code=4,
+            )
+        try:
+            path = normalized_path(path_text)
+        except KnowledgeError:
+            continue
+        matches.append(Match(path=path, line_number=line_number, line_text=line_text))
+    matches.sort(key=lambda item: (item.path.encode("utf-8"), item.line_number))
+    return matches
+
+
+def _tgrep_search(
+    repo: Path,
+    *,
+    patterns: Sequence[str],
+    roots: Sequence[str],
+    fixed_strings: bool,
+    index_path: Path,
+) -> list[Match] | None:
+    """Run tgrep; ``None`` means the caller must use the rg fallback."""
+
+    if not patterns:
+        return []
+    command = _tgrep_search_command(
+        repo,
+        patterns=patterns,
+        roots=roots,
+        fixed_strings=fixed_strings,
+        index_path=index_path,
+    )
+    command_bytes = sum(len(value.encode("utf-8")) + 1 for value in command)
+    if command_bytes > TGREP_MAX_COMMAND_BYTES:
+        return None
+    try:
+        completed = _run(
+            command,
+            cwd=repo,
+            accepted={0, 1},
+            code="TGREP_UNAVAILABLE",
+        )
+    except (KnowledgeError, OSError):
+        return None
+    if completed.returncode == 1:
+        return []
+    try:
+        return _parse_tgrep_matches(completed.stdout)
+    except KnowledgeError:
+        return None
+
+
+def _discard_tgrep_state(repo: Path) -> None:
+    path = _tgrep_state_path(repo)
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def tgrep_index_repository(repo_value: str, *, force: bool = False) -> dict[str, Any]:
+    """Explicitly build and publish the repository-local tgrep index."""
+
+    repo = Path(repo_value).resolve()
+    if not repo.is_dir():
+        raise KnowledgeError(
+            "REPOSITORY_MISSING",
+            "repository root does not exist",
+            exit_code=4,
+        )
+    if os.name != "nt":
+        raise KnowledgeError(
+            "TGREP_UNSUPPORTED_PLATFORM",
+            "tgrep.exe index is supported only on Windows",
+            exit_code=4,
+        )
+    binary = _tgrep_binary_path(repo)
+    if binary is None:
+        raise KnowledgeError(
+            "TGREP_BINARY_MISSING",
+            "repository-bundled tgrep.exe is missing or redirected",
+            exit_code=4,
+        )
+    binary_sha = _stable_file_sha256(binary, repo)
+    version = _tgrep_binary_version(binary, repo)
+    if binary_sha is None or version is None:
+        raise KnowledgeError(
+            "TGREP_UNAVAILABLE",
+            "repository-bundled tgrep.exe could not be verified",
+            exit_code=4,
+        )
+    if version != TGREP_EXPECTED_VERSION:
+        raise KnowledgeError(
+            "TGREP_VERSION_UNSUPPORTED",
+            f"expected tgrep {TGREP_EXPECTED_VERSION}, found {version}",
+            exit_code=4,
+        )
+    if not force:
+        existing = _tgrep_load_state(repo)
+        if _tgrep_state_is_valid(repo, existing):
+            assert existing is not None
+            return {
+                "schema": TGREP_RESULT_SCHEMA,
+                "status": "ready",
+                "rebuilt": False,
+                "state_path": TGREP_STATE_RELATIVE,
+                "binary": existing.get("binary"),
+                "parameters": existing.get("parameters"),
+                "repository_snapshot": existing.get("repository_snapshot"),
+                "source_fingerprint": existing.get("source_fingerprint"),
+                "index": existing.get("index"),
+            }
+    before = _tgrep_repository_snapshot(repo)
+    if before is None:
+        raise KnowledgeError(
+            "TGREP_SNAPSHOT_FAILED",
+            "could not capture repository snapshot before indexing",
+            exit_code=3,
+            recoverable=True,
+        )
+    _discard_tgrep_state(repo)
+    command = [
+        str(binary),
+        "index",
+        "--hidden",
+        "--exclude",
+        ".git",
+        "--exclude",
+        ".tgrep",
+    ]
+    if force:
+        command.append("--force")
+    command.append(".")
+    try:
+        _run(
+            command,
+            cwd=repo,
+            code="TGREP_INDEX_FAILED",
+        )
+    except (KnowledgeError, OSError) as exc:
+        _discard_tgrep_state(repo)
+        if isinstance(exc, KnowledgeError):
+            raise
+        raise KnowledgeError(
+            "TGREP_INDEX_FAILED",
+            "tgrep index command failed",
+            exit_code=4,
+        ) from exc
+    after = _tgrep_repository_snapshot(repo)
+    after_binary_sha = _stable_file_sha256(binary, repo)
+    after_version = _tgrep_binary_version(binary, repo)
+    index_path = _tgrep_index_path(repo)
+    index_fingerprint = _tgrep_index_fingerprint(index_path)
+    index_status_ok = _tgrep_index_status(binary, repo, index_path)
+    if (
+        after is None
+        or after != before
+        or after_binary_sha != binary_sha
+        or after_version != version
+        or not _tgrep_index_complete(index_path)
+        or index_fingerprint is None
+        or not index_status_ok
+    ):
+        _discard_tgrep_state(repo)
+        code = (
+            "TGREP_INDEX_STATUS_INVALID"
+            if not index_status_ok
+            else "TGREP_REPOSITORY_CHANGED"
+        )
+        message = (
+            "tgrep status did not report a complete index"
+            if not index_status_ok
+            else "repository or tgrep binary changed while building the index"
+        )
+        raise KnowledgeError(
+            code,
+            message,
+            exit_code=3,
+            recoverable=True,
+        )
+    source = {
+        "dirty_paths": after.get("dirty_paths", []),
+        "index_fingerprint": index_fingerprint,
+        "repository_snapshot_sha256": after["snapshot_sha256"],
+    }
+    source["sha256"] = sha256_bytes(_canonical_json_bytes(source))
+    state = {
+        "schema": TGREP_STATE_SCHEMA,
+        "ready": True,
+        "binary": {
+            "path": "tgrep.exe",
+            "sha256": binary_sha,
+            "version": version,
+        },
+        "index": {
+            "path": TGREP_INDEX_RELATIVE,
+            "fingerprint": index_fingerprint,
+        },
+        "parameters": copy.deepcopy(TGREP_INDEX_PARAMETERS),
+        "repository_snapshot": after,
+        "source_fingerprint": source,
+    }
+    try:
+        _write_tgrep_state(_tgrep_state_path(repo), state)
+    except OSError as exc:
+        _discard_tgrep_state(repo)
+        raise KnowledgeError(
+            "TGREP_STATE_WRITE_FAILED",
+            "could not publish tgrep index state",
+            exit_code=4,
+        ) from exc
+    if not _tgrep_state_is_valid(repo, state):
+        _discard_tgrep_state(repo)
+        raise KnowledgeError(
+            "TGREP_STATE_INVALID",
+            "published tgrep index state could not be verified",
+            exit_code=3,
+            recoverable=True,
+        )
+    return {
+        "schema": TGREP_RESULT_SCHEMA,
+        "status": "ready",
+        "rebuilt": True,
+        "state_path": TGREP_STATE_RELATIVE,
+        "binary": state["binary"],
+        "parameters": state["parameters"],
+        "repository_snapshot": state["repository_snapshot"],
+        "source_fingerprint": state["source_fingerprint"],
+        "index": state["index"],
+    }
 
 
 def _parse_git_grep_matches(output: bytes) -> list[Match]:
@@ -925,6 +1721,88 @@ def _dirty_overlay_paths(
             key=lambda value: value.encode("utf-8"),
         )
     )
+
+
+def _tgrep_worktree_matches(
+    repo: Path,
+    patterns: Sequence[str],
+    *,
+    roots: Sequence[str],
+    fixed_strings: bool,
+    session: QuerySearchSession,
+) -> list[Match] | None:
+    """Search indexed bytes, then read every changed path as a direct overlay."""
+
+    if not session.tgrep_search_enabled:
+        return None
+    overlay_paths = _dirty_overlay_paths(
+        repo,
+        session.tgrep_dirty_paths,
+        roots,
+    )
+    indexed = _tgrep_search(
+        repo,
+        patterns=patterns,
+        roots=roots,
+        fixed_strings=fixed_strings,
+        index_path=session.tgrep_index_path,
+    )
+    if indexed is None:
+        return None
+    indexed = [match for match in indexed if match.path not in overlay_paths]
+    if overlay_paths:
+        overlay = _tgrep_search(
+            repo,
+            patterns=patterns,
+            roots=overlay_paths,
+            fixed_strings=fixed_strings,
+            index_path=session.tgrep_index_path,
+        )
+        if overlay is None:
+            return None
+    else:
+        overlay = []
+    unique = {
+        (match.path, match.line_number, match.line_text): match
+        for match in [*indexed, *overlay]
+    }
+    return sorted(
+        unique.values(),
+        key=lambda item: (item.path.encode("utf-8"), item.line_number),
+    )
+
+
+def _search_worktree_regex(
+    repo: Path,
+    pattern: str,
+    *,
+    roots: Sequence[str] = (".",),
+    session: QuerySearchSession | None = None,
+) -> list[Match]:
+    """Use tgrep when its verified index is available, otherwise use rg."""
+
+    owned_session = session is None
+    active_session = session or QuerySearchSession(repo)
+    cache_key: SearchCacheKey = ("regex", (pattern,), tuple(roots))
+    cached_matches = active_session.lookup(cache_key)
+    if cached_matches is not None:
+        matches = list(cached_matches)
+        if owned_session:
+            active_session.validate()
+        return matches
+    matches = _tgrep_worktree_matches(
+        repo,
+        [pattern],
+        roots=roots,
+        fixed_strings=False,
+        session=active_session,
+    )
+    if matches is None:
+        matches = _rg_matches(repo, pattern, roots=roots, session=active_session)
+    active_session.remember(cache_key, matches)
+    if owned_session:
+        active_session.validate()
+    return matches
 
 
 def _git_index_fixed_matches(
@@ -1074,12 +1952,57 @@ def _rg_fixed_matches(
             active_session.validate()
         return matches
     if active_session.index_search_enabled:
-        matches = _index_and_dirty_fixed_matches(
+        if getattr(active_session, "tgrep_search_enabled", False):
+            overlay_paths = _dirty_overlay_paths(
+                repo,
+                active_session.tgrep_dirty_paths,
+                roots,
+            )
+            clean_matches = _git_index_fixed_matches(
+                repo,
+                encoded_patterns,
+                roots=roots,
+            )
+            clean_matches = [
+                match for match in clean_matches if match.path not in overlay_paths
+            ]
+            overlay_matches = _tgrep_search(
+                repo,
+                patterns=normalized_patterns,
+                roots=overlay_paths,
+                fixed_strings=True,
+                index_path=active_session.tgrep_index_path,
+            ) if overlay_paths else []
+            if overlay_matches is None:
+                matches = _index_and_dirty_fixed_matches(
+                    repo,
+                    encoded_patterns,
+                    roots=roots,
+                    session=active_session,
+                )
+            else:
+                matches = clean_matches + overlay_matches
+        else:
+            matches = _index_and_dirty_fixed_matches(
+                repo,
+                encoded_patterns,
+                roots=roots,
+                session=active_session,
+            )
+    elif getattr(active_session, "tgrep_search_enabled", False):
+        matches = _tgrep_worktree_matches(
             repo,
-            encoded_patterns,
+            normalized_patterns,
             roots=roots,
+            fixed_strings=True,
             session=active_session,
         )
+        if matches is None:
+            matches = _rg_fixed_worktree_matches(
+                repo,
+                encoded_patterns,
+                roots=roots,
+            )
     else:
         matches = _rg_fixed_worktree_matches(
             repo,
@@ -1709,7 +2632,7 @@ def query_repository(repo_value: str, *, stage: str, query: str) -> dict[str, An
             session=session,
         )
     else:
-        matches = _rg_matches(repo, pattern, session=session)
+        matches = _search_worktree_regex(repo, pattern, session=session)
     eligible, pages = _query_pages_and_eligibility(repo, matches, session=session)
     blocked_claims, blocked_sources = _conflict_registry(pages)
     canonical = _canonical_results(

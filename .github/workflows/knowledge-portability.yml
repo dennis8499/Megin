@@ -8,6 +8,8 @@ on:
       - "docs/**"
       - "README.md"
       - "OPERATIONS.md"
+      - "THIRD_PARTY_NOTICES.md"
+      - "tgrep.exe"
       - ".gitattributes"
       - ".github/workflows/knowledge-portability.yml"
       - ".gitignore"
@@ -69,6 +71,24 @@ jobs:
           fi
           git --version
           rg --version
+      - name: Verify Linux uses rg fallback without executing the binary
+        if: matrix.os_name == 'linux'
+        shell: bash
+        run: >-
+          python -X utf8 -B
+          .agents/skills/project-knowledge/scripts/test_tgrep.py
+          TgrepLinuxFallbackTests
+      - name: Verify bundled tgrep index and smoke query
+        if: matrix.os_name == 'windows'
+        shell: pwsh
+        run: |
+          $expected = "bac0a288f6e588e7708c87ace2e381f50d5190269c471c10e1ffb9c524fc02de"
+          $actual = (Get-FileHash -LiteralPath .\tgrep.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "tgrep.exe SHA-256 mismatch: $actual" }
+          $version = (& .\tgrep.exe --version | Select-Object -First 1).Trim()
+          if ($version -ne "tgrep 1.0.4") { throw "unexpected tgrep version: $version" }
+          python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . --force > tgrep-index-windows.json
+          python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepWindowsParityTests
       - name: Benchmark cold and warm queries with portability oracle
         shell: bash
         run: >-
@@ -98,6 +118,12 @@ jobs:
             knowledge-suite-${{ matrix.os_name }}.json
             knowledge-suite-metrics-${{ matrix.os_name }}.json
             .knowledge-test-tmp/evidence/release-${{ matrix.os_name }}
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.os_name == 'windows'
+        with:
+          name: tgrep-index-windows
+          path: tgrep-index-windows.json
           if-no-files-found: error
 
   compare:

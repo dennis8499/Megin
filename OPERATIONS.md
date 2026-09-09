@@ -37,6 +37,21 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 未指定 Work ID 時，系統只會在恰有一筆 active run 時選取；多筆候選必須由操作者明確指定，工具不代替人工選擇。
 
+## Project Knowledge tgrep index
+
+Windows 的 Project Knowledge 查詢可使用 repository-local tgrep index。index 不會由
+query 隱式建立；每個 worktree 都要各自初始化一次：
+
+```console
+python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . [--force]
+```
+
+初始化只建立 ignored `.tgrep/` 與 `tgrep-index-state/v1` state，並在 index 前後
+驗證 repository snapshot、binary SHA-256、版本與 index fingerprint。修改內容、
+checkout、branch switch、Git index 或替換 `tgrep.exe` 後，重新執行命令；state
+不一致時 query 維持唯讀並靜默使用 `rg`。本次不使用 `tgrep serve`，也不會在 query
+期間下載或修復 index。
+
 ## Blocked
 
 Blocked 表示 workspace、能力、工具、資料完整性或外部前提無法安全成立。先保存原始錯誤碼與 evidence refs，再執行 `doctor`。修正同一項環境前提後，blocked recovery 必須留在原 phase；不得用 `reset`、`clean`、刪除 registry 或複製核准資料繞過 gate。

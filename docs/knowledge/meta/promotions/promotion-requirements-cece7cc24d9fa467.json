@@ -1,0 +1,20 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "evidence": "conversation:implement-tgrep-plan-20260908"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-requirements-cece7cc24d9fa467/candidate.json",
+  "decision": "change",
+  "formal_paths": [
+    "docs/work/work-20260908-tgrep-index-4f6a8a9c/requirements.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "4996ca80905c72d399a150f986fd838acf69ef3f16c1a151fa4e521717059ab9",
+  "promotion_id": "promotion-requirements-cece7cc24d9fa467",
+  "schema": "knowledge-promotion/v1",
+  "stage": "requirements",
+  "status": "Ready",
+  "work_id": "work-20260908-tgrep-index-4f6a8a9c"
+}

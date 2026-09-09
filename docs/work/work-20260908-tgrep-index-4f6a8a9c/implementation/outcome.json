@@ -1,0 +1,159 @@
+{
+  "bug": null,
+  "bug_verification_ref": null,
+  "changes": [
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_cli.py",
+      "sha256": "9059f59f26966d94c2beac51c647f1bd724172b829065ee0dcb65b74ef78db36",
+      "summary": "Added the explicit tgrep-index command."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "sha256": "dd659793787678e9d7daf9d12f90b43b4acf80db825dff342c73e1dd5ec8cff9",
+      "summary": "Added the Windows tgrep adapter, state validation, indexed search, and rg fallback."
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "91c018f527ad85e522306f961b367d2f465f52cc2e2942f89e4b260ae3ce65ba",
+      "summary": "Marked tgrep.exe as a binary asset."
+    },
+    {
+      "path": ".github/workflows/knowledge-portability.yml",
+      "sha256": "f895bca40e31edafaf913dce2fa7f5e177ba897c836a531bdd2c7503c19371dd",
+      "summary": "Added Windows tgrep coverage and Linux fallback portability checks."
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "9cb1cce18a879129a1a50cd0a2960f0d803e804301c75b02d49a2f32297e97ec",
+      "summary": "Ignored repository-local .tgrep index state."
+    },
+    {
+      "path": "OPERATIONS.md",
+      "sha256": "f1813e9d1741a882ed9b45496e78bb43940abab790d21f3100960b077d7c49f2",
+      "summary": "Documented tgrep initialization, staleness, and worktree operation."
+    },
+    {
+      "path": "README.md",
+      "sha256": "7b2c9285284907fe4c79ab8be4a630ae927ff4bbf8b758a1eef347148e796ebc",
+      "summary": "Documented the default Windows tgrep accelerator and rg fallback."
+    },
+    {
+      "path": ".agents/skills/project-knowledge/scripts/test_tgrep.py",
+      "sha256": "64f5568d156f8c53168088b16d4e60bb3aec726b30d606e1e2b54a03def0645e",
+      "summary": "Added tgrep command, state, parity, and fallback tests."
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "9d37c847a1969a1cc4af569b5426bc9307a5cfa7d33ca165f5b7d11381d692b4",
+      "summary": "Added Microsoft tgrep v1.0.4 attribution, license, and binary digest."
+    }
+  ],
+  "created_at": "2026-09-09T05:45:17.849465Z",
+  "implementation_run_id": "d32cd9338d377353a298cdd8861ee5b0d9e3c411de7c5d70f7a930c68babfd04",
+  "knowledge_decision": "change",
+  "known_deviations": [],
+  "markdown": {
+    "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/implementation/outcome.md",
+    "sha256": "d982970b947df7997ce601e11b264d32e2172bfcafa19e3a91f9258481760b03"
+  },
+  "result": "complete",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-r2"
+    ],
+    "report_ref": "reviews/preliminary-r1/report.json",
+    "report_sha256": "dc9d453cc132a6e5745fb6dd627c21453cddc204899d15878cc62b9c8d1b2514",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "Integrated the bundled Microsoft tgrep v1.0.4 accelerator into Project Knowledge search with explicit indexing and rg fallback.",
+  "verification": [
+    {
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-BDD-DISCOVERY-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-BDD-FOCUSED-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-BDD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-TDD-FOCUSED-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-TDD-FOCUSED-002.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-RELATED-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-RELATED-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-BUILD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-TEST-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-GOVERNANCE-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TGREPINDEX-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-TGREPINDEX-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-PORTABILITY-WINDOWS-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-PORTABILITY-WINDOWS-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-PORTABILITY-LINUX-001",
+      "evidence_refs": [
+        "reviews/preliminary-r1/outputs/CMD-PORTABILITY-LINUX-001.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260908-tgrep-index-4f6a8a9c",
+  "work_kind": "standard"
+}

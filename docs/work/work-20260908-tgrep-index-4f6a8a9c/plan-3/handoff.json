@@ -1,0 +1,1159 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "confirmed_at": "2026-09-09T02:42:37Z",
+    "evidence": "conversation:reapprove-full-test-runner-20260909",
+    "status": "Ready"
+  },
+  "artifacts": [
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/plan.md",
+      "role": "primary",
+      "sha256": "9d0a15052fd1eb8d7243621971478d12da7c5bfc45f4b886c38303e3803cb339"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/source-evidence.md",
+      "role": "supporting",
+      "sha256": "c00d520ccb3c95bf896a98d388190472a305321a577e2396ca094dd1864b0655"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/runner-contract-evidence.md",
+      "role": "supporting",
+      "sha256": "8958e53e9fd59e779d266011c011eb0055af1e2f21e5d6311dffda729c11c44d"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/handoff.json",
+      "role": "handoff",
+      "sha256": null
+    }
+  ],
+  "candidate": {
+    "payload_sha256": "9aa74cecdf9e23853a95ab92d529a4f4742639ae21d05475b9b259b4ffda6358",
+    "revision": "candidate-3"
+  },
+  "commands": [
+    {
+      "absence_evidence": [
+        {
+          "outcome": "False; the tgrep behavior binding is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-PK-TEST"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B -c \"import ast,pathlib; p=pathlib.Path('.agents/skills/project-knowledge/scripts/test_tgrep.py'); t=ast.parse(p.read_text(encoding='utf-8')); print('\\n'.join(sorted(n.name for n in ast.walk(t) if isinstance(n, ast.FunctionDef) and n.name.startswith('test_'))))\"",
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "completeness_criteria": [
+        "The discovered inventory is non-empty and matches BDD-001..BDD-004 with zero omissions."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-discovery",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and list every registered tgrep behavior scenario exactly once."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "No such class at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"class TgrepBehaviorTests\" .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-PK-TEST"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepBehaviorTests",
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "completeness_criteria": [
+        "BDD-001 and BDD-002 run with failures=0, errors=0, skipped=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and indexed/fallback behavior scenarios pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "False; full tgrep BDD suite is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-PK-TEST"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py",
+      "command_id": "CMD-BDD-FULL-001",
+      "completeness_criteria": [
+        "BDD-001..BDD-004 run with failures=0, errors=0, skipped=0; temporary fixture is absent."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-full",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and all tgrep behavior scenarios pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "No such class at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"class TgrepCommandTests\" .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-PK-TEST"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepCommandTests",
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "completeness_criteria": [
+        "All command adapter tests run with failures=0, errors=0, skipped=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and command flag, NUL parser, path, exit-1 and malformed-output tests pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "No such class at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"class TgrepIndexStateTests\" .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-PK-TEST"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepIndexStateTests",
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "completeness_criteria": [
+        "All index state tests run with failures=0, errors=0, skipped=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and state, fingerprint, no-auto-index and atomic-publication tests pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_query.py",
+      "command_id": "CMD-RELATED-001",
+      "completeness_criteria": [
+        "The complete existing query owner suite is discovered and no unexpected skip is introduced."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0 and existing query contract tests pass."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B -c \"from pathlib import Path; files=sorted(Path('.agents/skills/project-knowledge/scripts').glob('*.py')); [compile(p.read_text(encoding='utf-8'),str(p),'exec') for p in files]; print(f'compiled={len(files)}')\"",
+      "command_id": "CMD-BUILD-FULL-001",
+      "completeness_criteria": [
+        "Compiled count equals the enumerated source count and no pycache or repository file is written."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "build-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0; every Project Knowledge Python source compiles in memory."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The direct discovery command exited 1 after 105 tests with errors=152 because it bypassed the existing fixture-root and scenario-binding initialization.",
+          "probe": "attempt-002 sequence 008: python -X utf8 -B -m unittest discover -s .agents/skills/project-knowledge/scripts -p \"test_*.py\"",
+          "source_ref": "SRC-RUNNER-EVIDENCE"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --scope all --profile local --fixture-root .knowledge-test-tmp/fixtures --jobs 1 --evidence-root .knowledge-test-tmp/evidence",
+      "command_id": "CMD-TEST-FULL-001",
+      "completeness_criteria": [
+        "All 12 Ready-plan validation obligations remain present and the full-suite producer/child inventory is complete.",
+        "Every scheduled owner command reports exit 0 with no failures, errors or unexpected skips."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree",
+        "IMPLEMENTATION_READY_PAYLOAD_SHA256 is set by the governed executor to the current Ready handoff payload"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and stdout is a knowledge-suite-report/v1 object with outcome passed.",
+        "The runner writes validation-evidence/v1 under .knowledge-test-tmp/evidence bound to IMPLEMENTATION_READY_PAYLOAD_SHA256."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py lint --repo .",
+      "command_id": "CMD-GOVERNANCE-001",
+      "completeness_criteria": [
+        "All eligible knowledge pages, links, source refs and promotion metadata are checked."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "governance",
+      "status": "Observed",
+      "success_criteria": [
+        "Exit 0 and knowledge lint reports passed."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The explicit tgrep-index command is absent at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"tgrep-index\" .agents/skills/project-knowledge/scripts/knowledge_cli.py",
+          "source_ref": "SRC-PK-CLI"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Repository-local index is explicitly rebuildable and is never created by query.",
+          "kind": "ignored",
+          "path": ".tgrep/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . --force",
+      "command_id": "CMD-TGREPINDEX-001",
+      "completeness_criteria": [
+        "`.tgrep/` and exactly one state sidecar are complete; pre/post repository fingerprint and binary hash are recorded."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0 and output schema is tgrep-index/v1 with status=ready."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Windows parity binding is absent at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"TgrepWindowsParityTests\" .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-CI"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepWindowsParityTests",
+      "command_id": "CMD-PORTABILITY-WINDOWS-001",
+      "completeness_criteria": [
+        "CJK, hidden .agents, CRLF, fixed, regex, staged, dirty and untracked cases are all exercised with zero unexpected skip."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "ci",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; binary version/hash, indexed smoke and rg parity pass on Windows."
+      ],
+      "timeout_seconds": 900
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "Linux fallback binding is absent at the planning baseline.",
+          "probe": "rg -n --fixed-strings \"TgrepLinuxFallbackTests\" .agents/skills/project-knowledge/scripts/test_tgrep.py",
+          "source_ref": "SRC-CI"
+        }
+      ],
+      "allowed_writes": [
+        {
+          "cleanup": "Test runner removes all fixture and temporary files before exit.",
+          "kind": "temporary",
+          "path": ".knowledge-test-tmp/"
+        }
+      ],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepLinuxFallbackTests",
+      "command_id": "CMD-PORTABILITY-LINUX-001",
+      "completeness_criteria": [
+        "The fallback result matches rg and no tgrep process is recorded."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Python 3.13+",
+        "Git",
+        "ripgrep",
+        "Run from the canonical delivery worktree"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "ci",
+      "status": "Proposed",
+      "success_criteria": [
+        "Exit 0; Linux selects rg and does not execute the .exe."
+      ],
+      "timeout_seconds": 900
+    }
+  ],
+  "contract_index": [
+    {
+      "contract_id": "BDD-FWK-001",
+      "kind": "bdd-framework",
+      "source_refs": [
+        "SRC-PK-TEST"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "BDD-001",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-002",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-003",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-004",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-001",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-002",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-003",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-DISCOVERY-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-TEST"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-TEST"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-TEST"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-RELATED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BUILD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TEST-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-TEST",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-GOVERNANCE-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TGREPINDEX-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-PORTABILITY-WINDOWS-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-PORTABILITY-LINUX-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "WP-001",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "WP-002",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-TEST",
+        "SRC-CI"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "WP-003",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-DOC",
+        "SRC-CI",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    }
+  ],
+  "planning_baseline": {
+    "head_sha": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+    "repo_id": "0c5534020993ce0e527ffefdd0bbbdf8e3e26138d3933defe22de1ed5ea2530c",
+    "status_sha256": "e9359f02ff1764540de01b93827b67253fe9f00c6ed147f2dd3988ae60f22cd4"
+  },
+  "primary_plan": {
+    "path": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/plan.md",
+    "sha256": "9d0a15052fd1eb8d7243621971478d12da7c5bfc45f4b886c38303e3803cb339"
+  },
+  "revision_impact": {
+    "changes": [
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "CMD-TEST-FULL-001",
+        "scope": "global-baseline"
+      }
+    ],
+    "revision": "candidate-3"
+  },
+  "schema": "ready-plan/v1",
+  "sources": [
+    {
+      "kind": "spec",
+      "location": "docs/work/work-20260908-tgrep-index-4f6a8a9c/requirements.md",
+      "plan_refs": [
+        "FR-001",
+        "FR-002",
+        "FR-003",
+        "FR-004",
+        "FR-005",
+        "FR-006",
+        "AC-001",
+        "AC-002",
+        "AC-003",
+        "AC-004",
+        "AC-005"
+      ],
+      "revision": "1",
+      "sha256": "22352fc4b1c124e6358b5758b12bb9d1ec900cd6b0dfc142b175878529283b41",
+      "source_id": "SRC-REQ",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/knowledge_query.py",
+      "plan_refs": [
+        "TD-001",
+        "TD-002",
+        "TD-003"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "aed002188a8ddf5e1c4c3f78ff1d3f08125cef177d2c0d2448200b4b62eae7d5",
+      "source_id": "SRC-PK-QUERY",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/knowledge_cli.py",
+      "plan_refs": [
+        "TD-003"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "f0c21fd185d30d0dcf932a9460389f451c4c550e9b458ce94cb969076865b47d",
+      "source_id": "SRC-PK-CLI",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/project-knowledge/scripts/test_query.py",
+      "plan_refs": [
+        "BDD-FWK-001",
+        "BDD-001",
+        "BDD-002",
+        "BDD-003",
+        "BDD-004",
+        "TEST-001",
+        "TEST-002",
+        "TEST-003",
+        "TD-005"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "cc6d6cd5c62c9ed91a09497a0b6ca3bdf3c41e1112e08d09d3ad589f602ea87a",
+      "source_id": "SRC-PK-TEST",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "platform",
+      "location": ".github/workflows/knowledge-portability.yml",
+      "plan_refs": [
+        "TD-004",
+        "AC-005"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "e276cee936fe6e6a02e64d85a59b7bd021e1414d5822ff9118b3f0d6cafd5c97",
+      "source_id": "SRC-CI",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": "README.md",
+      "plan_refs": [
+        "TD-004",
+        "AC-005"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "b210e5a22b484ba36e58ec7fde534c6501bcadd1d7719c9ce93617ae66504ba4",
+      "source_id": "SRC-DOC",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "supporting",
+      "location": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/source-evidence.md",
+      "plan_refs": [
+        "TD-001",
+        "TD-002",
+        "TD-003",
+        "TD-004",
+        "TD-005"
+      ],
+      "revision": "2026-09-09",
+      "sha256": "c00d520ccb3c95bf896a98d388190472a305321a577e2396ca094dd1864b0655",
+      "source_id": "SRC-UPSTREAM",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "platform",
+      "location": "tgrep.exe",
+      "plan_refs": [
+        "TD-001",
+        "TD-004",
+        "AC-002",
+        "AC-005"
+      ],
+      "revision": "1.0.4",
+      "sha256": "bac0a288f6e588e7708c87ace2e381f50d5190269c471c10e1ffb9c524fc02de",
+      "source_id": "SRC-BINARY",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".agents/skills/project-knowledge/scripts/run_full_suite.py",
+      "plan_refs": [
+        "TD-005",
+        "CMD-TEST-FULL-001"
+      ],
+      "revision": "8e88c1278d7cdf5c0c08106a49290d0d80ea327f",
+      "sha256": "cb175db119dd79229f420e8fca3e07784b77938ab258eec3838c67d0a849bbf0",
+      "source_id": "SRC-PK-RUNNER",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "supporting",
+      "location": "docs/work/work-20260908-tgrep-index-4f6a8a9c/plan-3/runner-contract-evidence.md",
+      "plan_refs": [
+        "TD-005",
+        "CMD-TEST-FULL-001"
+      ],
+      "revision": "attempt-002",
+      "sha256": "8958e53e9fd59e779d266011c011eb0055af1e2f21e5d6311dffda729c11c44d",
+      "source_id": "SRC-RUNNER-EVIDENCE",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    }
+  ],
+  "validation": {
+    "coverage_edges": [],
+    "profile": "local",
+    "release_requirements": {
+      "hosted": true,
+      "platforms": [
+        "windows",
+        "linux"
+      ],
+      "profile": "release"
+    },
+    "required_obligations": [
+      {
+        "command_ref": "CMD-BDD-DISCOVERY-001",
+        "obligation_id": "CMD-BDD-DISCOVERY-001"
+      },
+      {
+        "command_ref": "CMD-BDD-FOCUSED-001",
+        "obligation_id": "CMD-BDD-FOCUSED-001"
+      },
+      {
+        "command_ref": "CMD-BDD-FULL-001",
+        "obligation_id": "CMD-BDD-FULL-001"
+      },
+      {
+        "command_ref": "CMD-TDD-FOCUSED-001",
+        "obligation_id": "CMD-TDD-FOCUSED-001"
+      },
+      {
+        "command_ref": "CMD-TDD-FOCUSED-002",
+        "obligation_id": "CMD-TDD-FOCUSED-002"
+      },
+      {
+        "command_ref": "CMD-RELATED-001",
+        "obligation_id": "CMD-RELATED-001"
+      },
+      {
+        "command_ref": "CMD-BUILD-FULL-001",
+        "obligation_id": "CMD-BUILD-FULL-001"
+      },
+      {
+        "command_ref": "CMD-TEST-FULL-001",
+        "obligation_id": "CMD-TEST-FULL-001"
+      },
+      {
+        "command_ref": "CMD-GOVERNANCE-001",
+        "obligation_id": "CMD-GOVERNANCE-001"
+      },
+      {
+        "command_ref": "CMD-TGREPINDEX-001",
+        "obligation_id": "CMD-TGREPINDEX-001"
+      },
+      {
+        "command_ref": "CMD-PORTABILITY-WINDOWS-001",
+        "obligation_id": "CMD-PORTABILITY-WINDOWS-001"
+      },
+      {
+        "command_ref": "CMD-PORTABILITY-LINUX-001",
+        "obligation_id": "CMD-PORTABILITY-LINUX-001"
+      }
+    ],
+    "reuse_policy": {
+      "executable_input_globs": [
+        ".agents/**",
+        "docs/**",
+        "README.md",
+        "OPERATIONS.md",
+        ".github/workflows/**",
+        ".gitignore",
+        ".gitattributes",
+        "tgrep.exe"
+      ],
+      "terminal_only_paths": [
+        "docs/work/work-20260908-tgrep-index-4f6a8a9c/implementation/outcome.json",
+        "docs/work/work-20260908-tgrep-index-4f6a8a9c/implementation/outcome.md"
+      ]
+    },
+    "schema": "validation-plan/v1",
+    "target_environment": {
+      "git": "Git 2.x",
+      "os": "Windows",
+      "python": "Python 3.13+",
+      "tools": [
+        "ripgrep",
+        "tgrep.exe 1.0.4"
+      ]
+    }
+  },
+  "work_packages": [
+    {
+      "blocked_by": [],
+      "command_refs": [
+        "CMD-TGREPINDEX-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-TDD-FOCUSED-002"
+      ],
+      "contract_refs": [
+        "BDD-001",
+        "BDD-002",
+        "BDD-003",
+        "TEST-001",
+        "TEST-002",
+        "CMD-TGREPINDEX-001",
+        "BDD-004",
+        "TEST-003",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-TDD-FOCUSED-002",
+        "WP-001"
+      ],
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_id": "WP-001"
+    },
+    {
+      "blocked_by": [
+        "WP-001"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-RELATED-001",
+        "CMD-PORTABILITY-WINDOWS-001",
+        "CMD-PORTABILITY-LINUX-001"
+      ],
+      "contract_refs": [
+        "BDD-FWK-001",
+        "BDD-001",
+        "BDD-002",
+        "BDD-003",
+        "BDD-004",
+        "TEST-001",
+        "TEST-002",
+        "TEST-003",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-PORTABILITY-WINDOWS-001",
+        "CMD-PORTABILITY-LINUX-001",
+        "CMD-RELATED-001",
+        "WP-002"
+      ],
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_id": "WP-002"
+    },
+    {
+      "blocked_by": [
+        "WP-001",
+        "WP-002"
+      ],
+      "command_refs": [
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001"
+      ],
+      "contract_refs": [
+        "TEST-003",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "BDD-001",
+        "BDD-002",
+        "BDD-003",
+        "BDD-004",
+        "TEST-001",
+        "TEST-002",
+        "WP-003"
+      ],
+      "source_refs": [
+        "SRC-REQ",
+        "SRC-PK-QUERY",
+        "SRC-PK-CLI",
+        "SRC-PK-TEST",
+        "SRC-CI",
+        "SRC-DOC",
+        "SRC-UPSTREAM",
+        "SRC-BINARY",
+        "SRC-PK-RUNNER",
+        "SRC-RUNNER-EVIDENCE"
+      ],
+      "wp_id": "WP-003"
+    }
+  ]
+}

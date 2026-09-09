@@ -19,6 +19,9 @@
 - ripgrep (rg)
 - Windows PowerShell 或 POSIX shell
 
+Windows checkout 另隨 repository 提供 `tgrep.exe` v1.0.4；它是可選的
+Project Knowledge 搜尋加速器，`rg` 仍是所有平台的必要 fallback。
+
 本專案只使用 Python standard library，沒有 production third-party dependency，也沒有需要啟動的 server、database 或 build service。
 
 確認環境：
@@ -135,6 +138,17 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py lint
 ~~~
 
 query 最多使用五個結果；引用結果前要重新讀取 source_refs 指向的原始 repository 檔案。docs/knowledge/ 是人類檢索層，raw repository source 才是 canonical claim 的 evidence authority。
+
+Windows 若要啟用 tgrep 的 on-disk index，必須由使用者明確初始化：
+
+~~~console
+python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . [--force]
+~~~
+
+查詢不會自動建立 index，也不會啟動 `tgrep serve`。`.tgrep/` 與
+`.tgrep/state.json` 是每個 worktree 各自維護的 ignored state；內容變更、
+checkout、branch switch、Git index 或 binary 變更後，重新執行上述命令（必要時
+加 `--force`）。state 驗證失敗或 tgrep 執行失敗時，查詢會靜默回到 `rg`。
 
 ## 會產生狀態的進階命令
 
@@ -292,6 +306,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 ├── docs/knowledge/                 # canonical knowledge 與 provenance sidecars
 ├── .github/workflows/              # Windows／Linux portability CI
 ├── README.md                       # 本入口與常用使用方法
+├── THIRD_PARTY_NOTICES.md          # bundled tgrep attribution／license
 └── OPERATIONS.md                   # 續跑、診斷、Blocked、Complete、復原手冊
 ~~~
 

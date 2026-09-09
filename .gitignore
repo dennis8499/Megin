@@ -493,3 +493,6 @@ docs/*
 
 # Deterministic knowledge-suite fixtures are disposable local state.
 .knowledge-test-tmp/
+
+# tgrep maintains a separate on-disk index for each worktree.
+.tgrep/

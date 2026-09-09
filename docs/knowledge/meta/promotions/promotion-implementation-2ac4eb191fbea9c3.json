@@ -1,0 +1,18 @@
+{
+  "approval": {
+    "actor": "delivery-owner",
+    "evidence": "conversation:implementation-knowledge-candidate-prepared-20260909"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-implementation-2ac4eb191fbea9c3/candidate.json",
+  "decision": "change",
+  "formal_paths": [],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "20f2ebf8e30497327d471e34de5729f3dd7bbff0dd0ce98c5b21c18fefea11aa",
+  "promotion_id": "promotion-implementation-2ac4eb191fbea9c3",
+  "schema": "knowledge-promotion/v1",
+  "stage": "implementation",
+  "status": "Ready",
+  "work_id": "work-20260908-tgrep-index-4f6a8a9c"
+}
