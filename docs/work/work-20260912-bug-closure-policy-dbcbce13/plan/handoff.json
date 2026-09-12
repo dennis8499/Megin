@@ -1,0 +1,1109 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "confirmed_at": "2026-09-12T12:02:07Z",
+    "evidence": "conversation:plan-work-20260912-bug-closure-policy-dbcbce13-candidate-1",
+    "status": "Ready"
+  },
+  "artifacts": [
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260912-bug-closure-policy-dbcbce13/plan/plan.md",
+      "role": "primary",
+      "sha256": "0dd4ebcd9dcec5f7ae334366b35e038e60d6d0658882fcf3b297d5195e7a4454"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260912-bug-closure-policy-dbcbce13/plan/test-strategy.md",
+      "role": "supporting",
+      "sha256": "7decb29dc4e7193b29f54f93061c877010649973c849289152004bbdecd9922c"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260912-bug-closure-policy-dbcbce13/plan/work-packages.md",
+      "role": "supporting",
+      "sha256": "4e8b866c5c55832314e44d561a36d7daca53d40766632718d94221ce1111f340"
+    },
+    {
+      "approval_status": "Ready",
+      "path": "docs/work/work-20260912-bug-closure-policy-dbcbce13/plan/handoff.json",
+      "role": "handoff",
+      "sha256": null
+    }
+  ],
+  "candidate": {
+    "payload_sha256": "98253bc190a99bb95fec939edd5978a7d26f5381538d581f47e4d652f2f952ef",
+    "revision": "candidate-1"
+  },
+  "commands": [
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py --list-scenarios",
+      "command_id": "CMD-BDD-DISCOVERY-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-discovery",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 120
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusBDDTests.test_fixed_gate_and_partial_disposition",
+      "command_id": "CMD-BDD-FOCUSED-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusBDDTests.test_blocker_risk_reviewer_and_timebox",
+      "command_id": "CMD-BDD-FOCUSED-002",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusBDDTests.test_multi_bug_report_and_outlier_preservation",
+      "command_id": "CMD-BDD-FOCUSED-003",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusContractTests.test_fixed_requires_all_evidence",
+      "command_id": "CMD-TDD-FOCUSED-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusTransitionTests.test_blocker_and_risk_rules",
+      "command_id": "CMD-TDD-FOCUSED-002",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py ClosureStatusReportTests.test_chain_scope_and_report_counts",
+      "command_id": "CMD-TDD-FOCUSED-003",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "tdd-focused",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+      "command_id": "CMD-BDD-FULL-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "bdd-full",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 600
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/bug_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/bug_status.py report --repo .",
+      "command_id": "CMD-RELATED-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "related",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/validate_contracts.py --syntax-all",
+      "command_id": "CMD-BUILD-FULL-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "build-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 180
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/run_quick_checks.py",
+      "command_id": "CMD-TEST-FULL-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "test-full",
+      "status": "Observed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py lint --repo .",
+      "command_id": "CMD-GOVERNANCE-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Windows 11 local planning profile",
+        "Python 3.14.5",
+        "Git 2.51.0.windows.1",
+        "ripgrep 15.2.0",
+        "network unavailable"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "governance",
+      "status": "Observed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 300
+    },
+    {
+      "absence_evidence": [
+        {
+          "outcome": "The proposed entrypoint is absent at the planning baseline.",
+          "probe": "Test-Path .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+          "source_ref": "SRC-008"
+        }
+      ],
+      "allowed_writes": [],
+      "command": "python -X utf8 -B .agents/skills/bug-diagnosis/scripts/test_closure_status.py",
+      "command_id": "CMD-CI-001",
+      "completeness_criteria": [
+        "Evidence identifies the complete command/scenario inventory; failed=0, skipped=0 and required not_run=0."
+      ],
+      "cwd": ".",
+      "environment_prerequisites": [
+        "Hosted Windows and Linux jobs",
+        "Python 3.13 or newer",
+        "network unavailable unless CI image provides it"
+      ],
+      "external_side_effects": [],
+      "network_policy": "forbidden",
+      "purpose": "ci",
+      "status": "Proposed",
+      "success_criteria": [
+        "Process exits 0 and every selected assertion or report invariant passes."
+      ],
+      "timeout_seconds": 600
+    }
+  ],
+  "contract_index": [
+    {
+      "contract_id": "BDD-FWK-001",
+      "kind": "bdd-framework",
+      "source_refs": [
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "BDD-001",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-001",
+        "SRC-002"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "BDD-002",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "BDD-003",
+      "kind": "bdd-scenario",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "TEST-001",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-001",
+        "SRC-002"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "TEST-002",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "TEST-003",
+      "kind": "inner-test",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-DISCOVERY-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-002"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FOCUSED-003",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-002"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-002",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "CMD-TDD-FOCUSED-003",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BDD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-RELATED-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-BUILD-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-TEST-FULL-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-GOVERNANCE-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-004",
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "CMD-CI-001",
+      "kind": "command",
+      "source_refs": [
+        "SRC-001",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "contract_id": "WP-001",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "contract_id": "WP-002",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005",
+        "SRC-008"
+      ],
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "contract_id": "WP-003",
+      "kind": "work-package",
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_refs": [
+        "WP-003"
+      ]
+    }
+  ],
+  "planning_baseline": {
+    "head_sha": "9ca64837a9c519d324a5f36a28c3ab7eb6e479e8",
+    "repo_id": "c02a0b6fa293bdbf99be435da6898d63abd509d25d61bdc9b4409ea9b8210b99",
+    "status_sha256": "a57c92a1e2a15f8c36f175781802570721e8badfcafcb2a2a349c8073b3ae90f"
+  },
+  "primary_plan": {
+    "path": "docs/work/work-20260912-bug-closure-policy-dbcbce13/plan/plan.md",
+    "sha256": "0dd4ebcd9dcec5f7ae334366b35e038e60d6d0658882fcf3b297d5195e7a4454"
+  },
+  "revision_impact": {
+    "changes": [
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "SRC-001",
+        "scope": "global-baseline"
+      },
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "BDD-FWK-001",
+        "scope": "global-baseline"
+      },
+      {
+        "affected_wp_refs": [
+          "WP-001",
+          "WP-002",
+          "WP-003"
+        ],
+        "changed_ref": "CMD-BDD-DISCOVERY-001",
+        "scope": "global-baseline"
+      }
+    ],
+    "revision": "candidate-1"
+  },
+  "schema": "ready-plan/v1",
+  "sources": [
+    {
+      "kind": "spec",
+      "location": "docs/work/work-20260912-bug-closure-policy-dbcbce13/requirements.md",
+      "plan_refs": [
+        "CON-001",
+        "CON-002",
+        "CON-003",
+        "CON-004",
+        "CON-005",
+        "CON-006",
+        "TD-001",
+        "TD-002",
+        "TD-003"
+      ],
+      "revision": "accepted-requirements-20260912",
+      "sha256": "56e410a72af1ae4d0c3e710be0319d048d5c40195514b7263762c03d96afcd3a",
+      "source_id": "SRC-001",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/bug-diagnosis/references/assessment-contract.md",
+      "plan_refs": [
+        "CON-001",
+        "TD-001",
+        "BDD-001"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "550a48383a2a0ea0a33a62930e5086e41115c4a4f499f5aec177fe3324be871c",
+      "source_id": "SRC-002",
+      "wp_refs": [
+        "WP-001"
+      ]
+    },
+    {
+      "kind": "contract",
+      "location": ".agents/skills/implementation-execution/references/reviewer-contract.md",
+      "plan_refs": [
+        "CON-002",
+        "TD-002",
+        "BDD-002"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "5e741f7601e40b408c6805c4d77813a87e8d20487de0f702b793605f352ff2a8",
+      "source_id": "SRC-003",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/project-knowledge/references/human-gate-review.md",
+      "plan_refs": [
+        "CON-004",
+        "TD-002",
+        "BDD-002"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "ec360c3bafa252420a239ae2f4c12024672902f60301aabf5901b39d8dee7fca",
+      "source_id": "SRC-004",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "governance",
+      "location": ".agents/skills/delivery-orchestrator/references/workspace-and-run.md",
+      "plan_refs": [
+        "CON-003",
+        "CON-004",
+        "TD-002"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "1c82197bfd5be28bec9f59fab429ff67604f8fd141ef3cf0c7b466bcbfb4b5b9",
+      "source_id": "SRC-005",
+      "wp_refs": [
+        "WP-002"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": "docs/bugs/bug-bdd016-warm-query-tail/assessment-1.json",
+      "plan_refs": [
+        "CON-005",
+        "TD-003",
+        "BDD-003"
+      ],
+      "revision": "1",
+      "sha256": "61c4a0d6afa29c97d16b064ee5662536e9a462782b929c5207e4c3e572cb44fa",
+      "source_id": "SRC-006",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": "docs/work/work-20260907-workflow-speed-d0b3946d/implementation/outcome.md",
+      "plan_refs": [
+        "CON-005",
+        "TD-003",
+        "BDD-003"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "3e22a7d5c35e294a09d3fb51ce81288f154ed55b36133dcda4cbe2b1dd0ff832",
+      "source_id": "SRC-007",
+      "wp_refs": [
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": "README.md",
+      "plan_refs": [
+        "BDD-FWK-001",
+        "CMD-*"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "7b2c9285284907fe4c79ab8be4a630ae927ff4bbf8b758a1eef347148e796ebc",
+      "source_id": "SRC-008",
+      "wp_refs": [
+        "WP-001",
+        "WP-002",
+        "WP-003"
+      ]
+    },
+    {
+      "kind": "project",
+      "location": ".github/workflows/knowledge-portability.yml",
+      "plan_refs": [
+        "CON-006",
+        "CMD-CI-001",
+        "BDD-003"
+      ],
+      "revision": "base-9ca64837",
+      "sha256": "f895bca40e31edafaf913dce2fa7f5e177ba897c836a531bdd2c7503c19371dd",
+      "source_id": "SRC-009",
+      "wp_refs": [
+        "WP-003"
+      ]
+    }
+  ],
+  "validation": {
+    "coverage_edges": [],
+    "profile": "local",
+    "release_requirements": {
+      "hosted": true,
+      "platforms": [
+        "Windows",
+        "Linux"
+      ],
+      "profile": "release"
+    },
+    "required_obligations": [
+      {
+        "command_ref": "CMD-BDD-DISCOVERY-001",
+        "obligation_id": "CMD-BDD-DISCOVERY-001"
+      },
+      {
+        "command_ref": "CMD-BDD-FOCUSED-001",
+        "obligation_id": "CMD-BDD-FOCUSED-001"
+      },
+      {
+        "command_ref": "CMD-BDD-FOCUSED-002",
+        "obligation_id": "CMD-BDD-FOCUSED-002"
+      },
+      {
+        "command_ref": "CMD-BDD-FOCUSED-003",
+        "obligation_id": "CMD-BDD-FOCUSED-003"
+      },
+      {
+        "command_ref": "CMD-TDD-FOCUSED-001",
+        "obligation_id": "CMD-TDD-FOCUSED-001"
+      },
+      {
+        "command_ref": "CMD-TDD-FOCUSED-002",
+        "obligation_id": "CMD-TDD-FOCUSED-002"
+      },
+      {
+        "command_ref": "CMD-TDD-FOCUSED-003",
+        "obligation_id": "CMD-TDD-FOCUSED-003"
+      },
+      {
+        "command_ref": "CMD-BDD-FULL-001",
+        "obligation_id": "CMD-BDD-FULL-001"
+      },
+      {
+        "command_ref": "CMD-RELATED-001",
+        "obligation_id": "CMD-RELATED-001"
+      },
+      {
+        "command_ref": "CMD-BUILD-FULL-001",
+        "obligation_id": "CMD-BUILD-FULL-001"
+      },
+      {
+        "command_ref": "CMD-TEST-FULL-001",
+        "obligation_id": "CMD-TEST-FULL-001"
+      },
+      {
+        "command_ref": "CMD-GOVERNANCE-001",
+        "obligation_id": "CMD-GOVERNANCE-001"
+      },
+      {
+        "command_ref": "CMD-CI-001",
+        "obligation_id": "CMD-CI-001"
+      }
+    ],
+    "reuse_policy": {
+      "executable_input_globs": [
+        ".agents/skills/**",
+        "docs/bugs/**",
+        "docs/work/work-20260912-bug-closure-policy-dbcbce13/**",
+        ".github/workflows/**",
+        "README.md"
+      ],
+      "terminal_only_paths": [
+        "docs/work/work-20260912-bug-closure-policy-dbcbce13/implementation/outcome.json",
+        "docs/work/work-20260912-bug-closure-policy-dbcbce13/implementation/outcome.md",
+        "docs/knowledge/**",
+        "docs/bugs/status-reviews/**",
+        "docs/bugs/*/status-*.json"
+      ]
+    },
+    "schema": "validation-plan/v1",
+    "target_environment": {
+      "git": "2.51.0.windows.1",
+      "os": "Windows 11",
+      "python": "3.14.5",
+      "tools": [
+        "PowerShell 7",
+        "ripgrep 15.2.0"
+      ]
+    }
+  },
+  "work_packages": [
+    {
+      "blocked_by": [],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-CI-001"
+      ],
+      "contract_refs": [
+        "BDD-001",
+        "BDD-FWK-001",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-001",
+        "CMD-BDD-FULL-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-CI-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-TDD-FOCUSED-001",
+        "CMD-TEST-FULL-001",
+        "TEST-001",
+        "WP-001"
+      ],
+      "source_refs": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-008"
+      ],
+      "wp_id": "WP-001"
+    },
+    {
+      "blocked_by": [
+        "WP-001"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-002",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-BDD-FULL-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-CI-001"
+      ],
+      "contract_refs": [
+        "BDD-002",
+        "BDD-FWK-001",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-002",
+        "CMD-BDD-FULL-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-CI-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-TDD-FOCUSED-002",
+        "CMD-TEST-FULL-001",
+        "TEST-002",
+        "WP-002"
+      ],
+      "source_refs": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005",
+        "SRC-008"
+      ],
+      "wp_id": "WP-002"
+    },
+    {
+      "blocked_by": [
+        "WP-002"
+      ],
+      "command_refs": [
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-003",
+        "CMD-TDD-FOCUSED-003",
+        "CMD-BDD-FULL-001",
+        "CMD-RELATED-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-TEST-FULL-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-CI-001"
+      ],
+      "contract_refs": [
+        "BDD-003",
+        "BDD-FWK-001",
+        "CMD-BDD-DISCOVERY-001",
+        "CMD-BDD-FOCUSED-003",
+        "CMD-BDD-FULL-001",
+        "CMD-BUILD-FULL-001",
+        "CMD-CI-001",
+        "CMD-GOVERNANCE-001",
+        "CMD-RELATED-001",
+        "CMD-TDD-FOCUSED-003",
+        "CMD-TEST-FULL-001",
+        "TEST-003",
+        "WP-003"
+      ],
+      "source_refs": [
+        "SRC-001",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009"
+      ],
+      "wp_id": "WP-003"
+    }
+  ]
+}

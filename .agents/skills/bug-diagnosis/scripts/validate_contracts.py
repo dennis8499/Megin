@@ -49,6 +49,14 @@ REQUIRED_FILES = {
     "scripts/test_validate_contracts.py",
     "scripts/behavior-evaluation-report.md",
 }
+CLOSURE_REQUIRED_FILES = {
+    "references/closure-status.schema.json",
+    "references/closure-policy.md",
+    "scripts/bug_status.py",
+    "scripts/test_closure_status.py",
+}
+CLOSURE_SCHEMA_PATH = SKILL_ROOT / "references" / "closure-status.schema.json"
+CLOSURE_SCHEMA_SHA256 = "9b053974b9de2974db9289710f45e38d35e1ff419eba8fc88b6478f1c501aaa2"
 
 
 class _UnsafeAssessmentPath(OSError):
@@ -511,6 +519,33 @@ def validate_owner_bundle() -> list[str]:
     missing = sorted(REQUIRED_FILES - actual_files)
     if missing:
         errors.append(f"missing owned files: {missing}")
+    closure_missing = sorted(CLOSURE_REQUIRED_FILES - actual_files)
+    if closure_missing:
+        errors.append(f"missing closure-status owned files: {closure_missing}")
+    closure_schema_bytes = CLOSURE_SCHEMA_PATH.read_bytes() if CLOSURE_SCHEMA_PATH.is_file() else b""
+    if sha256_bytes(closure_schema_bytes) != CLOSURE_SCHEMA_SHA256:
+        errors.append("closure status schema bytes changed without updating owner contract")
+    try:
+        closure_schema = json.loads(closure_schema_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        errors.append(f"closure status schema is not valid UTF-8 JSON: {exc}")
+        closure_schema = {}
+    if closure_schema.get("$id") != "https://local.skills/bug-diagnosis/closure-status.schema.json":
+        errors.append("closure status schema $id drift")
+    if closure_schema.get("properties", {}).get("schema", {}).get("const") != "bug-closure-status/v1":
+        errors.append("closure status schema discriminator drift")
+    closure_required = set(closure_schema.get("required", []))
+    for field in {"bug_id", "revision", "assessment", "verification", "current_disposition", "tracking", "timebox"}:
+        if field not in closure_required:
+            errors.append(f"closure status schema no longer requires {field}")
+    closure_script = (SKILL_ROOT / "scripts" / "bug_status.py").read_text(encoding="utf-8") if (SKILL_ROOT / "scripts" / "bug_status.py").is_file() else ""
+    for forbidden in ["add_parser(\"create\"", "add_parser(\"update\"", "add_parser(\"apply\"", "write_text(", "write_bytes(", "os.replace("]:
+        if forbidden in closure_script:
+            errors.append(f"closure status validator must remain read-only: {forbidden}")
+    closure_policy = (SKILL_ROOT / "references" / "closure-policy.md").read_text(encoding="utf-8") if (SKILL_ROOT / "references" / "closure-policy.md").is_file() else ""
+    for anchor in ["Separate evidence from disposition", "Fixed gate", "High and Critical", "append-only", "no third approval Gate"]:
+        if anchor not in closure_policy:
+            errors.append(f"closure policy missing behavior anchor: {anchor}")
     schema_bytes = SCHEMA_PATH.read_bytes() if SCHEMA_PATH.is_file() else b""
     if sha256_bytes(schema_bytes) != SCHEMA_SHA256:
         errors.append("assessment schema bytes changed without updating owner contract")

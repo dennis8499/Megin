@@ -71,6 +71,12 @@ description: 診斷疑似 BUG、flaky failure、效能回歸或不明工程異�
 
 完成條件：下一個 action 唯一為結束、standard requirements、bug delivery requirements、current-run fixing、upstream reapproval 或 deferred inbox；不自動建立 Work、issue、commit、push、merge、deploy 或通知。
 
+## 6. 結案狀態追蹤
+
+需要追蹤既有 BUG 的目前處置時，使用 [BUG Closure Policy v2](references/closure-policy.md) 與唯讀的 `scripts/bug_status.py`。這個 overlay 將既有 `bug-verification/v1` 的 `verified | partial | failed` 與 `current_disposition` 分開保存；只有同一 status revision 具備原始症狀 pre／post、regression red→green、完整驗證、所有必要平台及獨立 reviewer 時，才可標為 `fixed-verified`。
+
+`environment-blocked`、`contract-blocked`、`accepted-risk` 與 `deferred` 必須保留 owner、期限、升級或風險決策；缺證據時使用 `evidence-pending`，不得把無法重現、proxy 或單一平台通過當成修復。Status files 與 report 是 append-only／read-only 追蹤資料，不回寫既有 assessment、Outcome、Ready handoff 或失敗 evidence。
+
 ## 維護本 Skill
 
 修改本 bundle 時完整讀取 [行為驗證契約](references/behavior-evaluation.md)，執行 skill quick validation、owner validator、mutation tests、全部 forward cases與 fresh read-only review。

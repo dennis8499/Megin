@@ -172,4 +172,3 @@ Readiness：
 - 正式 sample 超標、平台缺口、回復衝突與證據不足都會保留，不以成功重跑覆蓋。
 - handoff.json 使用 ready-plan/v1、完整 local/release validation plan、完整 command inventory、source/contract/WP symmetry、DAG 與 revision impact。
 - 本計畫授權 implementation-execution 執行工作包，不授權 commit、merge、push、部署或改寫 assessment。
-
