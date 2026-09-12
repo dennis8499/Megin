@@ -1,0 +1,112 @@
+{
+  "schema": "bug-verification/v1",
+  "bug_id": "bug-bdd020-first-cold-tail",
+  "work_id": "work-20260912-bug-remediation-0e0ea628",
+  "result": "partial",
+  "plan": {
+    "handoff_path": "docs/work/work-20260912-bug-remediation-0e0ea628/plan-3/handoff.json",
+    "candidate_revision": "candidate-3",
+    "verification_target": "partial"
+  },
+  "assessment": {
+    "path": "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.json",
+    "sha256": "fabcde0eb1b01575d00bc11ceb550aa2c109a8605de30a4057c6b111b29bdd23",
+    "markdown_path": "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.md",
+    "markdown_sha256": "286634449bbe9ab17451aa42d9757b3ebab9cbc6ad78af6f231d06ea6cd6929a"
+  },
+  "original_reproduction": {
+    "pre_fix": {
+      "command_ref": null,
+      "status": "inconclusive",
+      "evidence_refs": [
+        "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.json#historical-reproduction"
+      ]
+    },
+    "post_fix": {
+      "command_ref": null,
+      "status": "inconclusive",
+      "evidence_refs": [
+        "validation/baseline-1/outputs/005-CMD-BDD-FOCUSED-004.stdout.txt#current-oracle"
+      ]
+    }
+  },
+  "regression": {
+    "bdd_refs": [
+      "BDD-BUG-015"
+    ],
+    "test_refs": [
+      "TEST-BUG-015"
+    ],
+    "red_evidence_refs": [
+      "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.md#historical-red"
+    ],
+    "green_evidence_refs": [
+      "validation/baseline-1/outputs/006-CMD-BDD-FULL-001.stdout.txt"
+    ]
+  },
+  "proxy": {
+    "bdd_refs": [
+      "BDD-BUG-015"
+    ],
+    "test_refs": [
+      "TEST-BUG-015"
+    ],
+    "red_evidence_refs": [
+      "docs/bugs/bug-bdd020-first-cold-tail/assessment-1.json#proxy-red"
+    ],
+    "green_evidence_refs": [
+      "validation/baseline-1/outputs/010-CMD-TEST-FULL-001.stdout.txt"
+    ]
+  },
+  "full_verification": [
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/ast-2/outputs/001-CMD-BUILD-FULL-001.stdout.txt",
+      "not_run_reason": null
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/baseline-1/outputs/006-CMD-BDD-FULL-001.stderr.txt",
+      "not_run_reason": null
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/baseline-1/outputs/010-CMD-TEST-FULL-001.stderr.txt",
+      "not_run_reason": null
+    },
+    {
+      "command_id": "CMD-PERFORMANCE-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/baseline-1/outputs/012-CMD-PERFORMANCE-001.stderr.txt",
+      "not_run_reason": null
+    }
+  ],
+  "residual_risks": [
+    "本輪沒有把歷史 assessment 直接當作現行修復結案證據。",
+    "Ready handoff 未提供可承接此 BUG 的 bug_context；既有 semantic gate 尚不能合法驗證本紀錄。",
+    "一次完整 Windows release capture 的 BDD-016 index_candidate 測得 2.0487 秒，需保留並處理。"
+  ],
+  "follow_up": [
+    "保存五次 fresh-process raw samples、readiness boundary 與環境 identity，再由獨立 reviewer 核對。",
+    "補足本紀錄的獨立 preliminary/final review identity 與持久化 raw evidence。",
+    "待 bug_context／assessment revision 契約可表達後，重新執行 bug-verification/v1 semantic validation。"
+  ],
+  "implementation_review_ref": "review:fresh-review:bug-remediation-preliminary",
+  "summary": "Proxy evidence passed; original symptom remains inconclusive.",
+  "created_at": "2026-09-12T11:05:00+08:00"
+}

@@ -1,0 +1,21 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "evidence": "conversation:user-implement-plan-20260912"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-planning-c3db54fb6aa22aa4/candidate.json",
+  "decision": "no-change",
+  "formal_paths": [
+    "docs/work/work-20260912-bug-remediation-0e0ea628/plan-2/handoff.json",
+    "docs/work/work-20260912-bug-remediation-0e0ea628/plan-2/plan.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "c0f5a034fcaf443d2d4a766517b633f8d998331e09a59bb8caed0ca28160b813",
+  "promotion_id": "promotion-planning-c3db54fb6aa22aa4",
+  "schema": "knowledge-promotion/v1",
+  "stage": "planning",
+  "status": "Ready",
+  "work_id": "work-20260912-bug-remediation-0e0ea628"
+}

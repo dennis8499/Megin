@@ -1,0 +1,103 @@
+{
+  "schema": "bug-verification/v1",
+  "bug_id": "bug-linux-delivery-posix-path-classification",
+  "work_id": "work-20260912-bug-remediation-0e0ea628",
+  "result": "partial",
+  "plan": {
+    "handoff_path": "docs/work/work-20260912-bug-remediation-0e0ea628/plan-3/handoff.json",
+    "candidate_revision": "candidate-3",
+    "verification_target": "partial"
+  },
+  "assessment": {
+    "path": "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.json",
+    "sha256": "5d17f8f8f1fa35d282f52a54e85b50c80d818bc3ce562182b43a5d625dac8933",
+    "markdown_path": "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.md",
+    "markdown_sha256": "f703b6082a8aa76bbbef31e22b560615c8c69d0262a5943949c7fda0bda3fa61"
+  },
+  "original_reproduction": {
+    "pre_fix": {
+      "command_ref": null,
+      "status": "inconclusive",
+      "evidence_refs": [
+        "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.json#historical-reproduction"
+      ]
+    },
+    "post_fix": {
+      "command_ref": null,
+      "status": "inconclusive",
+      "evidence_refs": [
+        "validation/baseline-1/outputs/003-CMD-BDD-FOCUSED-002.stdout.txt#current-oracle"
+      ]
+    }
+  },
+  "regression": {
+    "bdd_refs": [
+      "BDD-BUG-009"
+    ],
+    "test_refs": [
+      "TEST-BUG-009"
+    ],
+    "red_evidence_refs": [
+      "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.md#historical-red"
+    ],
+    "green_evidence_refs": [
+      "validation/baseline-1/outputs/006-CMD-BDD-FULL-001.stdout.txt"
+    ]
+  },
+  "proxy": {
+    "bdd_refs": [
+      "BDD-BUG-009"
+    ],
+    "test_refs": [
+      "TEST-BUG-009"
+    ],
+    "red_evidence_refs": [
+      "docs/bugs/bug-linux-delivery-posix-path-classification/assessment-1.json#proxy-red"
+    ],
+    "green_evidence_refs": [
+      "validation/baseline-1/outputs/010-CMD-TEST-FULL-001.stdout.txt"
+    ]
+  },
+  "full_verification": [
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/ast-2/outputs/001-CMD-BUILD-FULL-001.stdout.txt",
+      "not_run_reason": null
+    },
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/baseline-1/outputs/006-CMD-BDD-FULL-001.stderr.txt",
+      "not_run_reason": null
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "outcome": "passed",
+      "exit_code": 0,
+      "failure_count": 0,
+      "skipped_count": 0,
+      "output_ref": "validation/baseline-1/outputs/010-CMD-TEST-FULL-001.stderr.txt",
+      "not_run_reason": null
+    }
+  ],
+  "residual_risks": [
+    "本輪沒有把歷史 assessment 直接當作現行修復結案證據。",
+    "Ready handoff 未提供可承接此 BUG 的 bug_context；既有 semantic gate 尚不能合法驗證本紀錄。",
+    "Linux native worktree evidence 尚未完成；WSL linked-worktree probe 不能替代 native Linux 證據。"
+  ],
+  "follow_up": [
+    "在 native Linux checkout 重跑普通 artifact path、revision diagnostic 與 workspace transition 全套 oracle。",
+    "補足本紀錄的獨立 preliminary/final review identity 與持久化 raw evidence。",
+    "待 bug_context／assessment revision 契約可表達後，重新執行 bug-verification/v1 semantic validation。"
+  ],
+  "implementation_review_ref": "review:fresh-review:bug-remediation-preliminary",
+  "summary": "Proxy evidence passed; original symptom remains inconclusive.",
+  "created_at": "2026-09-12T11:05:00+08:00"
+}
