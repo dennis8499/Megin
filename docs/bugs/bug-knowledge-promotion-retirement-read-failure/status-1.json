@@ -1,0 +1,110 @@
+{
+  "assessment": {
+    "markdown_path": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.md",
+    "markdown_sha256": "f3d1bf38269b69ca06c4f7bc93add93a470ea1b56baf40594f508e5992eef604",
+    "path": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.json",
+    "revision": 1,
+    "sha256": "9478a3fa1be00b228a2068ec8c67f6b6bcf16a42f775ca9b18686aafe3c0fb6a"
+  },
+  "blocker": null,
+  "bug_id": "bug-knowledge-promotion-retirement-read-failure",
+  "closure_evidence": null,
+  "current_disposition": "evidence-pending",
+  "current_observation": {
+    "command_ref": null,
+    "evidence_refs": [
+      "assessment:docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.json",
+      "historical:host-temp:evidence/bug-knowledge-promotion-retirement-read-failure-diagnosis.json",
+      "historical:host-temp:commands/preliminary-r3-fixing/windows-WP-002-red-retry-2.json",
+      "historical:host-temp:commands/preliminary-r3-fixing/linux-WP-002-red.json",
+      "historical:host-temp:reviews/preliminary-r3-fresh/report.json#PRELIM-R3-001"
+    ],
+    "status": "inconclusive"
+  },
+  "evidence_manifest": [
+    {
+      "kind": "assessment-json",
+      "preserved": true,
+      "ref": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.json",
+      "sha256": "9478a3fa1be00b228a2068ec8c67f6b6bcf16a42f775ca9b18686aafe3c0fb6a"
+    },
+    {
+      "kind": "assessment-markdown",
+      "preserved": true,
+      "ref": "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.md",
+      "sha256": "f3d1bf38269b69ca06c4f7bc93add93a470ea1b56baf40594f508e5992eef604"
+    }
+  ],
+  "platform_evidence": [
+    {
+      "evidence_refs": [
+        "status-review:work-20260912-bug-closure-policy-dbcbce13:bug-knowledge-promotion-retirement-read-failure:Windows:not-run"
+      ],
+      "outcome": "not_run",
+      "platform": "Windows"
+    },
+    {
+      "evidence_refs": [
+        "status-review:work-20260912-bug-closure-policy-dbcbce13:bug-knowledge-promotion-retirement-read-failure:Linux:not-run"
+      ],
+      "outcome": "not_run",
+      "platform": "Linux"
+    }
+  ],
+  "previous": null,
+  "required_platforms": [
+    "Windows",
+    "Linux"
+  ],
+  "reviewer": null,
+  "revision": 1,
+  "risk_decision": null,
+  "schema": "bug-closure-status/v1",
+  "severity": "high",
+  "timebox": {
+    "blocker_due": "2026-09-17",
+    "classify_due": "2026-09-15",
+    "decision_due": "2026-09-28",
+    "escalate_due": "2026-09-21",
+    "t0": "2026-09-14"
+  },
+  "tracking": {
+    "due_date": "2026-09-28",
+    "implementation_owner": "implementation-owner-pending",
+    "next_action": "Run current-version verification and append bug-verification/v1 evidence.",
+    "owner": "delivery-governance"
+  },
+  "transition": {
+    "at": "2026-09-14T00:00:00+00:00",
+    "evidence_refs": [
+      "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.json",
+      "docs/bugs/bug-knowledge-promotion-retirement-read-failure/assessment-1.md"
+    ],
+    "from": null,
+    "reason": "Initial policy overlay records historical assessment without inferring current verification or closure.",
+    "to": "evidence-pending"
+  },
+  "verification": null,
+  "work_scope": {
+    "bug_ids": [
+      "bug-bdd016-warm-query-tail",
+      "bug-bdd020-first-cold-tail",
+      "bug-bdd020-review-query-tail",
+      "bug-delivery-knowledge-formal-paths-bypass",
+      "bug-delivery-reviewer-identity-reuse",
+      "bug-knowledge-apply-commit-boundary-toctou",
+      "bug-knowledge-apply-concurrent-state-loss",
+      "bug-knowledge-candidate-ancestor-redirect",
+      "bug-knowledge-candidate-publish-overwrite",
+      "bug-knowledge-outcome-create-only-toctou",
+      "bug-knowledge-page-closed-contract-lint",
+      "bug-knowledge-promotion-registry-component-validation",
+      "bug-knowledge-promotion-retirement-read-failure",
+      "bug-linux-delivery-posix-path-classification",
+      "bug-linux-posix-path-classification",
+      "bug-preliminary-review-ready-validation"
+    ],
+    "scope_kind": "common",
+    "work_id": "work-20260912-bug-closure-policy-dbcbce13"
+  }
+}

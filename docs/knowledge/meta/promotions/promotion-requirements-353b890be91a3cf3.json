@@ -1,0 +1,20 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "evidence": "conversation:user-approved-bug-closure-policy-v2-20260912"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-requirements-353b890be91a3cf3/candidate.json",
+  "decision": "no-change",
+  "formal_paths": [
+    "docs/work/work-20260912-bug-closure-policy-dbcbce13/requirements.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "59a85cb577382c4955defc0ea9c979519b971320cff3c0a0f1586737dba68e57",
+  "promotion_id": "promotion-requirements-353b890be91a3cf3",
+  "schema": "knowledge-promotion/v1",
+  "stage": "requirements",
+  "status": "Ready",
+  "work_id": "work-20260912-bug-closure-policy-dbcbce13"
+}

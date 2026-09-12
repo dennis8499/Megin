@@ -9,10 +9,12 @@
 - `promotion-implementation-fd2747a982eb75d9` — `Ready` — `knowledge:candidates/promotion-implementation-fd2747a982eb75d9/candidate.json` — `415d1e774fe668118d88547cf323c9249db3637c351f8cf119fada1d0c51dd03`
 - `promotion-planning-212a7adc4dbe708d` — `Ready` — `knowledge:candidates/promotion-planning-212a7adc4dbe708d/candidate.json` — `ad92633b1a52a7d2bd2067fa1fd3340d1ce299057047bca5f1fc8624116e069c`
 - `promotion-planning-5716b37bde7283d0` — `Ready` — `knowledge:candidates/promotion-planning-5716b37bde7283d0/candidate.json` — `112caaca43c47bc51f6b8b521c052000cc9cf1e3da4d8a9cafeda47aa08e4449`
+- `promotion-planning-733502769f7454d2` — `Ready` — `knowledge:candidates/promotion-planning-733502769f7454d2/candidate.json` — `c9679e56130dda72c31eab5008d2d2cc8f7ad016f13b67a91a1e7f7d7c9dd73c`
 - `promotion-planning-7e9c5325d723b43d` — `Ready` — `knowledge:candidates/promotion-planning-7e9c5325d723b43d/candidate.json` — `6db2ebd56c4b362c606d41e924de835d398675e672471c8770cb1172d7715f46`
 - `promotion-planning-8d48fe7b5db3f591` — `Ready` — `knowledge:candidates/promotion-planning-8d48fe7b5db3f591/candidate.json` — `6bb9adc5d02b29a2be3123ae786a818e44b484bc908791f21328f2828cd64a35`
 - `promotion-planning-e2d88466949b1965` — `Ready` — `knowledge:candidates/promotion-planning-e2d88466949b1965/candidate.json` — `495a2c59adecb048b04b11cd7b5a5224694eb07ff413948e268db3e3aeb82605`
 - `promotion-requirements-12eea08f385cfe72` — `Ready` — `knowledge:candidates/promotion-requirements-12eea08f385cfe72/candidate.json` — `90caeeb4dfc4f596a510fdb01b21e0caa4d760433842bcc3e7c3e909e8ee1138`
+- `promotion-requirements-353b890be91a3cf3` — `Ready` — `knowledge:candidates/promotion-requirements-353b890be91a3cf3/candidate.json` — `59a85cb577382c4955defc0ea9c979519b971320cff3c0a0f1586737dba68e57`
 - `promotion-requirements-35404d2e5e5f96f2` — `Ready` — `knowledge:candidates/promotion-requirements-35404d2e5e5f96f2/candidate.json` — `fa93b50234c453484238d4eda7027fbaa6a54ed29bcf57733dd5ddb22c4c24d9`
 - `promotion-requirements-8eca0ecc45c9a328` — `Ready` — `knowledge:candidates/promotion-requirements-8eca0ecc45c9a328/candidate.json` — `7978fe24bfece7e3fffac59f707890a9be54be13644856f43cd198dc12e5bba4`
 - `promotion-requirements-c2ee0c830499eadb` — `Ready` — `knowledge:candidates/promotion-requirements-c2ee0c830499eadb/candidate.json` — `c448388cee8992a48c97da23d0d4f9fdfae3eb08eb40bd0507c1d6947156ef84`

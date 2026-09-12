@@ -1,0 +1,109 @@
+{
+  "assessment": {
+    "markdown_path": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.md",
+    "markdown_sha256": "89b4e3171e846d065a06ce36d6831801adb38a715302bc5db2bf5ad216e9ea5d",
+    "path": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.json",
+    "revision": 1,
+    "sha256": "66c95628534c115437e49357c8fc8403080f5db19e5809c230720b5d33f5761d"
+  },
+  "blocker": null,
+  "bug_id": "bug-knowledge-apply-commit-boundary-toctou",
+  "closure_evidence": null,
+  "current_disposition": "evidence-pending",
+  "current_observation": {
+    "command_ref": null,
+    "evidence_refs": [
+      "assessment:docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.json",
+      "historical:host-temp:evidence/bug-knowledge-apply-commit-boundary-toctou-diagnosis.json",
+      "historical:host-temp:commands/preliminary-r2-fresh-retry-fixing/windows-WP-002-red.txt",
+      "historical:host-temp:reviews/preliminary-r2-fresh-retry/report.json#FINDING-001"
+    ],
+    "status": "inconclusive"
+  },
+  "evidence_manifest": [
+    {
+      "kind": "assessment-json",
+      "preserved": true,
+      "ref": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.json",
+      "sha256": "66c95628534c115437e49357c8fc8403080f5db19e5809c230720b5d33f5761d"
+    },
+    {
+      "kind": "assessment-markdown",
+      "preserved": true,
+      "ref": "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.md",
+      "sha256": "89b4e3171e846d065a06ce36d6831801adb38a715302bc5db2bf5ad216e9ea5d"
+    }
+  ],
+  "platform_evidence": [
+    {
+      "evidence_refs": [
+        "status-review:work-20260912-bug-closure-policy-dbcbce13:bug-knowledge-apply-commit-boundary-toctou:Windows:not-run"
+      ],
+      "outcome": "not_run",
+      "platform": "Windows"
+    },
+    {
+      "evidence_refs": [
+        "status-review:work-20260912-bug-closure-policy-dbcbce13:bug-knowledge-apply-commit-boundary-toctou:Linux:not-run"
+      ],
+      "outcome": "not_run",
+      "platform": "Linux"
+    }
+  ],
+  "previous": null,
+  "required_platforms": [
+    "Windows",
+    "Linux"
+  ],
+  "reviewer": null,
+  "revision": 1,
+  "risk_decision": null,
+  "schema": "bug-closure-status/v1",
+  "severity": "critical",
+  "timebox": {
+    "blocker_due": "2026-09-17",
+    "classify_due": "2026-09-15",
+    "decision_due": "2026-09-28",
+    "escalate_due": "2026-09-21",
+    "t0": "2026-09-14"
+  },
+  "tracking": {
+    "due_date": "2026-09-28",
+    "implementation_owner": "implementation-owner-pending",
+    "next_action": "Run current-version verification and append bug-verification/v1 evidence.",
+    "owner": "delivery-governance"
+  },
+  "transition": {
+    "at": "2026-09-14T00:00:00+00:00",
+    "evidence_refs": [
+      "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.json",
+      "docs/bugs/bug-knowledge-apply-commit-boundary-toctou/assessment-1.md"
+    ],
+    "from": null,
+    "reason": "Initial policy overlay records historical assessment without inferring current verification or closure.",
+    "to": "evidence-pending"
+  },
+  "verification": null,
+  "work_scope": {
+    "bug_ids": [
+      "bug-bdd016-warm-query-tail",
+      "bug-bdd020-first-cold-tail",
+      "bug-bdd020-review-query-tail",
+      "bug-delivery-knowledge-formal-paths-bypass",
+      "bug-delivery-reviewer-identity-reuse",
+      "bug-knowledge-apply-commit-boundary-toctou",
+      "bug-knowledge-apply-concurrent-state-loss",
+      "bug-knowledge-candidate-ancestor-redirect",
+      "bug-knowledge-candidate-publish-overwrite",
+      "bug-knowledge-outcome-create-only-toctou",
+      "bug-knowledge-page-closed-contract-lint",
+      "bug-knowledge-promotion-registry-component-validation",
+      "bug-knowledge-promotion-retirement-read-failure",
+      "bug-linux-delivery-posix-path-classification",
+      "bug-linux-posix-path-classification",
+      "bug-preliminary-review-ready-validation"
+    ],
+    "scope_kind": "common",
+    "work_id": "work-20260912-bug-closure-policy-dbcbce13"
+  }
+}
