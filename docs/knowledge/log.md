@@ -7,13 +7,17 @@
 - `promotion-implementation-da781c080713522c` — `Ready` — `knowledge:candidates/promotion-implementation-da781c080713522c/candidate.json` — `c9c3947d7119799fb4a854b4bf3ae38ddd3d9b5ef8ccc01ff8b4d2fdfa1b0012`
 - `promotion-implementation-e1bbb30ecc7752e7` — `Ready` — `knowledge:candidates/promotion-implementation-e1bbb30ecc7752e7/candidate.json` — `43fa8a05fc9232b2c0e823d3d85a459236976005225991a4384d9b24f75b82c6`
 - `promotion-implementation-fd2747a982eb75d9` — `Ready` — `knowledge:candidates/promotion-implementation-fd2747a982eb75d9/candidate.json` — `415d1e774fe668118d88547cf323c9249db3637c351f8cf119fada1d0c51dd03`
+- `promotion-planning-0ace8370ae5b0b47` — `Ready` — `knowledge:candidates/promotion-planning-0ace8370ae5b0b47/candidate.json` — `b467cf7e9b9b22bcfe08ffc4f90318b19de6ea97327ac55af93db170df9b0838`
 - `promotion-planning-212a7adc4dbe708d` — `Ready` — `knowledge:candidates/promotion-planning-212a7adc4dbe708d/candidate.json` — `ad92633b1a52a7d2bd2067fa1fd3340d1ce299057047bca5f1fc8624116e069c`
 - `promotion-planning-5716b37bde7283d0` — `Ready` — `knowledge:candidates/promotion-planning-5716b37bde7283d0/candidate.json` — `112caaca43c47bc51f6b8b521c052000cc9cf1e3da4d8a9cafeda47aa08e4449`
+- `promotion-planning-71c80a9e52dfca09` — `Ready` — `knowledge:candidates/promotion-planning-71c80a9e52dfca09/candidate.json` — `2e4b2712899f5cd4f7ba7498670e3d8353382a44110ea07e3647d7153cb1ad4f`
 - `promotion-planning-7e9c5325d723b43d` — `Ready` — `knowledge:candidates/promotion-planning-7e9c5325d723b43d/candidate.json` — `6db2ebd56c4b362c606d41e924de835d398675e672471c8770cb1172d7715f46`
 - `promotion-planning-8d48fe7b5db3f591` — `Ready` — `knowledge:candidates/promotion-planning-8d48fe7b5db3f591/candidate.json` — `6bb9adc5d02b29a2be3123ae786a818e44b484bc908791f21328f2828cd64a35`
+- `promotion-planning-c3db54fb6aa22aa4` — `Ready` — `knowledge:candidates/promotion-planning-c3db54fb6aa22aa4/candidate.json` — `c0f5a034fcaf443d2d4a766517b633f8d998331e09a59bb8caed0ca28160b813`
 - `promotion-planning-e2d88466949b1965` — `Ready` — `knowledge:candidates/promotion-planning-e2d88466949b1965/candidate.json` — `495a2c59adecb048b04b11cd7b5a5224694eb07ff413948e268db3e3aeb82605`
 - `promotion-requirements-12eea08f385cfe72` — `Ready` — `knowledge:candidates/promotion-requirements-12eea08f385cfe72/candidate.json` — `90caeeb4dfc4f596a510fdb01b21e0caa4d760433842bcc3e7c3e909e8ee1138`
 - `promotion-requirements-35404d2e5e5f96f2` — `Ready` — `knowledge:candidates/promotion-requirements-35404d2e5e5f96f2/candidate.json` — `fa93b50234c453484238d4eda7027fbaa6a54ed29bcf57733dd5ddb22c4c24d9`
+- `promotion-requirements-7b1cc16c0ef69f6e` — `Ready` — `knowledge:candidates/promotion-requirements-7b1cc16c0ef69f6e/candidate.json` — `44b8b85c5fc01ff8ccc01752de844c8eeb40392374a71b0f34adeaa6f5e5c1e0`
 - `promotion-requirements-8eca0ecc45c9a328` — `Ready` — `knowledge:candidates/promotion-requirements-8eca0ecc45c9a328/candidate.json` — `7978fe24bfece7e3fffac59f707890a9be54be13644856f43cd198dc12e5bba4`
 - `promotion-requirements-c2ee0c830499eadb` — `Ready` — `knowledge:candidates/promotion-requirements-c2ee0c830499eadb/candidate.json` — `c448388cee8992a48c97da23d0d4f9fdfae3eb08eb40bd0507c1d6947156ef84`
 - `promotion-requirements-cece7cc24d9fa467` — `Ready` — `knowledge:candidates/promotion-requirements-cece7cc24d9fa467/candidate.json` — `4996ca80905c72d399a150f986fd838acf69ef3f16c1a151fa4e521717059ab9`

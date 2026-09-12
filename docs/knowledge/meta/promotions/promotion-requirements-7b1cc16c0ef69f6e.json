@@ -1,0 +1,20 @@
+{
+  "approval": {
+    "actor": "workspace-user",
+    "evidence": "conversation:user-implement-plan-20260912"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-requirements-7b1cc16c0ef69f6e/candidate.json",
+  "decision": "no-change",
+  "formal_paths": [
+    "docs/work/work-20260912-bug-remediation-0e0ea628/requirements-2.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "44b8b85c5fc01ff8ccc01752de844c8eeb40392374a71b0f34adeaa6f5e5c1e0",
+  "promotion_id": "promotion-requirements-7b1cc16c0ef69f6e",
+  "schema": "knowledge-promotion/v1",
+  "stage": "requirements",
+  "status": "Ready",
+  "work_id": "work-20260912-bug-remediation-0e0ea628"
+}
