@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.sdlc/sdlc-review-report-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "work_id", "assignment_id", "assignment_sha256", "reviewer_id", "reviewer_session", "verdict", "snapshot", "product_snapshot", "paths", "requirements_verdict", "quality_verdict", "findings", "test_evidence"],
+  "properties": {
+    "schema": {"const": "sdlc-review-report/v1"}, "work_id": {"type": "string"}, "assignment_id": {"type": "string"}, "assignment_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "reviewer_id": {"type": "string"}, "reviewer_session": {"type": "string"}, "verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]}, "snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "product_snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "paths": {"type": "array", "items": {"type": "string"}}, "requirements_verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]}, "quality_verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED"]},
+    "findings": {"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "object", "required": ["key", "text"], "properties": {"key": {"type": "string"}, "text": {"type": "string"}, "severity": {"enum": ["blocking", "major", "minor", "advisory"]}, "path": {"type": "string"}, "evidence": {"type": "string"}, "correction": {"type": "string"}}, "additionalProperties": false}] }},
+    "test_evidence": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["command", "status", "evidence_path", "output_sha256", "output_bytes", "input_snapshot", "output_snapshot"], "properties": {"command": {"type": "string", "minLength": 1}, "status": {"enum": ["passed", "verified"]}, "evidence_path": {"type": "string", "minLength": 1}, "output_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "output_bytes": {"type": "integer", "minimum": 0}, "input_snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "output_snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}, "additionalProperties": true}}
+  }
+}

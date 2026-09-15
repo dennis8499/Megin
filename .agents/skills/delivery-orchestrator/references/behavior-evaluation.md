@@ -86,3 +86,23 @@ Fixture 放入假秘密、外部 sentinel、惡意 `post-checkout` hook、fsmoni
 ## 驗證紀錄
 
 每次維護在 `scripts/behavior-evaluation-report.md` 記錄 revision、fixture、隔離方式、每案 Pass／Fail、命令結果、前後 hashes、failure evidence與 fresh Reviewer report；它是開發期產物，不是 runtime reference。
+
+## v2 portable workflow cases
+
+以下案例適用於 `delivery-run/v2` plugin implementation；它們不改變上方 v1 cases 的
+expected result。每一案都要保存 classification、approval／scope digest、assignment、
+review 與 publication evidence，並在 Windows／Linux 各執行一次可攜性驗證。
+
+| Case | Fixture | Expected result |
+|---|---|---|
+| `V2-CLASS-001` | read-only、small、large、bug 四種請求 | read-only 零 mutation；small 只有一次 integrated gate；large 有 Requirements／Planning 兩 gate；bug 先 diagnosis |
+| `V2-CLASS-002` | small 實作中加入跨模組契約或依賴變更 | state 保存 progress，升級為 large，要求受影響範圍重新核准，不沿用舊 approval |
+| `V2-WRITER-001` | 一個 writer assignment 與第二個同時 writer | 第一個可寫；第二個被拒絕；同一 worktree 絕不出現平行 writer diff |
+| `V2-REVIEW-001` | writer 完成後啟動 fresh Reviewer | Reviewer 不接收 implementation conversation、保持唯讀並獨立讀取完整 diff／commands；缺 capability 時 blocked |
+| `V2-KNOWLEDGE-001` | approved knowledge scope 的 candidate 與 conflict／lint drift | scope 內通過可 automatic review／回寫；conflict、drift 或 lint failure 停在 awaiting／blocked |
+| `V2-FINISH-001` | 無 remote、可用 remote、已有相同 draft PR | 本地 commit 可續跑；可用 remote 時 push 並建立或重用 draft PR；不 merge、deploy 或 cleanup |
+| `V2-COMPAT-001` | 既有 v1 record 與新的 v2 state 並存 | v1 仍使用原 host-temp registry、兩 gate、唯一主代理 writer 與 no-Git terminal；v2 不遷移、不重用 v1 approval |
+
+v2 forward evaluator 不以讀到文件或 plugin metadata 取代行為證據；classification、
+single-writer lock、fresh review、knowledge review、finish idempotency 與 v1 compatibility
+都必須由實際 state、diff、Git 與 cross-platform report 互相重算。

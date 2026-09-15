@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.sdlc/bug-diagnosis-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repo_id", "request", "request_sha256", "command", "disposition", "hypothesis", "exit_code", "output_sha256", "output_bytes", "evidence_path", "input_snapshot", "output_snapshot", "read_only", "created_at", "record_sha256"],
+  "properties": {
+    "schema": {"const": "bug-diagnosis/v1"}, "repo_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "request": {"type": "string", "minLength": 1}, "request_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "command": {"type": "string", "minLength": 1}, "environment": {"type": "array", "items": {"type": "string"}},
+    "disposition": {"enum": ["confirmed", "likely", "partial", "not-a-bug", "blocked"]}, "hypothesis": {"type": "string", "minLength": 1},
+    "exit_code": {"type": "integer"}, "output_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "output_bytes": {"type": "integer", "minimum": 0},
+    "evidence_path": {"type": "string", "minLength": 1}, "input_snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "output_snapshot": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "read_only": {"type": "boolean"}, "created_at": {"type": "string", "format": "date-time"}, "record_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

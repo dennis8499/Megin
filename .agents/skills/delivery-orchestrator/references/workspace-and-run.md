@@ -2,7 +2,10 @@
 
 # Workspace 與 Run 契約
 
-本文件是 `work_id` identity、host-temp registry、`delivery-run/v1`、resume 與 record continuity 的唯一權威。New work／generation 的 Git mutation 由 [Workspace 建立契約](workspace-creation.md)擁有。
+本文件是 repository-local legacy path 的 `work_id` identity、host-temp registry、
+`delivery-run/v1`、resume 與 record continuity 的唯一權威。Portable `delivery-run/v2`
+state 的欄位與 lifecycle 由 [v2 任務分級與核准契約](v2-task-routing.md)補充；New
+work／generation 的 Git mutation 仍由 [Workspace 建立契約](workspace-creation.md)擁有。
 所有人工 Gate 的呈現遵循 `.agents/skills/project-knowledge/references/human-gate-review.md`；本文件只擁有 phase／record binding，不另定 Chat payload 規則。
 
 ## Identity 與固定位置
@@ -22,6 +25,26 @@ Record 只保存 request digest。Generation 1 的固定 identity：
 | Plan bundle | `docs/work/<work_id>/plan/` |
 
 Generation `N > 1` 的 worktree label 與 branch 分別追加 `-rN`；artifact paths 仍由 revision suffix 區分。
+
+## Portable v2 state
+
+`sdlc init --repo <path>` 只建立目標專案設定、state binding 與必要的 ignore-safe
+metadata；runtime record、dispatch assignments、review reports、raw test outputs
+與 publication state 位於 plugin 管理的使用者狀態區，並依 repository identity／Work ID
+隔離。State root 必須在目標 repository 之外；不把 credential、token 或原始秘密寫入
+state，也不要求目標專案安裝或包含本 repository 的 `.agents/skills` tree。
+
+v2 `start` 先做唯讀 classification。`read_only` 不建立 run；`small` 在一次 integrated
+approval 前只保存 create-only design bundle；`large`／bug 在完成各自 Requirements／
+Planning／diagnosis gates 前也只保存候選 state。核准與 payload digest 綁定後，才可建立
+Work ID 專用 worktree／branch。`doctor` 與 `status` 顯示 repository identity、task class、
+phase／status、current assignment、review／knowledge／publication state 與 state path，
+`resume` 只重試第一個未完成 action。
+
+v2 state 與 v1 registry 不共用 record、approval 或 evidence。既有 v1 record 缺少
+`delivery-run/v2` discriminator 時，沿用本文件下方的 legacy host-temp rules；不做自動
+遷移。v2 finish handoff 的 commit／push／draft PR 規則見
+[v2 派工、審查與交付收尾契約](../../implementation-execution/references/v2-dispatch-and-finish.md)。
 
 ## 公開 helper
 
