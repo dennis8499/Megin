@@ -2,7 +2,7 @@
 
 # 階段路由契約
 
-本文件只把 child 的持久化狀態映射為 delivery transition；Candidate、Ready、BDD／TDD、review與品質規則仍由對應 child Skill唯一擁有。
+本文件只把 child 的持久化狀態映射為 delivery transition；Candidate、Ready、BDD／TDD、review與品質規則仍由對應 child Skill唯一擁有。以下既有 phase table 描述 repository-local `delivery-run/v1`；portable `delivery-run/v2` 的 task class 與 gate policy 見 [v2 任務分級與核准契約](v2-task-routing.md)。
 
 所有Chat人工核准邊界遵守 [共用 Human Gate contract](../../project-knowledge/references/human-gate-review.md)（canonical path：`.agents/skills/project-knowledge/references/human-gate-review.md`）。Human Gate bundle inventory: Requirements composite bundle, Plan composite bundle, and the post-Implementation Knowledge Candidate; each remains its existing single Gate.
 
@@ -13,6 +13,31 @@
 使用者直接點名 child 時也套用相同判定，不形成第二條 standalone mutation path。純解說、診斷、唯讀審查、plan-only、治理驗證、Project Knowledge 明示治理流程及隔離測試維持其唯讀／既有 Gate 例外；一旦要形成 Requirements／Plan／Implementation 階段成果，就回到本授權流程。
 
 Requirements Ready 的人工 Gate 通過後自動 dispatch Planning；Plan Ready 的人工 Gate 通過後自動 dispatch Implementation，不再詢問額外的「是否開始實作」。Child 只回傳自身持久化結果，Delivery transition 仍由 Orchestrator 單獨持有。
+
+## v2 task routing
+
+v2 在任何 mutation 前先保存唯讀 classification：`read_only`、`small`、`large` 或
+`bug`。`read_only` 只回報；`small` 以一份精簡 design brief 取得一次 integrated
+approval；`large` 依序取得 Requirements 與 Planning approvals；`bug` 先完成
+`confirmed`／`likely` diagnosis，再依影響進入 small 或 large。核准前不得建立
+產品 worktree／branch；核准後才建立 v2 Work ID workspace。
+
+v2 的 approval payload 同時綁定驗收、允許修改 paths、測試命令、knowledge scope
+與 Git finish destination。小任務的同一份 approval 授權 scoped implementation、
+fresh review、automatic knowledge review 與 finish handoff；大型變更只在第二次
+Planning approval 後 dispatch Implementation。新增跨模組、資料、權限、依賴或架構
+影響時，保存 progress 並升級至 large，要求受影響內容重新核准。
+
+| v2 `task_class` | 可 dispatch 的 child | gate 與下一步 |
+|---|---|---|
+| `read_only` | query／diagnosis／review | 不建立 delivery run；回報 evidence |
+| `small` | implementation → fresh review → knowledge review | 一次 integrated approval；通過後交給 `finish` |
+| `large` | requirements → planning → implementation → fresh review → knowledge review | Requirements 與 Planning 各一次；第二次核准後自動 implementation |
+| `bug` | diagnosis → small 或 large path | 保留 BUG verification；`failed` 不得完成 |
+
+v2 Child 不直接執行 phase transition。Orchestrator 以 state 的 exact authorization
+與 writer assignment dispatch，並在每次 child result 後原子保存 refs／state；缺少
+授權、reviewer 或必要能力時保持零 mutation 並回報 `blocked`／`awaiting_user`。
 
 | Current phase | Child 持久化結果 | Delivery transition |
 |---|---|---|
@@ -65,4 +90,10 @@ Standard work的affecting assessment在重新核准後以`kind: supporting`來�
 
 Resume依 record phase/status進入最早未完成的 child action；不重跑已持久化核准或 Complete child。Blocked解除另追加 recovery evidence，再回同 phase active。
 
-每次交付回報 identity、current refs、next action與 record path。完成條件：回報值可由 record與實際 workspace重算，且沒有 stage、commit、push、merge、deploy或cleanup。
+每次 v1 交付回報 identity、current refs、next action與 record path。完成條件：回報值可由 record與實際 workspace重算，且沒有 stage、commit、push、merge、deploy或cleanup。v2 交付另回報 `task_class`、writer／reviewer assignment、knowledge 與 publication state；`finish` 可在 approved scope 內 stage／commit／push／建立 draft PR，但 merge、deploy 與 cleanup 仍為獨立動作。
+
+## v1 compatibility
+
+缺少 `delivery-run/v2` state 的既有工作仍遵循本文件原有 v1 phases、兩次人工 gate、
+host-temp registry 與 terminal checks。v2 不遷移或重寫 v1 record，也不把 v1 approval、
+standalone Ledger 或舊 Knowledge Candidate 當成 v2 authorization。

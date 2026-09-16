@@ -84,3 +84,18 @@ Ready、workspace與binding通過後，按handoff command contract fresh執行�
 Proposed不宣稱執行；其absence evidence證明baseline不適用。Code-empty不豁免其他Observed commands。Producer誤標為Awaiting upstream reapproval；環境、工具或真實既有baseline failure為Blocked。
 
 完成條件：所有適用baseline有raw evidence且結果可信，preflight zero-write gate仍成立，才可開始Executing。
+
+## Portable v2 preflight
+
+若 current state 是 `delivery-run/v2`，在任何產品或測試寫入前另驗證：task class 與
+approval policy、repository／Work ID／worktree identity、current writer assignment、
+single-writer lock、allowed path set、test／evidence commands、knowledge scope 及
+finish destination。v2 runtime records 與 raw outputs 必須位於 repository 外的持久化
+state root；目標 repository 不需要本 bundle 的 `.agents/skills` tree。
+
+`read_only` 沒有 implementation authorization。`small` 必須具備一次 integrated
+approval；`large`／bug 必須具備相應 Requirements／Planning／diagnosis evidence。缺少
+assignment、fresh Reviewer capability、scope digest 或 state continuity 時維持零寫入，
+回報 `awaiting_user`／`blocked`，不得把 v1 Ready plan 或主代理 prompt 當成 v2 授權。
+v2 完成後的 knowledge review 與 Git finish handoff 只使用同一份 approved scope；v1
+preflight、host-temp Ledger 與 capability evidence 不被遷移或改寫。

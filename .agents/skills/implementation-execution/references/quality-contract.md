@@ -42,3 +42,17 @@
 
 - `Pass`：所有適用格為真，且 terminal ordering 後為 `Complete`。
 - `Fail`：記錄最早失敗格、authority 與 evidence，依唯一狀態機修正或終止。
+
+## Portable v2 additions
+
+v2 在上述檢查前再確認 task classification 與 gate policy：`read_only` 不得 mutation；
+`small` 必須有一次 integrated approval；`large`／bug 必須有相符的 Requirements、
+Planning／diagnosis evidence。Implementation 只能由一名 current assignment writer
+寫入，subagent 可以擔任 writer，但同一 worktree 不得平行 writers；fresh Reviewer
+必須是不同 read-only session。
+
+v2 的 completion 還要求 automatic knowledge review 只落在 approved knowledge scope，
+以及 `finish` handoff 的 publication state 可由 commit／push／draft PR evidence 重算。
+缺少 reviewer、scope／snapshot drift、failed／blocked／not_run command、knowledge
+conflict 或 publication prerequisite 時，結果維持 `awaiting_user`／`blocked`。既有
+v1 的 Pass／Fail、Ledger 與 terminal gate 仍按前文執行。

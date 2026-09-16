@@ -496,3 +496,8 @@ docs/*
 
 # tgrep maintains a separate on-disk index for each worktree.
 .tgrep/
+
+# The portable plugin ships executable wrappers under a directory name that the
+# Visual Studio template otherwise ignores.
+!plugins/sdlc/bin/
+!plugins/sdlc/bin/**

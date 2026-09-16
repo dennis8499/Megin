@@ -1,6 +1,10 @@
-# SDLC Repository-local Delivery System
+# SDLC Delivery System
 
-這個 repository 不是一般應用程式或可安裝套件，而是一套以 repository-local Skills 驅動的軟體交付系統。它把需求探索、技術規劃、實作、BUG 分診、Project Knowledge、人工核准與可追溯 evidence 串成一條可驗證的流程。
+這個 repository 同時提供兩條相容路徑：既有的 repository-local Skills 與 `delivery-run/v1`
+治理流程，以及可跨專案安裝的 `sdlc` plugin 與 `delivery-run/v2` workflow。兩者都把需求探索、
+技術規劃、實作、BUG 分診、Project Knowledge、核准與可追溯 evidence 串成一條可驗證的流程。
+v2 另依任務大小分流，支援受監督的單一 implementation writer、fresh review、automatic
+knowledge review 與 Git finish handoff。
 
 系統的核心原則是：每筆變更都有穩定的 Work ID、隔離的 Git worktree、版本化契約、階段授權與雜湊綁定。README 提供入口與常用操作；各 owner contract 才是行為、資料格式與授權規則的唯一權威。
 
@@ -9,6 +13,49 @@
 - 第一次接觸 repository 的維護者
 - 依流程工作的 Contributor／AI Agent
 - 需要判讀測試、CI、metrics 與 evidence 的 CI Reviewer
+
+## Portable `sdlc` plugin（v2）
+
+這個 v2 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)，
+保留本 repository 原有的 Work ID、來源追溯、核准綁定與 v1 相容性。
+
+要在其他 Git repository 使用 v2，先安裝本 repository 提供的 plugin；安裝不會替任何目標
+repository 初始化設定或寫入程式碼：
+
+~~~console
+codex plugin install ./plugins/sdlc
+~~~
+
+進入目標 repository 後，初始化一次專案 binding，再讓 `start` 先做唯讀分類：
+
+~~~console
+sdlc init --repo .
+sdlc doctor --repo .
+sdlc start --repo . --request "<request>"
+~~~
+
+`start` 會將請求分類為 `read_only`、`small`、`large` 或 `bug`。read-only 只回報 evidence；
+small 產生短 design brief 並只需一次 integrated approval；large 依序取得 Requirements 與
+Planning approvals；bug 先完成唯讀 diagnosis，再依影響進入 small 或 large。核准前不建立
+產品 worktree／branch。
+
+核准後可由 `status`／`resume` 續跑，完成 review 後使用 `finish`：
+
+~~~console
+sdlc status --repo . --work-id <work-id>
+sdlc resume --repo . --work-id <work-id>
+sdlc finish --repo . --work-id <work-id>
+~~~
+
+v2 runtime state、dispatch assignment、review reports、測試 raw outputs 與 publication state
+位於 plugin 管理的 repository 外部持久化 state root；`doctor` 會顯示實際 state path。目標
+repository 不需要這個 repository 的 `.agents/skills` tree。`finish` 只會在核准範圍內完成
+knowledge review、stage／commit；只有已核准 remote 且具備權限時才 push 並建立或重用 draft PR。
+沒有核准目的地時保留 `publication_pending`，設定並核准目的地後再續跑發布。
+Merge、deployment 與 worktree cleanup 必須另外執行。
+
+完整的分類、核准、升級與相容規則見 [v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)；writer、Reviewer、knowledge 與 finish 見
+[v2 派工、審查與交付收尾契約](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md)。
 
 ## 快速開始
 
@@ -51,7 +98,27 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/run_quick_checks.py
 
 ## 交付流程總覽
 
-### 一般變更
+### Portable v2 一般變更
+
+~~~text
+request -> read-only classify
+  -> read_only: evidence / report
+  -> small: short design + one integrated approval
+  -> large: Requirements approval + Planning approval
+  -> approved Work ID worktree / branch
+  -> single authorized writer (implementation subagent allowed)
+  -> focused + full verification
+  -> fresh read-only review
+  -> automatic knowledge review
+  -> finish: commit -> optional push -> draft PR
+~~~
+
+同一 worktree 同一時間只能有一名 writer，不能平行寫入；Reviewer 使用另一個 fresh、唯讀
+session。小任務的 integrated approval、或大型變更的第二次 Planning approval，都會綁定
+驗收、allowed paths、tests、knowledge scope 與 finish destination。scope drift、review
+finding、knowledge conflict 或缺少能力時會停在可觀察的 awaiting／blocked state。
+
+### Repository-local v1 一般變更（legacy）
 
 一般功能、實質重構、介面／資料／依賴行為變更，從 delivery-orchestrator 開始：
 
@@ -67,7 +134,7 @@ request
   -> Complete
 ~~~
 
-Requirements 與 Planning 各自有一次完整的 human gate。Candidate 只有在使用者核准精確的 review bundle、payload、digest 與 paths 後才是 Ready；聊天中的摘要或「繼續」不會取代核准。Implementation 仍須完成 fresh review，required Knowledge policy 另須通過 Knowledge promotion gate。
+在 v1 path 中，Requirements 與 Planning 各自有一次完整的 human gate。Candidate 只有在使用者核准精確的 review bundle、payload、digest 與 paths 後才是 Ready；聊天中的摘要或「繼續」不會取代核准。Implementation 仍須完成 fresh review，required Knowledge policy 另須通過 Knowledge promotion gate。這些 v1 規則不會套用到明確使用 `delivery-run/v2` 的 portable run。
 
 ### BUG 變更
 
@@ -102,8 +169,9 @@ work-YYYYMMDD-<topic>-<request-sha256-prefix>
 | Implementation evidence | host-temp registry 的 run evidence，並由 repository Outcome 綁定 |
 | Canonical knowledge | docs/knowledge/ |
 | Disposable test fixture | .knowledge-test-tmp/ |
+| Portable v2 runtime state | plugin 管理的 repository 外部 state root（由 `doctor` 顯示） |
 
-Delivery helper 只負責建立／定位 worktree、驗證 identity、授權階段與追加狀態事件；不會替操作者 stage、commit、push、merge、deploy 或 cleanup。
+Repository-local v1 Delivery helper 只負責建立／定位 worktree、驗證 identity、授權階段與追加狀態事件；不會替操作者 stage、commit、push、merge、deploy 或 cleanup。Portable v2 的 `finish` 是獨立 Git handoff，只有在 approved scope、fresh review 與 automatic knowledge review 通過後才可 stage／commit，並依 publication state 選擇 push／draft PR。
 
 ## 常用唯讀命令
 
@@ -154,7 +222,46 @@ checkout、branch switch、Git index 或 binary 變更後，重新執行上述�
 
 下列命令不是一般查詢入口。它們必須由 Delivery Orchestrator 或對應 owner contract 路由，不能拿來繞過人工 gate、phase authorization 或 hash validation。
 
-### 建立或續接 workspace
+### Portable v2 lifecycle
+
+以下是 plugin 的公開 CLI；它們使用目標 repository 的明確 `--repo`，不依賴目標專案的
+`.agents/skills`。`init` 只建立 project binding；`start` 先分類並保存候選 state；
+`doctor`／`status` 只讀取 state；`resume` 從第一個未完成 action 繼續；`finish` 是
+implementation、review、knowledge 與 Git handoff 的唯一收尾入口：
+
+~~~console
+sdlc init --repo <target-repo>
+sdlc doctor --repo <target-repo>
+sdlc start --repo <target-repo> --request "<request>"
+sdlc status --repo <target-repo> --work-id <work-id>
+sdlc resume --repo <target-repo> --work-id <work-id>
+sdlc finish --repo <target-repo> --work-id <work-id>
+~~~
+
+Approval and execution results are recorded explicitly. For a small task, bind the allowed
+paths and tests to one integrated approval, then record the writer and fresh reviewer results:
+
+~~~console
+sdlc start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
+sdlc resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+sdlc resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+sdlc finish --repo <target-repo> --work-id <work-id>
+~~~
+
+Large work uses `--approve requirements` and `--approve plan` on separate approval steps. Bug
+repair first runs `sdlc diagnose` with a read-only oracle and falsifiable hypothesis, then passes
+`--diagnosis-file <assessment>` to `start`; otherwise `start` remains a read-only diagnosis response.
+Writer／Reviewer／knowledge completion reports are external, snapshot-bound JSON evidence. The dependency-free self-check is
+`python -X utf8 -B <plugin-root>/scripts/validate.py`.
+
+v2 的 `start` 只在對應 approval 完成後建立 worktree／branch；同一 worktree 同一時間
+最多一名 authorized writer，implementation subagent 可以擔任 writer。Fresh Reviewer
+以不同 session 唯讀審查完整 diff 與 evidence。`finish` 通過 approved path、knowledge
+scope 與 snapshot preflight 後建立 commit；有 remote／認證時 push 並建立或重用 draft PR，
+否則保存 `publication_pending`，待目的地核准後供 `resume`／`finish` 重試。merge、deployment、cleanup
+與刪除 worktree 不由 v2 自動執行。
+
+### Repository-local v1 建立或續接 workspace
 
 ~~~console
 # 進階：建立 Work ID 專用 worktree；執行前必須已有本次交付授權
@@ -166,7 +273,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 start 會建立 Git worktree／branch 與 host-temp registry binding。建立前必須通過 strict-clean、base HEAD、destination collision、Git trust 與 repository identity 檢查；失敗時不應自行 reset、clean 或刪除現場。
 
-### Phase transition
+### v1 Phase transition
 
 transition 會以 append-only 方式追加 delivery phase event，並驗證 current refs、approval、artifact hashes、generation、knowledge 或 BUG verification bindings。這個命令的參數很多，請依目前 phase 使用 owner contract，不要手動組合參數來模擬 Requirements、Planning 或 Complete：
 
@@ -176,7 +283,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 實際寫入前，child 必須先取得 exact phase authorization：requirements/active、planning/active 或 implementation/active。doctor 或 prompt 本身不會授予寫入權。
 
-### Knowledge Candidate、Review 與 Apply
+### v1 Knowledge Candidate、Review 與 Apply
 
 Project Knowledge 的生命週期是：
 
@@ -215,6 +322,25 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py reco
 不要手動刪除 transaction journal、registry、worktree 或複製舊 approval。復原完成後，要重新執行 doctor／phase preflight，而不是假設交易已成功。
 
 ## 驗證、測試與 CI
+
+### Portable v2 validation
+
+Plugin release 前至少要在乾淨的 Git repository 驗證 manifest、CLI 與 state isolation；
+驗證範圍包含四種 task class、small／large gate policy、single-writer lock、fresh
+Reviewer、automatic knowledge review、finish idempotency，以及 Windows／Linux parity。
+Plugin 的 validator／test entrypoint 位於 `plugins/sdlc/`，執行方式以該 plugin 的
+README 或 `doctor` 輸出為準；它們不得把 runtime state 寫回目標 repository。
+
+~~~console
+# 在 plugin source checkout 驗證 manifest 與 portable CLI
+python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/sdlc/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'sdlc'; assert m['skills'] == './skills/'"
+python -X utf8 -B plugins/sdlc/scripts/sdlc.py --help
+python -X utf8 -B -m unittest discover -s plugins/sdlc/tests -p "test_*.py"
+~~~
+
+若 plugin 尚未安裝，先使用前面的 `codex plugin install ./plugins/sdlc`；上述命令不會
+取代目標專案自己的 build／test。v2 `finish` 的 commit／push／draft PR evidence 也要
+納入 CI artifact；沒有 remote 或 credentials 的測試應驗證 `publication_pending` 可續跑。
 
 ### 快速 gate
 
@@ -270,7 +396,7 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --s
 python -X utf8 -B .agents/skills/project-knowledge/scripts/measure_search_quality.py --repo .
 ~~~
 
-CI 位於 [.github/workflows/knowledge-portability.yml](.github/workflows/knowledge-portability.yml)：先執行 quick job，成功後才執行 Windows／Linux 完整矩陣，最後比較跨平台報告。.agents/skills/**、docs/**、README.md、OPERATIONS.md、.gitattributes 與 workflow 變更都會觸發相關檢查。
+CI 位於 [.github/workflows/knowledge-portability.yml](.github/workflows/knowledge-portability.yml)：先執行 quick job，成功後才執行 Windows／Linux 完整矩陣，最後比較跨平台報告。.agents/skills/**、plugins/sdlc/**、docs/**、README.md、OPERATIONS.md、.gitattributes 與 workflow 變更都會觸發相關檢查；若存在 plugin manifest，quick／platform jobs 也會執行 portable v2 validator 與 CLI tests。
 
 ## 常見診斷與安全處理
 
@@ -301,6 +427,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 ~~~text
 .
+├── plugins/sdlc/                    # portable v2 plugin、CLI、schemas、skills
 ├── .agents/skills/                 # repository-local Skills、contracts、scripts、schemas
 ├── docs/work/<work_id>/            # Requirements、Plan 與工作交接 artifacts
 ├── docs/knowledge/                 # canonical knowledge 與 provenance sidecars
@@ -316,11 +443,13 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 |---|---|
 | 工作區、phase routing 與唯一 mutation 入口 | [Delivery Orchestrator](.agents/skills/delivery-orchestrator/SKILL.md) |
 | 階段授權與 read-only boundary | [stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md) |
+| v2 任務分級與 approval policy | [v2-task-routing.md](.agents/skills/delivery-orchestrator/references/v2-task-routing.md) |
 | Worktree、Work ID、record 與 resume | [workspace-and-run.md](.agents/skills/delivery-orchestrator/references/workspace-and-run.md) |
 | 新 workspace 建立與 Git safety | [workspace-creation.md](.agents/skills/delivery-orchestrator/references/workspace-creation.md) |
 | Requirements | [Requirements Discovery](.agents/skills/requirements-discovery/SKILL.md) |
 | Planning 與 Ready plan | [Technical Planning](.agents/skills/technical-planning/SKILL.md) |
 | Implementation、BDD／TDD 與 fresh review | [Implementation Execution](.agents/skills/implementation-execution/SKILL.md) |
+| v2 writer、Reviewer、knowledge 與 Git finish | [v2-dispatch-and-finish.md](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md) |
 | BUG 唯讀分診 | [BUG Diagnosis](.agents/skills/bug-diagnosis/SKILL.md) |
 | Knowledge 搜尋、Candidate 與 promotion | [Project Knowledge](.agents/skills/project-knowledge/SKILL.md) |
 | 共用 human gate contract | [human-gate-review.md](.agents/skills/project-knowledge/references/human-gate-review.md) |
@@ -333,4 +462,4 @@ README 只負責導覽與使用方法。若本文件與 owner contract、schema�
 
 修改 Skills、contracts、schemas、docs 或根目錄指南前，先以對應 stage 執行 Project Knowledge query，並重新讀取引用的 raw source。文件變更至少應通過 quick gate；涉及交付、Schema、Knowledge、跨平台或 workspace 行為時，再執行完整 suite。
 
-本專案不提供自動備份還原、跨機遷移、核准流程重設、歷史 record 批次修補或自動發布流程。
+Repository-local v1 不提供自動備份還原、跨機遷移、核准流程重設、歷史 record 批次修補或自動發布流程。Portable v2 plugin 提供 scoped `finish` handoff，可自動 commit，並在 remote／credentials 可用時 push 與建立 draft PR；merge、deployment、cleanup 與歷史 record migration 仍不自動執行。

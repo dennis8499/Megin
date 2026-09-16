@@ -94,3 +94,20 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 ## 驗證紀錄
 
 每次維護在 `scripts/behavior-evaluation-report.md` 追加 Skill revision、corpus hash、fixture 與 evaluator 隔離方式、各 `EVAL-*` 的 `Pass`／`Fail`、原始命令結果、failure 證據、前後 hash 與 Reviewer report。此紀錄是開發期產物，不寫入 runtime Skill references；未執行案例標示 Not run。
+
+## v2 delegated execution cases
+
+以下 cases 驗證 portable `delivery-run/v2` 的新執行面；既有 `EVAL-001` 至 `EVAL-010`
+仍以 v1 `ready-plan`、host-temp Ledger 與 no-Git terminal 規則為準。
+
+| Case | Fixture | Expected result |
+|---|---|---|
+| `V2-EXEC-001` | approved small dispatch 與 approved large dispatch | small 使用一次 integrated gate；large 只有 Requirements／Planning 都核准後才 dispatch implementation |
+| `V2-EXEC-002` | 一名 implementation subagent writer、第二個競爭 writer、越界 path | current assignment writer 可寫；平行或越界 writer 被拒絕並保存 state evidence |
+| `V2-EXEC-003` | writer 完成後兩個 Reviewer session | Reviewer fresh、read-only、不同 session 且不讀 implementation conversation；blocking finding 回交 writer 並啟動 bounded fresh round |
+| `V2-EXEC-004` | approved knowledge scope 與 scope drift／lint conflict | scope 內由 automatic knowledge review 處理；drift／conflict 停在 awaiting／blocked，不寫 canonical knowledge |
+| `V2-EXEC-005` | local-only、remote、既有 draft PR、push failure | finish 只 stage approved paths，commit 可重算；可用 remote 時 push 並重用／建立 draft PR；失敗可續跑且不重複 commit／PR |
+
+v2 evaluator 必須把 writer assignment、review report、knowledge review、commit／PR
+identity 與 publication state 綁回同一 repository／Work ID。不能以主代理宣稱、摘要或
+文件字串取代 state、diff、Git 與 raw command evidence。

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.sdlc/delivery-run-v2.schema.json",
+  "title": "Portable SDLC delivery run v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "plugin", "plugin_version", "work_id", "revision", "repo", "task", "approval", "workspace", "phase", "status", "tasks", "assignments", "review", "verification", "knowledge", "candidates", "publication", "events", "next_action", "created_at", "updated_at"],
+  "properties": {
+    "schema": {"const": "delivery-run/v2"},
+    "version": {"const": 2},
+    "plugin": {"const": "sdlc"},
+    "plugin_version": {"type": "string", "minLength": 1},
+    "work_id": {"$ref": "#/$defs/workId"},
+    "revision": {"type": "integer", "minimum": 0},
+    "repo": {"$ref": "#/$defs/repo"},
+    "task": {"$ref": "#/$defs/task"},
+    "approval": {"$ref": "#/$defs/approval"},
+    "workspace": {"$ref": "#/$defs/workspace"},
+    "phase": {"enum": ["requirements", "planning", "implementation", "verification", "knowledge", "delivery"]},
+    "status": {"enum": ["awaiting_approval", "active", "blocked", "complete"]},
+    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/taskUnit"}},
+    "assignments": {"type": "array", "items": {"$ref": "#/$defs/assignment"}},
+    "review": {"$ref": "#/$defs/review"},
+    "verification": {"$ref": "#/$defs/verification"},
+    "knowledge": {"$ref": "#/$defs/knowledge"},
+    "candidates": {"$ref": "#/$defs/candidates"},
+    "publication": {"$ref": "#/$defs/publication"},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}},
+    "superseded_approvals": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["policy", "stages", "payload_sha256", "at"], "properties": {"policy": {"type": "string"}, "stages": {"type": "array", "items": {"type": "string"}}, "payload_sha256": {"$ref": "#/$defs/sha256"}, "at": {"type": "string", "format": "date-time"}}}},
+    "next_action": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "workId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "minLength": 3, "maxLength": 64},
+    "relativePath": {"type": "string", "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+)$"},
+    "repo": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repo_id", "path", "base_branch"],
+      "properties": {"repo_id": {"$ref": "#/$defs/sha256"}, "path": {"type": "string", "minLength": 1}, "base_branch": {"type": "string", "minLength": 1}}
+    },
+    "diagnosisAssessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "disposition", "hypothesis", "evidence_path", "output_sha256"],
+      "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "disposition": {"enum": ["confirmed", "likely"]}, "hypothesis": {"type": "string", "minLength": 1}, "evidence_path": {"type": "string", "minLength": 1}, "output_sha256": {"$ref": "#/$defs/sha256"}}
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request", "request_sha256", "task_class", "classification"],
+      "properties": {
+        "request": {"type": "string", "minLength": 1}, "request_sha256": {"$ref": "#/$defs/sha256"},
+        "task_class": {"enum": ["small", "large", "bug"]}, "repair_class": {"enum": ["small", "large", null]},
+        "classification": {"type": "object", "additionalProperties": true}, "diagnosis": {"enum": ["confirmed", "likely", "not-a-bug", null]}, "diagnosis_assessment": {"anyOf": [{"$ref": "#/$defs/diagnosisAssessment"}, {"type": "null"}]}, "escalated_from": {"enum": ["small", null]}
+      }
+    },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["acceptance", "allowed_paths", "test_commands", "knowledge_scope", "publication"],
+      "properties": {
+        "acceptance": {"type": "array", "items": {"type": "string"}}, "allowed_paths": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/relativePath"}},
+        "test_commands": {"type": "array", "items": {"type": "string", "minLength": 1}}, "knowledge_scope": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/relativePath"}},
+        "publication": {"type": "object", "additionalProperties": false, "required": ["remote", "remote_url_sha256", "base_branch", "title"], "properties": {"remote": {"type": ["string", "null"]}, "remote_url_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "base_branch": {"type": "string", "minLength": 1}, "title": {"type": "string", "minLength": 1}}}
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "status", "candidate_revision", "approved_stages", "refs", "scope", "payload_sha256", "stage_digests", "created_at"],
+      "properties": {
+        "policy": {"enum": ["integrated", "requirements_and_plan"]}, "status": {"enum": ["pending", "approved"]}, "candidate_revision": {"type": "string", "pattern": "^candidate-[0-9]+$"}, "approved_stages": {"type": "array", "uniqueItems": true, "items": {"enum": ["integrated", "requirements", "plan"]}},
+        "refs": {"type": "object", "additionalProperties": false, "required": ["integrated", "requirements", "plan"], "properties": {"integrated": {"type": "array", "items": {"type": "string"}}, "requirements": {"type": "array", "items": {"type": "string"}}, "plan": {"type": "array", "items": {"type": "string"}}}},
+        "scope": {"$ref": "#/$defs/scope"}, "payload_sha256": {"$ref": "#/$defs/sha256"}, "stage_digests": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sha256"}}, "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "workspace": {
+      "type": "object", "additionalProperties": false, "required": ["worktree", "branch", "base_sha", "repo", "created_at"],
+      "properties": {"worktree": {"type": ["string", "null"]}, "branch": {"type": ["string", "null"]}, "base_sha": {"type": ["string", "null"]}, "repo": {"type": "string", "minLength": 1}, "created_at": {"type": ["string", "null"], "format": "date-time"}}
+    },
+    "taskUnit": {"type": "object", "additionalProperties": false, "required": ["id", "status", "acceptance", "allowed_paths", "forbidden_paths", "interfaces", "focused_commands", "related_commands", "full_commands", "evidence_path", "blocked_by", "depends_on"], "properties": {"id": {"type": "string", "minLength": 1}, "status": {"enum": ["pending", "active", "completed", "blocked", "needs_revision"]}, "acceptance": {"type": "array", "items": {"type": "string"}}, "allowed_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "forbidden_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "interfaces": {"type": "array", "items": {"type": "string"}}, "focused_commands": {"type": "array", "items": {"type": "string"}}, "related_commands": {"type": "array", "items": {"type": "string"}}, "full_commands": {"type": "array", "items": {"type": "string"}}, "evidence_path": {"type": "string", "minLength": 1}, "blocked_by": {"type": "array", "items": {"type": "string"}}, "depends_on": {"type": "array", "items": {"type": "string"}}}},
+    "assignment": {"type": "object", "additionalProperties": false, "required": ["assignment_id", "task_id", "writer", "writer_id", "session", "session_id", "state_revision", "status", "acceptance", "allowed_paths", "forbidden_paths", "interfaces", "focused_commands", "related_commands", "full_commands", "test_commands", "blocked_by", "depends_on", "baseline_paths", "evidence_path", "capability_path", "capability_sha256", "writer_result_sha256", "created_at", "ticket_sha256", "assignment_sha256", "ticket_consumed"], "properties": {"assignment_id": {"type": "string", "minLength": 1}, "task_id": {"type": "string", "minLength": 1}, "writer": {"type": "string", "minLength": 1}, "writer_id": {"type": "string", "minLength": 1}, "session": {"type": "string", "minLength": 1}, "session_id": {"type": "string", "minLength": 1}, "state_revision": {"type": "integer", "minimum": 0}, "status": {"enum": ["active", "completed", "needs_revision", "blocked"]}, "acceptance": {"type": "array", "items": {"type": "string"}}, "allowed_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "forbidden_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "interfaces": {"type": "array", "items": {"type": "string"}}, "focused_commands": {"type": "array", "items": {"type": "string"}}, "related_commands": {"type": "array", "items": {"type": "string"}}, "full_commands": {"type": "array", "items": {"type": "string"}}, "test_commands": {"type": "array", "items": {"type": "string"}}, "blocked_by": {"type": "array", "items": {"type": "string"}}, "depends_on": {"type": "array", "items": {"type": "string"}}, "baseline_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "baseline_manifest": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "size", "mode"], "properties": {"path": {"$ref": "#/$defs/relativePath"}, "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "size": {"type": "integer", "minimum": 0}, "mode": {"type": ["integer", "null"], "minimum": 0}}}}, "evidence_path": {"type": "string", "minLength": 1}, "capability_path": {"type": ["string", "null"]}, "capability_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "writer_result_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "writer_result": {"type": ["object", "null"], "additionalProperties": true}, "created_at": {"type": "string", "format": "date-time"}, "completed_at": {"type": "string", "format": "date-time"}, "completion_snapshot": {"type": ["string", "null"]}, "ticket_sha256": {"$ref": "#/$defs/sha256"}, "assignment_sha256": {"$ref": "#/$defs/sha256"}, "ticket_consumed": {"type": "boolean"}}},
+    "review": {"type": "object", "additionalProperties": false, "required": ["verdict", "reviewer_id", "reviewer_session", "reviewer_capability_path", "reviewer_capability_sha256", "assignment_id", "assignment_sha256", "round", "review_ticket_sha256", "snapshot", "product_snapshot", "paths", "findings", "no_progress_count", "report_path", "report_sha256", "requirements_verdict", "quality_verdict", "test_evidence"], "properties": {"verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED", null]}, "reviewer_id": {"type": ["string", "null"]}, "reviewer_session": {"type": ["string", "null"]}, "reviewer_capability_path": {"type": ["string", "null"]}, "reviewer_capability_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "assignment_id": {"type": ["string", "null"]}, "assignment_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "round": {"type": "integer", "minimum": 0}, "review_ticket_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "snapshot": {"type": ["string", "null"]}, "product_snapshot": {"type": ["string", "null"]}, "paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}}, "no_progress_count": {"type": "integer", "minimum": 0}, "reviewed_at": {"type": "string", "format": "date-time"}, "report_path": {"type": ["string", "null"]}, "report_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "requirements_verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED", null]}, "quality_verdict": {"enum": ["APPROVED", "CHANGES_REQUIRED", "BLOCKED", null]}, "test_evidence": {"type": "array", "items": {"type": "object", "additionalProperties": true}}}},
+    "verification": {"type": "object", "additionalProperties": false, "required": ["status", "commands", "snapshot", "record_sha256"], "properties": {"status": {"enum": ["not_run", "passed", "verified", "failed"]}, "commands": {"type": "array", "items": {"type": "object", "additionalProperties": true}}, "snapshot": {"type": ["string", "null"]}, "record_sha256": {"$ref": "#/$defs/sha256"}, "verified_at": {"type": "string", "format": "date-time"}, "error": {"type": "string"}}},
+    "knowledge": {"type": "object", "additionalProperties": false, "required": ["scope", "status", "candidate_path", "candidate_sha256", "sources", "certainty", "snapshot_before", "snapshot_after", "lint", "conflicts", "reviewer_id", "reviewer_session", "report_path", "report_sha256", "promotion"], "properties": {"scope": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "status": {"enum": ["not_needed", "pending", "reviewed", "promoted", "blocked"]}, "candidate_path": {"type": ["string", "null"]}, "candidate_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "sources": {"type": "array", "items": {"type": "string"}}, "certainty": {"type": ["string", "null"]}, "snapshot_before": {"type": ["string", "null"]}, "snapshot_after": {"type": ["string", "null"]}, "lint": {"type": ["object", "null"], "additionalProperties": true}, "conflicts": {"type": "array", "items": {"type": "string"}}, "reviewer_id": {"type": ["string", "null"]}, "reviewer_session": {"type": ["string", "null"]}, "report_path": {"type": ["string", "null"]}, "report_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "promotion": {"type": ["object", "null"], "additionalProperties": true}}},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["path", "sha256", "source_sha256", "source_refs", "revision", "status"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"$ref": "#/$defs/sha256"}, "source_sha256": {"$ref": "#/$defs/sha256"}, "source_refs": {"type": "array", "items": {"type": "string"}}, "revision": {"type": "string"}, "status": {"enum": ["candidate", "approved"]}}},
+    "candidates": {"type": "object", "additionalProperties": false, "required": ["design", "requirements", "plan"], "properties": {"design": {"anyOf": [{"$ref": "#/$defs/candidate"}, {"type": "null"}]}, "requirements": {"anyOf": [{"$ref": "#/$defs/candidate"}, {"type": "null"}]}, "plan": {"anyOf": [{"$ref": "#/$defs/candidate"}, {"type": "null"}]}}},
+    "publication": {"type": "object", "additionalProperties": false, "required": ["remote", "remote_url_sha256", "base_branch", "state", "commit_sha", "push_commit_sha", "post_commit_snapshot", "pr", "reason"], "properties": {"remote": {"type": ["string", "null"]}, "remote_url_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}, "base_branch": {"type": "string", "minLength": 1}, "state": {"enum": ["not_ready", "local_verified", "committed", "pushed", "draft_pr_created", "publication_pending"]}, "commit_sha": {"anyOf": [{"type": "null"}, {"type": "string", "pattern": "^[a-f0-9]{40}$"}]}, "push_commit_sha": {"anyOf": [{"type": "string", "pattern": "^[a-f0-9]{40}$"}, {"type": "null"}]}, "post_commit_snapshot": {"type": ["string", "null"]}, "post_commit_product_snapshot": {"type": ["string", "null"]}, "changed_paths": {"type": "array", "items": {"$ref": "#/$defs/relativePath"}}, "pr": {"type": ["object", "null"], "additionalProperties": true}, "reason": {"type": ["string", "null"]}, "title": {"type": "string"}, "push_output_sha256": {"$ref": "#/$defs/sha256"}, "pr_output_sha256": {"$ref": "#/$defs/sha256"}}},
+    "finding": {"type": "object", "additionalProperties": false, "required": ["key", "text"], "properties": {"key": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "severity": {"enum": ["blocking", "major", "minor", "advisory"]}, "path": {"type": "string"}, "evidence": {"type": "string"}, "correction": {"type": "string"}}},
+    "event": {"type": "object", "additionalProperties": true, "required": ["sequence", "at", "kind"], "properties": {"sequence": {"type": "integer", "minimum": 1}, "at": {"type": "string", "format": "date-time"}, "kind": {"type": "string", "minLength": 1}}}
+  },
+  "allOf": [
+    {"if": {"properties": {"status": {"const": "complete"}}}, "then": {"required": ["phase"]}},
+    {"if": {"properties": {"task": {"properties": {"task_class": {"const": "bug"}}}}}, "then": {"properties": {"task": {"required": ["repair_class", "diagnosis", "diagnosis_assessment"]}}}}
+  ]
+}

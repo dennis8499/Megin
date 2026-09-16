@@ -1,0 +1,33 @@
+{
+  "name": "sdlc",
+  "version": "0.1.0",
+  "description": "Portable, evidence-driven SDLC workflow for classifying, implementing, reviewing, verifying, and delivering repository changes.",
+  "author": {
+    "name": "SDLC Contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "sdlc",
+    "workflow",
+    "tdd",
+    "code-review",
+    "delivery"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SDLC Delivery Workflow",
+    "shortDescription": "Classify, implement, review, verify, and deliver work safely.",
+    "longDescription": "A portable repository workflow that scales governance to the task, delegates implementation to one authorized writer, requires a fresh read-only review, and records verification before delivery.",
+    "developerName": "SDLC Contributors",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Classify this change and route the right SDLC workflow.",
+      "Implement this approved plan with TDD and a fresh review.",
+      "Verify the change and prepare a draft pull request."
+    ]
+  }
+}

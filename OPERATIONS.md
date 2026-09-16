@@ -1,8 +1,67 @@
 # SDLC 操作手冊
 
-本手冊集中說明開始、續跑、診斷、Blocked、Complete 與安全復原。規則細節仍以 [Delivery Orchestrator](.agents/skills/delivery-orchestrator/SKILL.md)、[stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md)及各階段的 `delivery-protocol.md` 為準。
+本手冊集中說明 portable v2 與 repository-local legacy v1 的開始、續跑、診斷、Blocked、Complete 與安全復原。規則細節仍以 [Delivery Orchestrator](.agents/skills/delivery-orchestrator/SKILL.md)、[v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)、[stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md)及各階段的 `delivery-protocol.md` 為準。
 
-## 開始一筆工作
+## Portable v2 快速操作
+
+先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立 worktree 或寫入產品：
+
+```console
+codex plugin install ./plugins/sdlc
+```
+
+在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀 task classification：
+
+```console
+sdlc init --repo <target-repo>
+sdlc doctor --repo <target-repo>
+sdlc start --repo <target-repo> --request "<request>"
+```
+
+分類與 gate policy：
+
+| 類型 | 行為 |
+|---|---|
+| `read_only` | 只查證與回報，不建立 run、worktree 或 branch |
+| `small` | 短 design brief，一次 integrated approval，核准後才建立 worktree |
+| `large` | Requirements 與 Planning 各一次 approval，第二次核准後自動進 Implementation |
+| `bug` | 先唯讀 diagnosis，再依影響走 small 或 large path |
+
+核准範圍同時綁定驗收、allowed paths、測試命令、knowledge scope 與 finish destination。
+同一 worktree 同一時間最多一名 authorized writer；implementation subagent 可以擔任 writer，
+但不得平行寫入或自行再委派。Implementation 完成後由不同 fresh、read-only Reviewer 審查；
+blocking finding 回交同一 writer，沿用 bounded fix loop。
+
+續跑與收尾：
+
+```console
+sdlc status --repo <target-repo> --work-id <work-id>
+sdlc resume --repo <target-repo> --work-id <work-id>
+sdlc finish --repo <target-repo> --work-id <work-id>
+```
+
+小任務的核准、派工與審查可用下列最小循序操作表示；每個結果都會寫入外部 v2 state：
+
+```console
+sdlc start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
+sdlc resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+sdlc resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+sdlc finish --repo <target-repo> --work-id <work-id>
+```
+
+大型變更在不同的 `resume` 呼叫分別帶入 `--approve requirements` 與 `--approve plan`；疑似
+BUG 先以 `diagnose` 的唯讀命令與根因假設保存 assessment，再以 `--diagnosis-file` 綁定修復。來源 checkout 可用
+`python -X utf8 -B plugins/sdlc/scripts/validate.py` 驗證 manifest、技能、schema 與 state。
+
+`finish` 先檢查 approved scope、review snapshot 與 automatic knowledge review，再只 stage／
+commit 核准 paths；只有已核准 remote／認證可用時才 push 並建立或重用該 branch 的 draft PR。缺少 remote、
+認證或網路時保存 `publication_pending`，設定並核准目的地後再由 `resume`／`finish` 只重試未完成步驟。Merge、
+deployment、cleanup 與刪除 worktree 永遠是獨立動作。runtime state、assignments、reports、
+raw outputs 與 publication state 存在 repository 外的持久化 state root；`doctor` 顯示實際路徑。
+
+v2 操作的詳細 writer／Reviewer／knowledge／finish 規則見 [v2 派工、審查與交付收尾契約](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md)。
+
+## Repository-local v1 開始一筆工作（legacy）
 
 1. 唯讀探測 repository，保存 `repo_id`、HEAD 與建議 Work ID：
 
@@ -24,7 +83,7 @@
 
    **人工決策點：** 使用者核准完整 promotion bundle 後，才可套用 canonical knowledge 並完成 Delivery。
 
-## 正常續跑
+## Repository-local v1 正常續跑（legacy）
 
 先執行唯讀定位及診斷：
 
@@ -37,7 +96,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 未指定 Work ID 時，系統只會在恰有一筆 active run 時選取；多筆候選必須由操作者明確指定，工具不代替人工選擇。
 
-## Project Knowledge tgrep index
+## Repository-local v1 Project Knowledge tgrep index
 
 Windows 的 Project Knowledge 查詢可使用 repository-local tgrep index。index 不會由
 query 隱式建立；每個 worktree 都要各自初始化一次：
@@ -52,7 +111,7 @@ checkout、branch switch、Git index 或替換 `tgrep.exe` 後，重新執行命
 不一致時 query 維持唯讀並靜默使用 `rg`。本次不使用 `tgrep serve`，也不會在 query
 期間下載或修復 index。
 
-## Blocked
+## Blocked（v1 與 v2 共用原則）
 
 Blocked 表示 workspace、能力、工具、資料完整性或外部前提無法安全成立。先保存原始錯誤碼與 evidence refs，再執行 `doctor`。修正同一項環境前提後，blocked recovery 必須留在原 phase；不得用 `reset`、`clean`、刪除 registry 或複製核准資料繞過 gate。
 
@@ -69,11 +128,21 @@ Blocked 表示 workspace、能力、工具、資料完整性或外部前提無�
 | `IDENTITY_MISMATCH` | 回到 registry 所記錄的 canonical worktree。 |
 | `ENVIRONMENT_UNAVAILABLE` | 恢復 Git、權限或檔案系統可讀性後重跑。 |
 
-## Complete
+v2 `doctor` 另會指出 `task_class`、approval／scope drift、writer lock、reviewer capability
+與 publication state。`WRITER_ASSIGNMENT_CONFLICT`、`SCOPE_DRIFT`、`REVIEW_REQUIRED`、
+`KNOWLEDGE_CONFLICT` 或 `PUBLICATION_PENDING` 都保留 state 與 evidence；修復後用
+`sdlc resume`／`sdlc finish` 從最早未完成 action 續跑，不複製舊 approval 或重複 commit／PR。
 
-Complete record 已凍結。可用 `locate --work-id` 與 `doctor --work-id` 唯讀檢查，但不得追加事件、重用核准或從原 run 重新開始。新變更必須建立新 Work ID。
+## Complete（v1 與 v2）
+
+v1 Complete record 已凍結。可用 `locate --work-id` 與 `doctor --work-id` 唯讀檢查，但不得追加事件、重用核准或從原 run 重新開始。新變更必須建立新 Work ID。v2 在 `finish` 後也會凍結 approved state；`publication_pending` 是尚未完成的可續跑狀態，不得宣稱 draft PR 已建立，且只允許重試未完成的 push／PR handoff。
 
 ## 驗證與量測
+
+Portable v2 另外驗證 plugin manifest、CLI、classification、single-writer dispatch、fresh
+review、automatic knowledge review、finish idempotency 與 Windows／Linux parity；執行 plugin
+提供的 validator／test entrypoint，不把 runtime state 寫入目標 repository。Repository-local
+v1 runner 與下列 commands 維持既有循序／profile 相容行為。
 
 未帶profile的舊runner保持循序執行及遇錯停止。新工作使用local profile：parallel-safe commands在有界worker pool中執行，每個worker有私有fixture、temp及Delivery registry；performance scenarios等所有parallel work完成後才循序執行。Fail-fast保留完整預定inventory，未啟動者為`not_run`，timeout不會被誤報為通過。Local profile排除要求跨平台release evidence的`BDD-016`；`--profile release`及未帶profile的相容入口仍執行50k portability scenario。Release完成仍以Windows／Linux CI reports為準。
 
@@ -107,5 +176,10 @@ Archive是deterministic、create-only，manifest逐檔保存hash與run／repo／
    python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py recover --repo .
    ```
 3. **registry、record 或正式 evidence 遺失：** 先驗證綁定同一run／repo／worktree的archive並匯入quarantine；成功只提供resume evidence，不繼承approval。沒有完整可信archive時，保留舊worktree與未提交修改，另建新Work ID，從Requirements重新驗證。安全重建不自動複製產品差異，也不繼承舊核准。
+
+v2 runtime state 遺失或損壞時，先用 `sdlc doctor --repo <target-repo> --work-id <work-id>`
+保存診斷；不要刪除 state root、worktree 或 branch，也不要把 v1 host-temp registry 複製成
+v2 state。只有能以 repository identity、Work ID、assignment、scope digest 與現有 diff
+證明 continuity 時，才由 `sdlc resume` 續跑；否則建立新 v2 Work ID，重新取得所需 gate。
 
 本專案不提供核准流程重設或歷史record批次修補；archive也不能把不同identity或不完整run變成可續跑狀態。

@@ -107,3 +107,21 @@ resolved transition 必須有新命令、測試、diff 或來源決策證據。�
 Report 只有在 schema／attestation 合法，`snapshot_before`／`snapshot_after` 等於送審 ID，且主代理重算目前 snapshot 相同時才具 accepted 資格。任一 snapshot 不同時，原始回覆只保存為 `invalid-snapshot` evidence，不成為 accepted report。
 
 主代理原樣保存 Reviewer response／outputs，Reviewer 不取得寫入工具或責任。保存前後的重算、state transition 與 `Complete` append 順序只由[交付協定](delivery-protocol.md)管理；pre-review evidence 維持 append-only。
+
+## v2 delegated implementation review
+
+Portable `delivery-run/v2` 沿用本文件的 fresh、read-only Reviewer 標準，但 writer 角色
+可以由 current dispatch authorization 指派給 implementation subagent。Reviewer 必須
+使用不同 fresh session，直接讀取 approved assignment、完整 diff、tests、knowledge
+scope、finish destination 與原始 evidence；不得接收 writer 對話、預期 verdict 或
+前一位 Reviewer 的未驗證結論，也不得再委派 subagent。
+
+v2 review 必須核對 assignment 的 `work_id`／state revision、single-writer 互斥、
+allowed paths、focused／related／full commands、snapshot before／after 與 findings。
+`CHANGES_REQUIRED` 只回交同一個 authorized writer；修正後保存新的 create-only
+assignment、evidence 與 fresh round。缺少 fresh Reviewer capability、任何命令為
+`failed`／`blocked`／`not_run`、scope drift 或 blocking finding 都不能 APPROVED。
+
+v2 review 通過後，才可進 automatic knowledge review 與 `finish` handoff；review
+本身不 stage、commit、push 或修改 canonical knowledge。Legacy v1 的 Reviewer schema、
+terminal ordering 與 Knowledge promotion gate 仍維持本文件既有規則。
