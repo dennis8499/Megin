@@ -501,3 +501,10 @@ docs/*
 # Visual Studio template otherwise ignores.
 !plugins/sdlc/bin/
 !plugins/sdlc/bin/**
+
+# Local SDLC scratch and validation output.
+/.tmp/
+/_review-temp/
+/_testtemp/
+/.validation-tmp/
+/tmp*/
