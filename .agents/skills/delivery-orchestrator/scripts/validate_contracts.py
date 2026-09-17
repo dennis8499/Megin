@@ -562,7 +562,7 @@ def _validate_runtime(bundle: Path, helper: Any, errors: list[str]) -> None:
 def _validate_unified_routing(root: Path, errors: list[str]) -> None:
     required: dict[str, tuple[str, ...]] = {
         "delivery-orchestrator/SKILL.md": (
-            "唯一 mutating SDLC 入口",
+            "唯一 mutating Megin 入口",
             "使用者直接點名 Requirements／Planning／Implementation",
             "references/stage-authorization.md",
             "只有 `outcome: authorized` 才 dispatch",
@@ -588,7 +588,7 @@ def _validate_unified_routing(root: Path, errors: list[str]) -> None:
             "歷史 standalone Ledger 只讀且 bytes 不變",
         ),
         "delivery-orchestrator/agents/openai.yaml": (
-            "唯一 mutating SDLC 入口",
+            "唯一 mutating Megin 入口",
             "allow_implicit_invocation: true",
         ),
         "requirements-discovery/SKILL.md": (

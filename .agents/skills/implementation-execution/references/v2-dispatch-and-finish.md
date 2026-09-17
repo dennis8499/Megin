@@ -1,6 +1,6 @@
 # v2 派工、審查與交付收尾契約
 
-本文件補充既有 [實作執行 Skill](../SKILL.md) 的 portable `sdlc` v2 path。
+本文件補充既有 [實作執行 Skill](../SKILL.md) 的 portable `megin` v2 path。
 它不改寫 `implementation-execution/references/execution-records.schema.json` 或
 任何既有 `delivery-run/v1` Ledger；v1 工作仍依原 owner contract 執行。
 

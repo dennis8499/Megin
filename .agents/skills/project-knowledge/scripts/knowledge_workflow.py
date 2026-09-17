@@ -1,4 +1,4 @@
-"""SDLC stage Candidate construction and promotion-gate validation."""
+"""Megin stage Candidate construction and promotion-gate validation."""
 
 from __future__ import annotations
 
@@ -478,7 +478,7 @@ def validate_stage_promotion(
     receipt_sha256: str,
     approval_evidence: str,
 ) -> dict[str, Any]:
-    """Validate the exact Ready receipt required before an SDLC phase advance."""
+    """Validate the exact Ready receipt required before an Megin phase advance."""
 
     repo = Path(repo_value).resolve()
     if stage not in STAGE_POLICY or WORK_ID_RE.fullmatch(work_id) is None:

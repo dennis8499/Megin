@@ -1,6 +1,6 @@
 # Delivery Orchestrator 行為驗證契約
 
-本文件只供建立或修改 `delivery-orchestrator` 時使用。每個案例使用隔離的暫存 Git repository／registry；不在 SDLC workspace 建立測試 worktree。
+本文件只供建立或修改 `delivery-orchestrator` 時使用。每個案例使用隔離的暫存 Git repository／registry；不在 Megin workspace 建立測試 worktree。
 所有案例中的人工Gate都繼承`.agents/skills/project-knowledge/references/human-gate-review.md`；驗收以immutable review files、直接連結與Summary-only Chat為準。
 
 ## 執行協定

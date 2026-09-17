@@ -128,8 +128,8 @@ class DeliveryContractMutationTests(unittest.TestCase):
         variants = (
             (
                 "delivery-orchestrator/SKILL.md",
-                "唯一 mutating SDLC 入口",
-                "可選 mutating SDLC 入口",
+                "唯一 mutating Megin 入口",
+                "可選 mutating Megin 入口",
             ),
             (
                 "requirements-discovery/SKILL.md",

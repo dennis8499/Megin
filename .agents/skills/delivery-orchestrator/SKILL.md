@@ -7,7 +7,7 @@ description: 交付軟體變更的統一入口：先依任務大小分類，再�
 
 # Delivery Orchestrator
 
-本 Skill 是唯一 mutating SDLC 入口，以穩定 work_id 保存 workspace identity、階段核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state、phase authorization 與 routing。既有 `delivery-run/v1` 仍使用兩次人工核准；portable `delivery-run/v2` 依 [v2 任務分級與核准契約](references/v2-task-routing.md) 讓小任務使用一次 integrated gate，大型變更保留 Requirements 與 Planning 兩個 gate。
+本 Skill 是唯一 mutating Megin 入口，以穩定 work_id 保存 workspace identity、階段核准與跨階段交接。Child Skills 擁有內容品質與執行；本 Skill 擁有 Git workspace、delivery state、phase authorization 與 routing。既有 `delivery-run/v1` 仍使用兩次人工核准；portable `delivery-run/v2` 依 [v2 任務分級與核准契約](references/v2-task-routing.md) 讓小任務使用一次 integrated gate，大型變更保留 Requirements 與 Planning 兩個 gate。
 人工Gate的review surface一律遵循`.agents/skills/project-knowledge/references/human-gate-review.md`：先重驗immutable review files，Chat只輸出摘要、direct links與exact identity。
 
 ## 呼叫邊界
@@ -15,7 +15,7 @@ description: 交付軟體變更的統一入口：先依任務大小分類，再�
 | 請求 | 路由 |
 |---|---|
 | 新功能、已有 `confirmed`／`likely` assessment 的修錯、實質重構、介面／資料／依賴行為變更 | 本 Skill |
-| portable `sdlc` 請求 | 先唯讀分類為 `read_only`、`small`、`large` 或 `bug`；只有核准後的 `small`／`large`／bug run 進入 v2 implementation |
+| portable `megin` 請求 | 先唯讀分類為 `read_only`、`small`、`large` 或 `bug`；只有核准後的 `small`／`large`／bug run 進入 v2 implementation |
 | 使用者直接點名 Requirements／Planning／Implementation，且工作會形成階段成果或其他寫入 | 先進本 Skill，再依 current phase 授權唯一 child |
 | 疑似 BUG 但尚無 assessment | 先用 `bug-diagnosis` 唯讀分診；此時不建立 worktree |
 | `not-a-bug` | 期望行為改變時走 standard requirements，否則結束且不建立 run |
@@ -39,7 +39,7 @@ description: 交付軟體變更的統一入口：先依任務大小分類，再�
 
 ## 0. v2 任務分級與 Gate
 
-Portable `sdlc start` 先做唯讀探索並保存 `task_class`。`read_only` 只回報，不建立
+Portable `megin start` 先做唯讀探索並保存 `task_class`。`read_only` 只回報，不建立
 run；`small` 使用一份精簡 design brief 與一次 integrated human approval；`large`
 使用獨立 Requirements／Planning approval；`bug` 先完成唯讀 diagnosis，再依影響
 進入 `small` 或 `large` bug run。分級、升級條件與核准 payload 的完整規則見

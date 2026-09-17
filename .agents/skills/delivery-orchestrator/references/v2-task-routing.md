@@ -1,12 +1,12 @@
 # v2 任務分級與核准契約
 
-本文件描述可攜式 `sdlc` workflow 的任務分級與核准邊界。它補充
+本文件描述可攜式 `megin` workflow 的任務分級與核准邊界。它補充
 [階段路由契約](stage-routing.md)，不改寫既有 `delivery-run/v1` record；沒有
 `delivery-run/v2` state 的工作仍依 v1 owner contract 執行。
 
 ## 1. 先分類，再建立交付狀態
 
-`sdlc start` 或 Delivery Orchestrator 先對請求做唯讀探索與分類。分類只依影響
+`megin start` 或 Delivery Orchestrator 先對請求做唯讀探索與分類。分類只依影響
 範圍與不確定性，不依修改行數。分類結果、理由、輸入 digest 與建議流程要寫入
 v2 state，供 `doctor`、`status` 與 `resume` 重算；分類前不建立產品 worktree、
 branch 或 repository artifact。

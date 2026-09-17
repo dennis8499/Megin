@@ -5,7 +5,7 @@ description: Execute an approved v2 dispatch package with one authorized writer,
 
 # Implementation Execution
 
-Accept work only from `sdlc-orchestrator` with a current v2 dispatch authorization. The package
+Accept work only from `megin-orchestrator` with a current v2 dispatch authorization. The package
 must bind Work ID, state revision, worktree and branch, acceptance, required interfaces, allowed
 and forbidden paths, test commands, evidence destination, knowledge scope, and finish destination.
 

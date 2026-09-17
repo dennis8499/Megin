@@ -5,7 +5,7 @@ description: Implement an approved change with an outside-in behavior red-green-
 
 # Test-Driven Development
 
-Use this skill only after `sdlc-orchestrator` has granted implementation authority for the exact work identity and scope. The approved acceptance criteria are the source of behavior; do not invent a broader contract while coding.
+Use this skill only after `megin-orchestrator` has granted implementation authority for the exact work identity and scope. The approved acceptance criteria are the source of behavior; do not invent a broader contract while coding.
 
 ## The loop
 

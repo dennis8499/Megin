@@ -50,7 +50,7 @@ class DeliveryPerformanceTests(support.DeliveryFixture):
             input_bytes=index_entries,
         )
         support.git(primary, "commit", "-m", "50k performance fixture")
-        local_profile = os.environ.get("SDLC_RUNNER_VALIDATION_PROFILE") == "local"
+        local_profile = os.environ.get("MEGIN_RUNNER_VALIDATION_PROFILE") == "local"
         if local_profile:
             support.run(
                 [
@@ -956,7 +956,7 @@ class WorkflowSpeedFixtureTests(unittest.TestCase):
                         "for k in ['TMP','TEMP','TMPDIR',"
                         "'KNOWLEDGE_TEST_WORKER_ROOT',"
                         "'KNOWLEDGE_TEST_REGISTRY_ROOT',"
-                        "'SDLC_RUNNER_VALIDATION_PROFILE']},"
+                        "'MEGIN_RUNNER_VALIDATION_PROFILE']},"
                         "'arguments':__import__('sys').argv[1:]}))"
                     ),
                     "--fixture-root",
@@ -998,10 +998,10 @@ class WorkflowSpeedFixtureTests(unittest.TestCase):
             )
             self.assertEqual("t", Path(first_environment["TMP"]).name)
             self.assertEqual(
-                "local", first_environment["SDLC_RUNNER_VALIDATION_PROFILE"]
+                "local", first_environment["MEGIN_RUNNER_VALIDATION_PROFILE"]
             )
             self.assertEqual(
-                "release", second_environment["SDLC_RUNNER_VALIDATION_PROFILE"]
+                "release", second_environment["MEGIN_RUNNER_VALIDATION_PROFILE"]
             )
             self.assertEqual(
                 "r", Path(first_environment["KNOWLEDGE_TEST_REGISTRY_ROOT"]).name

@@ -2778,7 +2778,7 @@ def requirements_query_ranks_canonical_stage_context_first(fixture_root: Path) -
 
 
 @scenario("BDD-003", "retrieval")
-def all_sdlc_stages_declare_a_read_only_knowledge_preflight(fixture_root: Path) -> None:
+def all_megin_stages_declare_a_read_only_knowledge_preflight(fixture_root: Path) -> None:
     del fixture_root
     workspace = Path.cwd().resolve()
     owners = {

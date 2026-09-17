@@ -481,7 +481,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-# Repository-local SDLC and canonical knowledge are versioned. Keep every other
+# Repository-local Megin and canonical knowledge are versioned. Keep every other
 # legacy docs subtree ignored unless it is explicitly migrated here.
 docs/*
 !docs/work/
@@ -494,15 +494,18 @@ docs/*
 # Deterministic knowledge-suite fixtures are disposable local state.
 .knowledge-test-tmp/
 
+# Legacy delivery scratch created by local tests.
+/.t/
+
 # tgrep maintains a separate on-disk index for each worktree.
 .tgrep/
 
 # The portable plugin ships executable wrappers under a directory name that the
 # Visual Studio template otherwise ignores.
-!plugins/sdlc/bin/
-!plugins/sdlc/bin/**
+!plugins/megin/bin/
+!plugins/megin/bin/**
 
-# Local SDLC scratch and validation output.
+# Local Megin scratch and validation output.
 /.tmp/
 /_review-temp/
 /_testtemp/

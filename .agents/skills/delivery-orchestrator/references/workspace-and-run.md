@@ -28,7 +28,7 @@ Generation `N > 1` 的 worktree label 與 branch 分別追加 `-rN`；artifact p
 
 ## Portable v2 state
 
-`sdlc init --repo <path>` 只建立目標專案設定、state binding 與必要的 ignore-safe
+`megin init --repo <path>` 只建立目標專案設定、state binding 與必要的 ignore-safe
 metadata；runtime record、dispatch assignments、review reports、raw test outputs
 與 publication state 位於 plugin 管理的使用者狀態區，並依 repository identity／Work ID
 隔離。State root 必須在目標 repository 之外；不把 credential、token 或原始秘密寫入

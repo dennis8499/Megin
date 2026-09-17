@@ -1,11 +1,11 @@
 ---
-name: sdlc-orchestrator
-description: Route repository work through the smallest appropriate SDLC path, bind approval to an immutable scope, coordinate one authorized writer and a fresh read-only reviewer, and resume safely.
+name: megin-orchestrator
+description: Route repository work through the smallest appropriate Megin path, bind approval to an immutable scope, coordinate one authorized writer and a fresh read-only reviewer, and resume safely.
 ---
 
-# SDLC Orchestrator
+# Megin Orchestrator
 
-Use this skill as the entry point whenever a request may change a repository. It owns classification, approval, work identity, phase routing, resume state, and the handoff to the other SDLC skills.
+Use this skill as the entry point whenever a request may change a repository. It owns classification, approval, work identity, phase routing, resume state, and the handoff to the other Megin skills.
 
 ## 1. Explore before mutating
 

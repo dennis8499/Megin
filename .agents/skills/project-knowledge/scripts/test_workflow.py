@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused contract tests for SDLC stage integration."""
+"""Focused contract tests for Megin stage integration."""
 
 from __future__ import annotations
 

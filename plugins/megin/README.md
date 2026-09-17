@@ -1,6 +1,6 @@
-# SDLC
+# Megin
 
-`sdlc` is a portable Codex plugin for evidence-driven repository delivery. It adapts the amount of process to the work, keeps approval tied to an immutable scope, delegates implementation to one authorized writer, and requires a fresh read-only review before delivery.
+`megin` is a portable Codex plugin for evidence-driven repository delivery. It adapts the amount of process to the work, keeps approval tied to an immutable scope, delegates implementation to one authorized writer, and requires a fresh read-only review before delivery.
 
 The workflow follows the task-sized explore/design/implement/review shape described in
 [obra/superpowers' basic workflow](https://github.com/obra/superpowers#the-basic-workflow),
@@ -10,7 +10,7 @@ while retaining this repository's Work ID, evidence, approval, and v1 compatibil
 
 | Skill | Responsibility |
 | --- | --- |
-| `sdlc-orchestrator` | Classify work, route phases, bind approvals, track identity, and resume safely. |
+| `megin-orchestrator` | Classify work, route phases, bind approvals, track identity, and resume safely. |
 | `requirements-discovery` | Explore the target repository and produce an evidence-linked WHAT candidate. |
 | `technical-planning` | Produce the approved HOW, work packages, commands, and scope. |
 | `bug-diagnosis` | Reproduce suspected defects without mutation before repair. |
@@ -34,44 +34,54 @@ The plugin does not assume that a target repository contains `.agents/skills`. R
 
 ## CLI
 
-The portable entry point is `bin/sdlc` (or `bin/sdlc.cmd` on Windows). A source checkout can
+The portable entry point is `bin/megin` (or `bin/megin.cmd` on Windows). A source checkout can
 invoke the Python implementation directly:
 
 ```console
-<plugin-root>/bin/sdlc classify --repo <target-repo> --request "<request>"
-<plugin-root>/bin/sdlc init --repo <target-repo>
-<plugin-root>/bin/sdlc doctor --repo <target-repo>
-<plugin-root>/bin/sdlc start --repo <target-repo> --request "<request>"
-<plugin-root>/bin/sdlc status --repo <target-repo> --work-id <work-id>
-<plugin-root>/bin/sdlc resume --repo <target-repo> --work-id <work-id>
-<plugin-root>/bin/sdlc finish --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin classify --repo <target-repo> --request "<request>"
+<plugin-root>/bin/megin init --repo <target-repo>
+<plugin-root>/bin/megin doctor --repo <target-repo>
+<plugin-root>/bin/megin start --repo <target-repo> --request "<request>"
+<plugin-root>/bin/megin status --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin resume --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin finish --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin migrate --repo <target-repo> --dry-run
+<plugin-root>/bin/megin migrate --repo <target-repo>
 python -X utf8 -B <plugin-root>/scripts/validate.py
 ```
 
-Use `SDLC_STATE_ROOT` to select a persistent state directory outside the target repository.
+Use `MEGIN_STATE_ROOT` to select a persistent state directory outside the target repository.
 The CLI stores only redacted command evidence and digests in that directory; credentials are
 never written to project configuration or runtime state.
+
+`migrate` is the one-time transition for repositories that still have `.sdlc/config.json` or
+legacy state. It validates source integrity, stages the converted files, rewrites Megin-owned
+paths and schemas, refreshes derived digests, then publishes atomically. Use
+`--from-state-root` and `--to-state-root` for custom locations. Successful migrations retain
+`.sdlc.migrated-<digest>` and a state backup; `--dry-run` makes no changes and a repeat run
+returns `already_migrated`. Normal commands never read the old configuration and do not expose
+an `sdlc` alias.
 
 For a small task, pass the approved scope and test command while starting, then record the
 integrated approval and the independent results:
 
 ```console
-<plugin-root>/bin/sdlc start --repo <target-repo> --request "<request>" \
+<plugin-root>/bin/megin start --repo <target-repo> --request "<request>" \
   --allowed-path src/example.py --test-command "python -m unittest" \
   --approve --approval-ref user:approval
-<plugin-root>/bin/sdlc resume --repo <target-repo> --work-id <work-id> \
+<plugin-root>/bin/megin resume --repo <target-repo> --work-id <work-id> \
   --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-<plugin-root>/bin/sdlc resume --repo <target-repo> --work-id <work-id> \
+<plugin-root>/bin/megin resume --repo <target-repo> --work-id <work-id> \
   --review-verdict APPROVED --reviewer-id fresh-reviewer \
   --review-report <review-report.json>
-<plugin-root>/bin/sdlc finish --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin finish --repo <target-repo> --work-id <work-id>
 ```
 
 Large changes use `--approve requirements` and `--approve plan` on separate `resume` calls.
-Bug repairs first require `sdlc diagnose --command <read-only-oracle> --disposition confirmed|likely
+Bug repairs first require `megin diagnose --command <read-only-oracle> --disposition confirmed|likely
 --hypothesis <falsifiable-cause>` and then `start --diagnosis-file <assessment>`. A diagnosis without
 that evidence never creates a delivery worktree. Knowledge updates require a separate
-`sdlc-knowledge-review/v1` report passed with `--knowledge-report`.
+`megin-knowledge-review/v1` report passed with `--knowledge-report`.
 
 For large work, optional `--requirements-file` and `--plan-file` inputs are copied as redacted,
 content-digested candidate bundles in the external state directory. The state exposes one-time
@@ -79,8 +89,8 @@ writer and fresh-review tickets; callers that identify a writer must return its 
 with the matching `--writer-ticket`. A task-specific dispatch file can be passed at start with
 `--work-package-file <packages.json>`; its acceptance, interfaces, path boundaries, dependency
 order, and focused/related/full commands are included in the approval digest. Writer and Reviewer
-results must conform to the `sdlc-writer-report-v1`, `sdlc-review-report-v1`, and
-`sdlc-knowledge-review-v1` schemas under `schemas/`; a CLI flag without the corresponding
+results must conform to the `megin-writer-report-v1`, `megin-review-report-v1`, and
+`megin-knowledge-review-v1` schemas under `schemas/`; a CLI flag without the corresponding
 snapshot-bound report is rejected.
 
 Each reviewer test-evidence item also carries its approved command, redacted output

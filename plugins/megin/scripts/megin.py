@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Portable SDLC v2 command line entry point.
+"""Portable Megin v2 command line entry point.
 
 The command intentionally has no third party dependencies.  It keeps runtime state in a
-user state directory and only writes the target repository's opt-in ``.sdlc/config.json``
+user state directory and only writes the target repository's opt-in ``.megin/config.json``
 and approved delivery changes.  The CLI is a small, deterministic state machine; the
 Codex skills provide the human and sub-agent orchestration around it.
 """
@@ -35,16 +35,24 @@ if hasattr(sys.stderr, "reconfigure"):
 
 
 SCHEMA = "delivery-run/v2"
-CONFIG_SCHEMA = "sdlc-project/v1"
-PLUGIN_VERSION = "0.1.0"
+CONFIG_SCHEMA = "megin-project/v1"
+MIGRATION_SCHEMA = "megin-migration/v1"
+PLUGIN_VERSION = "0.2.0"
 # v2 records are bound to the contract major version.  A newer compatible
 # plugin may continue an older minor/patch record; it must never reinterpret a
 # v1 record or a future record it does not understand.
 PLUGIN_VERSION_PARTS = tuple(int(item) for item in PLUGIN_VERSION.split(".")[:3])
 DIAGNOSIS_SCHEMA = "bug-diagnosis/v1"
-WRITER_REPORT_SCHEMA = "sdlc-writer-report/v1"
-REVIEW_REPORT_SCHEMA = "sdlc-review-report/v1"
-KNOWLEDGE_REVIEW_SCHEMA = "sdlc-knowledge-review/v1"
+WRITER_REPORT_SCHEMA = "megin-writer-report/v1"
+REVIEW_REPORT_SCHEMA = "megin-review-report/v1"
+KNOWLEDGE_REVIEW_SCHEMA = "megin-knowledge-review/v1"
+# These legacy identifiers are intentionally limited to the one-time migration
+# compatibility layer; normal Megin commands never accept them as identities.
+LEGACY_CONFIG_SCHEMA = "sdlc-project/v1"
+LEGACY_WRITER_REPORT_SCHEMA = "sdlc-writer-report/v1"
+LEGACY_REVIEW_REPORT_SCHEMA = "sdlc-review-report/v1"
+LEGACY_KNOWLEDGE_REVIEW_SCHEMA = "sdlc-knowledge-review/v1"
+LEGACY_CAPABILITY_SCHEMA = "sdlc-capability/v1"
 WORK_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 TASK_CLASSES = ("read_only", "small", "large", "bug")
@@ -52,7 +60,7 @@ APPROVAL_STAGES = ("integrated", "requirements", "plan")
 DELIVERY_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "schemas" / "delivery-run-v2.schema.json"
 
 
-class SdlcError(RuntimeError):
+class MeginError(RuntimeError):
     """A user-actionable, fail-closed CLI error."""
 
 
@@ -145,7 +153,7 @@ def reserve_state_file(path: Path) -> None:
     try:
         descriptor = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError as exc:
-        raise SdlcError(f"work ID already exists for this repository: {path.stem}; use resume") from exc
+        raise MeginError(f"work ID already exists for this repository: {path.stem}; use resume") from exc
     try:
         os.close(descriptor)
     except Exception:
@@ -161,11 +169,11 @@ def read_json(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as handle:
             value = json.load(handle)
     except FileNotFoundError as exc:
-        raise SdlcError(f"state/configuration not found: {path}") from exc
+        raise MeginError(f"state/configuration not found: {path}") from exc
     except (OSError, json.JSONDecodeError) as exc:
-        raise SdlcError(f"cannot read JSON file {path}: {exc}") from exc
+        raise MeginError(f"cannot read JSON file {path}: {exc}") from exc
     if not isinstance(value, dict):
-        raise SdlcError(f"JSON root must be an object: {path}")
+        raise MeginError(f"JSON root must be an object: {path}")
     return value
 
 
@@ -346,13 +354,13 @@ def run_process(
             check=False,
         )
     except FileNotFoundError as exc:
-        raise SdlcError(f"tool not found: {command[0]}") from exc
+        raise MeginError(f"tool not found: {command[0]}") from exc
     except subprocess.TimeoutExpired as exc:
         output = redact((exc.stdout or "") + (exc.stderr or ""))
-        raise SdlcError(f"command timed out after {timeout}s: {' '.join(command)}\n{output}") from exc
+        raise MeginError(f"command timed out after {timeout}s: {' '.join(command)}\n{output}") from exc
     if check and result.returncode != 0:
         detail = redact((result.stdout or "") + (result.stderr or "")).strip()
-        raise SdlcError(f"command failed ({result.returncode}): {' '.join(command)}\n{detail}")
+        raise MeginError(f"command failed ({result.returncode}): {' '.join(command)}\n{detail}")
     return result
 
 
@@ -360,7 +368,7 @@ def git(cwd: Path, *arguments: str, check: bool = True, timeout: int = 60) -> st
     result = run_process(("git", *arguments), cwd, timeout=timeout, check=False)
     if check and result.returncode != 0:
         detail = redact((result.stdout or "") + (result.stderr or "")).strip()
-        raise SdlcError(f"git {' '.join(arguments)} failed ({result.returncode}) in {cwd}: {detail}")
+        raise MeginError(f"git {' '.join(arguments)} failed ({result.returncode}) in {cwd}: {detail}")
     return result.stdout or ""
 
 
@@ -381,19 +389,19 @@ def git_bytes(cwd: Path, *arguments: str, check: bool = True, timeout: int = 60)
             check=False,
         )
     except FileNotFoundError as exc:
-        raise SdlcError("tool not found: git") from exc
+        raise MeginError("tool not found: git") from exc
     except subprocess.TimeoutExpired as exc:
-        raise SdlcError(f"git command timed out after {timeout}s: git {' '.join(arguments)}") from exc
+        raise MeginError(f"git command timed out after {timeout}s: git {' '.join(arguments)}") from exc
     if check and result.returncode != 0:
         detail = redact((result.stdout + result.stderr).decode("utf-8", errors="replace")).strip()
-        raise SdlcError(f"git {' '.join(arguments)} failed ({result.returncode}): {detail}")
+        raise MeginError(f"git {' '.join(arguments)} failed ({result.returncode}): {detail}")
     return result.stdout or b""
 
 
 def require_git_repo(path: str | Path) -> Path:
     requested = Path(path).expanduser().resolve()
     if not requested.exists():
-        raise SdlcError(f"repository path does not exist: {requested}")
+        raise MeginError(f"repository path does not exist: {requested}")
     top = git(requested, "rev-parse", "--show-toplevel", check=True).strip()
     return Path(top).resolve()
 
@@ -432,9 +440,9 @@ def validate_remote_name(value: str | None) -> str | None:
     value = str(value).strip()
     # The portable contract stores a Git remote *name*, never an URL or credential.
     if value.startswith("-") or "@" in value or "://" in value or re.search(r"\s", value):
-        raise SdlcError("remote must be a Git remote name; credentials and URLs are not stored")
+        raise MeginError("remote must be a Git remote name; credentials and URLs are not stored")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", value):
-        raise SdlcError("remote contains unsupported characters")
+        raise MeginError("remote contains unsupported characters")
     return value
 
 
@@ -474,7 +482,7 @@ def validate_branch_name(value: str) -> str:
         or re.search(r"[\s\x00-\x1f\\~^:?*\[]", value)
         or not re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", value)
     ):
-        raise SdlcError(f"base branch contains unsupported characters: {value!r}")
+        raise MeginError(f"base branch contains unsupported characters: {value!r}")
     return value
 
 
@@ -485,14 +493,14 @@ def head_sha(repo: Path) -> str:
 def normalize_rel(value: str) -> str:
     value = str(value).strip().replace("\\", "/")
     if not value:
-        raise SdlcError("paths cannot be empty")
+        raise MeginError("paths cannot be empty")
     if value == ".":
         return "."
     if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
-        raise SdlcError(f"path must be relative to the worktree: {value}")
+        raise MeginError(f"path must be relative to the worktree: {value}")
     pieces = value.split("/")
     if any(piece in ("", ".", "..") for piece in pieces):
-        raise SdlcError(f"path traversal is not allowed: {value}")
+        raise MeginError(f"path traversal is not allowed: {value}")
     return "/".join(pieces)
 
 
@@ -539,7 +547,7 @@ def working_tree_manifest(
     for name in names:
         try:
             normalized = normalize_rel(name)
-        except SdlcError:
+        except MeginError:
             continue
         if any(allowed_path(normalized, [item]) for item in requested) and not any(allowed_path(normalized, [item]) for item in excluded):
             paths.add(normalized)
@@ -558,7 +566,7 @@ def working_tree_manifest(
                             child_path = normalize_rel(str(child.relative_to(repo)))
                             if not any(allowed_path(child_path, [item]) for item in excluded):
                                 paths.add(child_path)
-                        except SdlcError:
+                        except MeginError:
                             continue
     files: list[dict[str, Any]] = []
     for path in sorted(paths):
@@ -567,7 +575,7 @@ def working_tree_manifest(
             try:
                 data = snapshot_bytes(absolute)
             except OSError as exc:
-                raise SdlcError(f"cannot read snapshot path {path}: {exc}") from exc
+                raise MeginError(f"cannot read snapshot path {path}: {exc}") from exc
             files.append({"path": path, "sha256": digest_bytes(data), "size": len(data), "mode": stat.S_IMODE(absolute.lstat().st_mode)})
         else:
             # Keep deletions in the manifest so a delete cannot masquerade as
@@ -680,7 +688,7 @@ def _knowledge_manifest(repo: Path, scope: Sequence[str]) -> list[dict[str, Any]
     for name in names:
         try:
             normalized = normalize_rel(name)
-        except SdlcError:
+        except MeginError:
             continue
         if allowed_path(normalized, requested):
             paths.add(normalized)
@@ -693,7 +701,7 @@ def _knowledge_manifest(repo: Path, scope: Sequence[str]) -> list[dict[str, Any]
                 if child.is_file() and ".git" not in child.parts:
                     try:
                         paths.add(normalize_rel(str(child.relative_to(repo))))
-                    except SdlcError:
+                    except MeginError:
                         continue
     result: list[dict[str, Any]] = []
     for path in sorted(paths):
@@ -799,13 +807,13 @@ def lint_knowledge_candidate(state: dict[str, Any], repo: Path) -> tuple[dict[st
     knowledge = state.get("knowledge", {})
     candidate_path = knowledge.get("candidate_path")
     if not candidate_path:
-        raise SdlcError("knowledge candidate is missing")
+        raise MeginError("knowledge candidate is missing")
     path = Path(candidate_path).expanduser().resolve()
     if not path.exists():
-        raise SdlcError(f"knowledge candidate is missing: {path}")
+        raise MeginError(f"knowledge candidate is missing: {path}")
     raw = path.read_bytes()
     if digest_bytes(raw) != knowledge.get("candidate_sha256"):
-        raise SdlcError("knowledge candidate digest drifted; review a new candidate")
+        raise MeginError("knowledge candidate digest drifted; review a new candidate")
     payload = read_json(path)
     errors: list[str] = []
     if payload.get("schema") != "knowledge-candidate/v2":
@@ -826,7 +834,7 @@ def lint_knowledge_candidate(state: dict[str, Any], repo: Path) -> tuple[dict[st
             continue
         try:
             item = normalize_rel(claim["path"])
-        except SdlcError:
+        except MeginError:
             errors.append("knowledge claim contains an invalid path")
             continue
         if item in seen:
@@ -862,28 +870,28 @@ def validate_knowledge_record(state: dict[str, Any]) -> None:
         return
     candidate_path = knowledge.get("candidate_path")
     if not candidate_path:
-        raise SdlcError("reviewed knowledge has no candidate path")
+        raise MeginError("reviewed knowledge has no candidate path")
     path = Path(candidate_path).expanduser().resolve()
     expected_root = state_root(state["repo"]["repo_id"], Path(state["repo"]["path"])) / state["repo"]["repo_id"] / state["work_id"]
     try:
         path.relative_to(expected_root)
     except ValueError as exc:
-        raise SdlcError("knowledge candidate is outside the persistent work state") from exc
+        raise MeginError("knowledge candidate is outside the persistent work state") from exc
     if not path.exists() or digest_bytes(path.read_bytes()) != knowledge.get("candidate_sha256"):
-        raise SdlcError("knowledge candidate digest drifted; review a new candidate")
+        raise MeginError("knowledge candidate digest drifted; review a new candidate")
     payload = read_json(path)
     if payload.get("schema") != "knowledge-candidate/v2" or payload.get("work_id") != state.get("work_id"):
-        raise SdlcError("knowledge candidate identity drifted")
+        raise MeginError("knowledge candidate identity drifted")
     if payload.get("revision") != candidate_revision(state):
-        raise SdlcError("knowledge candidate revision drifted")
+        raise MeginError("knowledge candidate revision drifted")
     report_path = Path(str(knowledge.get("report_path", ""))).expanduser().resolve()
     report_root = expected_root / "knowledge"
     try:
         report_path.relative_to(report_root)
     except ValueError as exc:
-        raise SdlcError("knowledge review report is outside the persistent work state") from exc
+        raise MeginError("knowledge review report is outside the persistent work state") from exc
     if not report_path.exists() or digest_bytes(report_path.read_bytes()) != knowledge.get("report_sha256"):
-        raise SdlcError("knowledge review report is missing or drifted")
+        raise MeginError("knowledge review report is missing or drifted")
     report = read_json(report_path)
     if (
         report.get("schema") != KNOWLEDGE_REVIEW_SCHEMA
@@ -894,7 +902,7 @@ def validate_knowledge_record(state: dict[str, Any]) -> None:
         or normalize_paths(report.get("scope", [])) != normalize_paths(knowledge.get("scope", []))
         or report.get("status") != "reviewed"
     ):
-        raise SdlcError("knowledge review report is not bound to the saved candidate")
+        raise MeginError("knowledge review report is not bound to the saved candidate")
 
 
 def promote_knowledge(state: dict[str, Any], repo: Path) -> None:
@@ -903,18 +911,18 @@ def promote_knowledge(state: dict[str, Any], repo: Path) -> None:
         knowledge["status"] = "not_needed"
         return
     if knowledge.get("status") not in ("reviewed", "promoted"):
-        raise SdlcError("knowledge promotion requires a reviewed candidate")
+        raise MeginError("knowledge promotion requires a reviewed candidate")
     before = knowledge.get("snapshot_before") or knowledge_snapshot(repo, knowledge["scope"])
     current = knowledge_snapshot(repo, knowledge["scope"])
     if knowledge.get("snapshot_before") and current != before:
         knowledge["conflicts"] = [f"knowledge scope changed after review: {', '.join(knowledge.get('scope', []))}"]
         knowledge["status"] = "blocked"
-        raise SdlcError("knowledge scope changed after review; obtain a fresh knowledge review")
+        raise MeginError("knowledge scope changed after review; obtain a fresh knowledge review")
     payload, errors = lint_knowledge_candidate(state, repo)
     if errors:
         knowledge["lint"] = {"status": "failed", "errors": errors}
         knowledge["status"] = "blocked"
-        raise SdlcError("knowledge candidate lint failed: " + "; ".join(errors))
+        raise MeginError("knowledge candidate lint failed: " + "; ".join(errors))
     written: list[str] = []
     skipped_redacted: list[str] = []
     planned_writes: list[tuple[str, Path, str]] = []
@@ -926,7 +934,7 @@ def promote_knowledge(state: dict[str, Any], repo: Path) -> None:
         if not allowed_path(item, state.get("approval", {}).get("scope", {}).get("allowed_paths", [])):
             knowledge["conflicts"] = [f"knowledge claim is outside approved write scope: {item}"]
             knowledge["status"] = "blocked"
-            raise SdlcError(f"knowledge claim is outside approved write scope: {item}")
+            raise MeginError(f"knowledge claim is outside approved write scope: {item}")
         target = repo / item
         if claim.get("redacted"):
             skipped_redacted.append(item)
@@ -939,7 +947,7 @@ def promote_knowledge(state: dict[str, Any], repo: Path) -> None:
             if current_sha != claim.get("sha256"):
                 knowledge["conflicts"] = [f"canonical knowledge changed after review: {item}"]
                 knowledge["status"] = "blocked"
-                raise SdlcError(f"canonical knowledge changed after review: {item}")
+                raise MeginError(f"canonical knowledge changed after review: {item}")
         if not target.exists() or target.read_text(encoding="utf-8", errors="replace") != content:
             planned_writes.append((item, target, content))
     # Complete all conflict checks before changing any canonical file.  A later
@@ -956,20 +964,707 @@ def promote_knowledge(state: dict[str, Any], repo: Path) -> None:
 
 
 def state_root(repo_id: str, repo: Path) -> Path:
-    configured = os.environ.get("SDLC_STATE_ROOT")
+    configured = os.environ.get("MEGIN_STATE_ROOT")
     if configured:
         root = Path(configured).expanduser().resolve()
     elif os.name == "nt":
         base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
-        root = (Path(base) if base else Path.home()) / "sdlc" / "state"
+        root = (Path(base) if base else Path.home()) / "megin" / "state"
     else:
-        root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "sdlc"
+        root = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "megin"
     root = root.resolve()
     try:
         root.relative_to(repo)
     except ValueError:
         return root
-    raise SdlcError("SDLC_STATE_ROOT must be outside the target repository")
+    raise MeginError("MEGIN_STATE_ROOT must be outside the target repository")
+
+
+def _migration_is_redirect(path: Path) -> bool:
+    """Return whether a migration input is a symlink or Windows reparse point."""
+
+    try:
+        value = path.lstat()
+    except FileNotFoundError:
+        return False
+    attributes = int(getattr(value, "st_file_attributes", 0))
+    reparse_point = int(getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+    return path.is_symlink() or bool(attributes & reparse_point)
+
+
+def _migration_signature(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
+    return (
+        int(value.st_mode),
+        int(value.st_size),
+        int(value.st_mtime_ns),
+        int(value.st_ctime_ns),
+        int(value.st_dev),
+        int(value.st_ino),
+    )
+
+
+def _migration_read(path: Path) -> bytes:
+    """Read one stable, regular migration input without following redirects."""
+
+    if _migration_is_redirect(path):
+        raise MeginError(f"migration refuses symlink or reparse-point input: {path}")
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise MeginError(f"migration input is not a regular file: {path}")
+        payload = path.read_bytes()
+        after = path.lstat()
+    except MeginError:
+        raise
+    except OSError as exc:
+        raise MeginError(f"migration cannot read {path}: {exc}") from exc
+    if _migration_signature(before) != _migration_signature(after):
+        raise MeginError(f"migration input changed during inspection: {path}")
+    return payload
+
+
+def _migration_files(root: Path) -> list[tuple[str, bytes]]:
+    """List a legacy state subtree while rejecting locks, redirects, and drift."""
+
+    if not root.exists() and not root.is_symlink():
+        return []
+    if _migration_is_redirect(root):
+        raise MeginError(f"migration refuses a redirected state root: {root}")
+    if not root.is_dir():
+        raise MeginError(f"migration state root is not a directory: {root}")
+
+    result: list[tuple[str, bytes]] = []
+
+    def on_error(error: OSError) -> None:
+        raise MeginError(f"migration cannot inspect state root {root}: {error}") from error
+
+    for current, directories, files in os.walk(root, topdown=True, followlinks=False, onerror=on_error):
+        current_path = Path(current)
+        directories.sort()
+        files.sort()
+        for name in directories:
+            child = current_path / name
+            if _migration_is_redirect(child):
+                raise MeginError(f"migration refuses symlink or reparse-point directory: {child}")
+        for name in files:
+            child = current_path / name
+            if name == ".lock" or name.endswith(".lock"):
+                raise MeginError(f"migration is blocked by an active lock: {child}")
+            result.append((child.relative_to(root).as_posix(), _migration_read(child)))
+    return result
+
+
+def _migration_reject_redirect_ancestors(path: Path, label: str) -> None:
+    """Reject a configured path that crosses a symlink or reparse point."""
+
+    candidate = path.expanduser()
+    for ancestor in (candidate, *candidate.parents):
+        if _migration_is_redirect(ancestor):
+            raise MeginError(f"migration refuses redirected {label}: {ancestor}")
+
+
+def _migration_root(
+    repo: Path,
+    explicit: str | None,
+    environment: str,
+    product_name: str,
+) -> Path:
+    configured = explicit or os.environ.get(environment)
+    if configured:
+        root = Path(configured).expanduser()
+    elif os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        root = (Path(base) if base else Path.home()) / product_name / "state"
+    else:
+        base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+        root = base / product_name
+    _migration_reject_redirect_ancestors(root, "state root")
+    root = root.resolve()
+    try:
+        root.relative_to(repo)
+    except ValueError:
+        return root
+    raise MeginError(f"{environment} must be outside the target repository")
+
+
+def _migration_rewrite_path(value: Any, source_root: Path, target_root: Path) -> Any:
+    if not isinstance(value, str) or not value.strip():
+        return value
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        return value
+    try:
+        relative = candidate.resolve().relative_to(source_root.resolve())
+    except ValueError:
+        return value
+    return str((target_root / relative).resolve())
+
+
+_MIGRATION_PATH_KEYS = {
+    "path", "repo", "repo_path", "worktree", "state_root", "evidence_path",
+    "candidate_path", "report_path", "reviewer_capability_path", "capability_path",
+    "requirements_path", "handoff_path", "assessment_path", "source_path",
+}
+
+
+def _migration_rewrite_paths(value: Any, source_root: Path, target_root: Path, key: str | None = None) -> Any:
+    if isinstance(value, dict):
+        return {
+            name: _migration_rewrite_paths(item, source_root, target_root, name)
+            for name, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_migration_rewrite_paths(item, source_root, target_root, key) for item in value]
+    if key in _MIGRATION_PATH_KEYS or (key and key.endswith("_path")):
+        return _migration_rewrite_path(value, source_root, target_root)
+    return value
+
+
+_MIGRATION_SCHEMA_RENAMES = {
+    LEGACY_CONFIG_SCHEMA: CONFIG_SCHEMA,
+    LEGACY_WRITER_REPORT_SCHEMA: WRITER_REPORT_SCHEMA,
+    LEGACY_REVIEW_REPORT_SCHEMA: REVIEW_REPORT_SCHEMA,
+    LEGACY_KNOWLEDGE_REVIEW_SCHEMA: KNOWLEDGE_REVIEW_SCHEMA,
+    LEGACY_CAPABILITY_SCHEMA: "megin-capability/v1",
+}
+
+
+def _migration_json_kind(payload: dict[str, Any]) -> str:
+    schema = payload.get("schema")
+    if schema == SCHEMA and isinstance(payload.get("plugin"), str):
+        return "state"
+    if schema in {
+        LEGACY_WRITER_REPORT_SCHEMA, LEGACY_REVIEW_REPORT_SCHEMA,
+        LEGACY_KNOWLEDGE_REVIEW_SCHEMA, WRITER_REPORT_SCHEMA,
+        REVIEW_REPORT_SCHEMA, KNOWLEDGE_REVIEW_SCHEMA,
+    }:
+        return "report"
+    if schema in {LEGACY_CAPABILITY_SCHEMA, "megin-capability/v1"}:
+        return "capability"
+    if schema == DIAGNOSIS_SCHEMA:
+        return "diagnosis"
+    if schema == "knowledge-candidate/v2":
+        return "candidate"
+    return "opaque"
+
+
+def _migration_transform_payload(
+    payload: dict[str, Any], source_root: Path, target_root: Path,
+) -> tuple[dict[str, Any], str]:
+    kind = _migration_json_kind(payload)
+    transformed = _migration_rewrite_paths(payload, source_root, target_root)
+    if kind == "state":
+        transformed = dict(transformed)
+        transformed["plugin"] = "megin"
+        transformed["plugin_version"] = PLUGIN_VERSION
+        for assignment in transformed.get("assignments", []) or []:
+            if not isinstance(assignment, dict):
+                continue
+            writer_result = assignment.get("writer_result")
+            if isinstance(writer_result, dict) and writer_result.get("schema") in _MIGRATION_SCHEMA_RENAMES:
+                writer_result["schema"] = _MIGRATION_SCHEMA_RENAMES[writer_result["schema"]]
+    elif kind in {"report", "capability"}:
+        transformed = dict(transformed)
+        schema = transformed.get("schema")
+        if schema in _MIGRATION_SCHEMA_RENAMES:
+            transformed["schema"] = _MIGRATION_SCHEMA_RENAMES[schema]
+    elif kind == "opaque":
+        return payload, kind
+    if kind == "capability":
+        transformed = dict(transformed)
+        transformed.pop("capability_sha256", None)
+        transformed["capability_sha256"] = digest_json(transformed)
+    elif kind == "diagnosis" and "record_sha256" in transformed:
+        transformed = dict(transformed)
+        transformed.pop("record_sha256", None)
+        transformed["record_sha256"] = digest_json(transformed)
+    return transformed, kind
+
+
+def _migration_path(value: Any) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        return None
+    return candidate.resolve()
+
+
+def _migration_file_digest(value: Any) -> str | None:
+    path = _migration_path(value)
+    if path is None or not path.exists() or not path.is_file():
+        return None
+    return digest_bytes(_migration_read(path))
+
+
+def _migration_manifest(files: Sequence[tuple[str, bytes]]) -> list[dict[str, Any]]:
+    return [
+        {"path": relative, "sha256": digest_bytes(data), "size": len(data)}
+        for relative, data in files
+    ]
+
+
+def _migration_verify_config_snapshot(path: Path, expected: bytes) -> None:
+    if _migration_read(path) != expected:
+        raise MeginError(f"legacy configuration changed during migration: {path}")
+
+
+def _migration_verify_state_snapshot(
+    root: Path, expected_present: bool, expected_manifest: Sequence[dict[str, Any]],
+) -> None:
+    current_present = root.exists() or root.is_symlink()
+    if current_present != expected_present:
+        raise MeginError(f"legacy state presence changed during migration: {root}")
+    current_manifest = _migration_manifest(_migration_files(root))
+    if current_manifest != list(expected_manifest):
+        raise MeginError(f"legacy state changed during migration: {root}")
+
+
+def _migration_rebind_report(
+    path_value: Any, schema: str, assignment_sha256: str | None, ticket_sha256: str | None = None,
+) -> str | None:
+    path = _migration_path(path_value)
+    if path is None or not path.exists():
+        return None
+    try:
+        payload = json.loads(_migration_read(path).decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise MeginError(f"migrated report is not valid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise MeginError(f"migrated report root must be an object: {path}")
+    payload_schema = payload.get("schema")
+    if payload_schema in _MIGRATION_SCHEMA_RENAMES:
+        payload_schema = _MIGRATION_SCHEMA_RENAMES[payload_schema]
+    if payload_schema != schema:
+        raise MeginError(f"migrated report schema does not match its state binding: {path}")
+    payload["schema"] = schema
+    if assignment_sha256 is not None:
+        payload["assignment_sha256"] = assignment_sha256
+    if ticket_sha256 is not None and "ticket_sha256" in payload:
+        payload["ticket_sha256"] = ticket_sha256
+    write_json_atomic(path, payload)
+    return digest_bytes(_migration_read(path))
+
+
+def _migration_refresh_review_ticket(state: dict[str, Any]) -> None:
+    review = state.get("review", {})
+    if not review.get("verdict"):
+        return
+    assignment = next(
+        (item for item in state.get("assignments", []) if item.get("assignment_id") == review.get("assignment_id")),
+        None,
+    )
+    if not assignment:
+        return
+    review["assignment_sha256"] = assignment.get("assignment_sha256")
+    review["review_ticket_sha256"] = digest_json({
+        "work_id": state["work_id"],
+        "assignment_id": assignment.get("assignment_id"),
+        "assignment_sha256": assignment.get("assignment_sha256"),
+        "snapshot": review.get("snapshot"),
+        "product_snapshot": review.get("product_snapshot"),
+        "round": review.get("round"),
+        "reviewer_id": review.get("reviewer_id"),
+        "reviewer_session": review.get("reviewer_session"),
+        "verdict": review.get("verdict"),
+        "findings": review.get("findings", []),
+        "test_evidence": review.get("test_evidence", []),
+        "no_progress_count": review.get("no_progress_count", 0),
+        "review_report_sha256": review.get("report_sha256"),
+        "reviewer_capability_sha256": review.get("reviewer_capability_sha256"),
+    })
+
+
+def _migration_refresh_state(state: dict[str, Any]) -> None:
+    """Rebind every derived digest after state-owned paths or identities move."""
+
+    task_assessment = (state.get("task", {}) or {}).get("diagnosis_assessment") or {}
+    if task_assessment.get("path"):
+        assessment_sha = _migration_file_digest(task_assessment.get("path"))
+        if assessment_sha:
+            task_assessment["sha256"] = assessment_sha
+
+    candidates = state.get("candidates", {}) or {}
+    for candidate in candidates.values():
+        if isinstance(candidate, dict) and candidate.get("path"):
+            candidate_sha = _migration_file_digest(candidate.get("path"))
+            if candidate_sha:
+                candidate["sha256"] = candidate_sha
+
+    knowledge = state.get("knowledge", {}) or {}
+    if knowledge.get("candidate_path"):
+        candidate_sha = _migration_file_digest(knowledge.get("candidate_path"))
+        if candidate_sha:
+            knowledge["candidate_sha256"] = candidate_sha
+    if knowledge.get("report_path"):
+        report_sha = _migration_file_digest(knowledge.get("report_path"))
+        if report_sha:
+            knowledge["report_sha256"] = report_sha
+
+    for assignment in state.get("assignments", []) or []:
+        capability_path = _migration_path(assignment.get("capability_path"))
+        if capability_path and capability_path.exists():
+            try:
+                capability = json.loads(_migration_read(capability_path).decode("utf-8"))
+            except (UnicodeError, json.JSONDecodeError) as exc:
+                raise MeginError(f"migrated capability is not valid JSON: {capability_path}") from exc
+            if isinstance(capability, dict) and capability.get("capability_sha256"):
+                assignment["capability_sha256"] = capability["capability_sha256"]
+        writer_result = assignment.get("writer_result")
+        if isinstance(writer_result, dict):
+            report_sha = _migration_file_digest(writer_result.get("report_path"))
+            if report_sha:
+                writer_result["report_sha256"] = report_sha
+            assignment["writer_result_sha256"] = digest_json(writer_result)
+        assignment["ticket_sha256"] = digest_json(assignment_ticket_payload(state, assignment))
+        refresh_assignment_digest(assignment)
+
+    review = state.get("review", {}) or {}
+    if review.get("report_path"):
+        report_sha = _migration_file_digest(review.get("report_path"))
+        if report_sha:
+            review["report_sha256"] = report_sha
+    reviewer_capability_path = _migration_path(review.get("reviewer_capability_path"))
+    if reviewer_capability_path and reviewer_capability_path.exists():
+        try:
+            capability = json.loads(_migration_read(reviewer_capability_path).decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise MeginError(f"migrated capability is not valid JSON: {reviewer_capability_path}") from exc
+        if isinstance(capability, dict) and capability.get("capability_sha256"):
+            review["reviewer_capability_sha256"] = capability["capability_sha256"]
+    _migration_refresh_review_ticket(state)
+    refresh_verification_digest(state)
+    refresh_approval_digests(state)
+    # Approval digests are part of assignment tickets. Rebind the tickets a
+    # second time after refreshing approval/candidate-derived values so a path
+    # move cannot leave a valid-looking but stale writer ticket behind.
+    for assignment in state.get("assignments", []) or []:
+        assignment["ticket_sha256"] = digest_json(assignment_ticket_payload(state, assignment))
+        writer_result = assignment.get("writer_result")
+        if isinstance(writer_result, dict):
+            report_sha = _migration_rebind_report(
+                writer_result.get("report_path"), WRITER_REPORT_SCHEMA, None, assignment["ticket_sha256"],
+            )
+            if report_sha:
+                writer_result["report_sha256"] = report_sha
+            writer_result["ticket_sha256"] = assignment["ticket_sha256"]
+            assignment["writer_result_sha256"] = digest_json(writer_result)
+            evidence_path = _migration_path(writer_result.get("evidence_path"))
+            if evidence_path and evidence_path.exists():
+                # The persisted writer result is a derived binding artifact;
+                # keep it byte-for-byte equal to the state copy after tickets
+                # and report digests are refreshed.
+                write_json_atomic(evidence_path, writer_result)
+        refresh_assignment_digest(assignment)
+    review = state.get("review", {}) or {}
+    if review.get("verdict"):
+        assignment = next(
+            (item for item in state.get("assignments", []) if item.get("assignment_id") == review.get("assignment_id")),
+            None,
+        )
+        if assignment:
+            report_sha = _migration_rebind_report(
+                review.get("report_path"), REVIEW_REPORT_SCHEMA, assignment["assignment_sha256"],
+            )
+            if report_sha:
+                review["report_sha256"] = report_sha
+    _migration_refresh_review_ticket(state)
+
+
+def _migration_transform_tree(root: Path, source_root: Path, target_root: Path) -> list[str]:
+    state_paths: list[Path] = []
+    for relative, _ in _migration_files(root):
+        path = root / Path(relative)
+        if path.suffix.casefold() != ".json":
+            continue
+        try:
+            payload = json.loads(_migration_read(path).decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise MeginError(f"migration JSON is malformed: {path}") from exc
+        if not isinstance(payload, dict):
+            raise MeginError(f"migration JSON root must be an object: {path}")
+        transformed, kind = _migration_transform_payload(payload, source_root, target_root)
+        if kind != "opaque":
+            write_json_atomic(path, transformed)
+        if kind == "state":
+            state_paths.append(path)
+
+    work_ids: list[str] = []
+    for path in state_paths:
+        state = read_json(path)
+        work_id = validate_work_id(str(state.get("work_id", "")))
+        # During the second pass the state references already point at the
+        # final destination, while the staged files still live in root.parent.
+        # Temporarily resolve those references back to the physical staging
+        # root while recalculating derived digests, then restore final paths.
+        physical = _migration_rewrite_paths(state, target_root, root.parent)
+        _migration_refresh_state(physical)
+        state = _migration_rewrite_paths(physical, root.parent, target_root)
+        # The state subtree is still staged under ``root.parent`` at this
+        # point, but its references now name the eventual target root.  Keep
+        # the persisted writer evidence at its physical staging path while
+        # storing the final path values inside it; otherwise the state and
+        # evidence would disagree after the subtree is published.
+        physical_assignments = {
+            item.get("assignment_id"): item
+            for item in physical.get("assignments", []) or []
+            if isinstance(item, dict)
+        }
+        for assignment in state.get("assignments", []) or []:
+            if not isinstance(assignment, dict):
+                continue
+            writer_result = assignment.get("writer_result")
+            physical_assignment = physical_assignments.get(assignment.get("assignment_id"))
+            physical_result = physical_assignment.get("writer_result") if physical_assignment else None
+            if not isinstance(writer_result, dict) or not isinstance(physical_result, dict):
+                continue
+            evidence_path = _migration_path(physical_result.get("evidence_path"))
+            if evidence_path and evidence_path.exists():
+                write_json_atomic(evidence_path, writer_result)
+        write_json_atomic(path, state)
+        work_ids.append(work_id)
+    return sorted(set(work_ids))
+
+
+def _migration_existing_work_ids(root: Path) -> list[str]:
+    if not root.exists():
+        return []
+    work_ids: list[str] = []
+    for relative, raw in _migration_files(root):
+        path = root / Path(relative)
+        if path.parent != root or path.suffix.casefold() != ".json":
+            continue
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise MeginError(f"existing Megin state is malformed: {path}") from exc
+        if isinstance(payload, dict) and payload.get("schema") == SCHEMA:
+            work_ids.append(validate_work_id(str(payload.get("work_id", ""))))
+    return sorted(set(work_ids))
+
+
+def _migration_validate_state_root(root: Path, repo: Path, work_ids: Sequence[str]) -> None:
+    previous = os.environ.get("MEGIN_STATE_ROOT")
+    os.environ["MEGIN_STATE_ROOT"] = str(root)
+    try:
+        for work_id in work_ids:
+            load_state(repo, work_id)
+    finally:
+        if previous is None:
+            os.environ.pop("MEGIN_STATE_ROOT", None)
+        else:
+            os.environ["MEGIN_STATE_ROOT"] = previous
+
+
+def _migration_config(repo: Path, path: Path) -> tuple[dict[str, Any], bytes]:
+    if _migration_is_redirect(path.parent):
+        raise MeginError(f"migration refuses redirected legacy configuration: {path.parent}")
+    raw = _migration_read(path)
+    try:
+        config = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise MeginError(f"legacy project configuration is malformed: {path}") from exc
+    if not isinstance(config, dict):
+        raise MeginError(f"legacy project configuration must be a JSON object: {path}")
+    if config.get("schema") != LEGACY_CONFIG_SCHEMA or config.get("plugin") != "sdlc":
+        raise MeginError(f"unsupported legacy project configuration: {path}")
+    if config.get("repo_id") != repo_identity(repo):
+        raise MeginError(f"legacy project configuration repository identity drifted: {path}")
+    configured_repo = config.get("repo_path")
+    if configured_repo and Path(str(configured_repo)).expanduser().resolve() != repo:
+        raise MeginError(f"legacy project configuration points to a different repository: {path}")
+    validate_remote_name(config.get("remote"))
+    for command in config.get("test_commands", []) or []:
+        validate_command_text(str(command))
+    migrated = dict(config)
+    migrated["schema"] = CONFIG_SCHEMA
+    migrated["plugin"] = "megin"
+    migrated["plugin_version"] = PLUGIN_VERSION
+    return migrated, raw
+
+
+def cmd_migrate(args: argparse.Namespace) -> int:
+    repo = require_git_repo(args.repo)
+    try:
+        result = _run_migration(args, repo)
+    except MeginError as exc:
+        source_root = target_root = None
+        try:
+            source_root = _migration_root(repo, args.from_state_root, "SDLC_STATE_ROOT", "sdlc")
+            target_root = _migration_root(repo, args.to_state_root, "MEGIN_STATE_ROOT", "megin")
+        except MeginError:
+            pass
+        emit(_migration_result(repo, "blocked", source_root, target_root, None, conflicts=[str(exc)]), args)
+        return 3
+    emit(result, args)
+    return 0
+
+
+def _migration_result(
+    repo: Path,
+    status: str,
+    source_root: Path | None,
+    target_root: Path | None,
+    migration_id: str | None,
+    work_ids: Sequence[str] = (),
+    file_count: int = 0,
+    conflicts: Sequence[str] = (),
+    backup: dict[str, str | None] | None = None,
+) -> dict[str, Any]:
+    return {
+        "schema": MIGRATION_SCHEMA,
+        "status": status,
+        "repo": str(repo),
+        "source": {"config": str(repo / ".sdlc" / "config.json"), "state_root": str(source_root) if source_root else None},
+        "target": {"config": str(repo / ".megin" / "config.json"), "state_root": str(target_root) if target_root else None},
+        "migration_id": migration_id,
+        "backup": backup,
+        "work_ids": list(work_ids),
+        "file_count": int(file_count),
+        "conflicts": [redact(str(item)) for item in conflicts],
+    }
+
+
+def _run_migration(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
+    legacy_dir = repo / ".sdlc"
+    target_dir = repo / ".megin"
+    legacy_config = legacy_dir / "config.json"
+    target_config = target_dir / "config.json"
+    legacy_present = legacy_dir.exists() or legacy_dir.is_symlink()
+    target_present = target_dir.exists() or target_dir.is_symlink()
+
+    if target_present and _migration_is_redirect(target_dir):
+        raise MeginError(f"migration destination is a symlink or reparse point: {target_dir}")
+    if legacy_present and _migration_is_redirect(legacy_dir):
+        raise MeginError(f"legacy configuration is a symlink or reparse point: {legacy_dir}")
+    if not legacy_present:
+        if not target_present:
+            raise MeginError(f"legacy project configuration was not found: {legacy_config}")
+        try:
+            config = load_config(repo, required=True)
+        except MeginError as exc:
+            raise MeginError(f"Megin configuration exists but is invalid: {target_config}") from exc
+        source_root = _migration_root(repo, args.from_state_root, "SDLC_STATE_ROOT", "sdlc")
+        target_root = _migration_root(repo, args.to_state_root, "MEGIN_STATE_ROOT", "megin")
+        old_state = source_root / repo_identity(repo)
+        if old_state.exists() and _migration_files(old_state):
+            raise MeginError(f"legacy state remains after configuration migration: {old_state}")
+        target_state = target_root / repo_identity(repo)
+        work_ids = _migration_existing_work_ids(target_state)
+        _migration_validate_state_root(target_root, repo, work_ids)
+        return _migration_result(repo, "already_migrated", source_root, target_root, None, work_ids)
+
+    if not legacy_config.exists() or not legacy_config.is_file():
+        raise MeginError(f"legacy project configuration is missing: {legacy_config}")
+    if target_present:
+        raise MeginError(f"migration destination already exists: {target_dir}")
+    migrated_config, config_raw = _migration_config(repo, legacy_config)
+    repo_id = repo_identity(repo)
+    source_root = _migration_root(repo, args.from_state_root, "SDLC_STATE_ROOT", "sdlc")
+    target_root = _migration_root(repo, args.to_state_root, "MEGIN_STATE_ROOT", "megin")
+    source_state = source_root / repo_id
+    target_state = target_root / repo_id
+    if source_root == target_root and target_state.exists():
+        # Same-root migrations intentionally stage and swap the repository-id subtree.
+        pass
+    elif target_state.exists() or target_state.is_symlink():
+        raise MeginError(f"migration state destination already exists: {target_state}")
+    source_state_present = source_state.exists() or source_state.is_symlink()
+    source_files = _migration_files(source_state)
+    manifest = _migration_manifest(source_files)
+    migration_id = digest_json({"config_sha256": digest_bytes(config_raw), "state": manifest})
+    state_backup = source_root / f"{repo_id}.sdlc-migrated-{migration_id}"
+    config_backup = repo / f".sdlc.migrated-{migration_id}"
+    if source_state.exists() and state_backup.exists():
+        raise MeginError(f"migration backup already exists: {state_backup}")
+    if config_backup.exists():
+        raise MeginError(f"migration backup already exists: {config_backup}")
+
+    if args.dry_run:
+        stage_root = Path(tempfile.mkdtemp(prefix="megin-migration-dry-run-"))
+        try:
+            stage_state = stage_root / repo_id
+            stage_state.mkdir(parents=True, exist_ok=True)
+            for relative, data in source_files:
+                write_bytes_atomic(stage_state / Path(relative), data)
+            work_ids = _migration_transform_tree(stage_state, source_root, stage_root)
+            _migration_validate_state_root(stage_root, repo, work_ids)
+            return _migration_result(
+                repo, "dry_run", source_root, target_root, migration_id, work_ids,
+                len(source_files) + 1,
+                backup={"config": str(config_backup), "state": str(state_backup) if source_state.exists() else None},
+            )
+        finally:
+            shutil.rmtree(stage_root, ignore_errors=True)
+
+    target_root.parent.mkdir(parents=True, exist_ok=True)
+    stage_root = Path(tempfile.mkdtemp(prefix=f".{repo_id}.megin-migration-", dir=str(target_root.parent)))
+    stage_state = stage_root / repo_id
+    state_published = False
+    config_started = False
+    try:
+        stage_state.mkdir(parents=True, exist_ok=True)
+        for relative, data in source_files:
+            write_bytes_atomic(stage_state / Path(relative), data)
+        work_ids = _migration_transform_tree(stage_state, source_root, stage_root)
+        _migration_verify_config_snapshot(legacy_config, config_raw)
+        _migration_verify_state_snapshot(source_state, source_state_present, manifest)
+        _migration_validate_state_root(stage_root, repo, work_ids)
+        _migration_transform_tree(stage_state, stage_root, target_root)
+
+        if source_state_present:
+            target_root.mkdir(parents=True, exist_ok=True)
+            os.replace(source_state, state_backup)
+            os.replace(stage_state, target_state)
+            state_published = True
+            # The second staging pass rebases state-owned paths to their final
+            # destination before the subtree is published.  Refresh the
+            # path-sensitive bindings once the files are physically at that
+            # destination so persisted evidence, report bytes, and assignment
+            # digests all describe the same final tree.
+            for work_id in work_ids:
+                published_path = target_state / f"{work_id}.json"
+                published_state = read_json(published_path)
+                _migration_refresh_state(published_state)
+                write_json_atomic(published_path, published_state)
+            _migration_validate_state_root(target_root, repo, work_ids)
+
+        _migration_verify_config_snapshot(legacy_config, config_raw)
+        os.replace(legacy_dir, config_backup)
+        config_started = True
+        target_dir.mkdir(parents=False, exist_ok=False)
+        write_json_atomic(target_config, migrated_config)
+        load_config(repo, required=True)
+        return _migration_result(
+            repo, "migrated", source_root, target_root, migration_id, work_ids,
+            len(source_files) + 1,
+            backup={"config": str(config_backup), "state": str(state_backup) if state_backup.exists() else None},
+        )
+    except Exception as exc:
+        recovery: list[str] = []
+        failed_state = target_root / f"{repo_id}.megin-failed-{migration_id}"
+        failed_config = repo / f".megin.failed-{migration_id}"
+        try:
+            if state_published and target_state.exists():
+                os.replace(target_state, failed_state)
+                recovery.append(str(failed_state))
+            if source_state.exists() is False and state_backup.exists():
+                os.replace(state_backup, source_state)
+                recovery.append(str(source_state))
+            if config_started and target_dir.exists() and not legacy_dir.exists():
+                os.replace(target_dir, failed_config)
+                recovery.append(str(failed_config))
+            if legacy_dir.exists() is False and config_backup.exists():
+                os.replace(config_backup, legacy_dir)
+                recovery.append(str(legacy_dir))
+        except OSError as recovery_error:
+            recovery.append(f"recovery-error: {recovery_error}")
+        detail = f"migration failed safely: {exc}"
+        if recovery:
+            detail += "; recovery artifacts: " + ", ".join(recovery)
+        raise MeginError(detail) from exc
+    finally:
+        shutil.rmtree(stage_root, ignore_errors=True)
 
 
 def state_target_repo(state: dict[str, Any], fallback: Path) -> Path:
@@ -1007,7 +1702,7 @@ def record_diagnosis(repo: Path, args: argparse.Namespace) -> tuple[dict[str, An
     before = working_tree_snapshot(repo)
     try:
         result = run_process(parse_command(command_text), repo, timeout=300, check=False)
-    except SdlcError:
+    except MeginError:
         raise
     after = working_tree_snapshot(repo)
     output = redact((result.stdout or "") + (result.stderr or ""))
@@ -1056,57 +1751,57 @@ def load_diagnosis_assessment(
     path = _external_path(value, repo)
     payload = read_json(path)
     if payload.get("schema") != DIAGNOSIS_SCHEMA:
-        raise SdlcError("diagnosis assessment must use bug-diagnosis/v1")
+        raise MeginError("diagnosis assessment must use bug-diagnosis/v1")
     schema_errors = validate_delivery_schema(payload, DELIVERY_SCHEMA_PATH.parent / "bug-diagnosis-v1.schema.json")
     if schema_errors:
-        raise SdlcError(f"diagnosis assessment schema validation failed: {'; '.join(schema_errors[:8])}")
+        raise MeginError(f"diagnosis assessment schema validation failed: {'; '.join(schema_errors[:8])}")
     if payload.get("repo_id") != repo_identity(repo):
-        raise SdlcError("diagnosis assessment repository identity drifted")
+        raise MeginError("diagnosis assessment repository identity drifted")
     expected_request_sha = request_sha256 or digest_text(request or "")
     if payload.get("request_sha256") != expected_request_sha:
-        raise SdlcError("diagnosis assessment belongs to a different request")
+        raise MeginError("diagnosis assessment belongs to a different request")
     if payload.get("disposition") not in ("confirmed", "likely", "partial", "not-a-bug", "blocked"):
-        raise SdlcError("diagnosis assessment has an unsupported disposition")
+        raise MeginError("diagnosis assessment has an unsupported disposition")
     if not payload.get("command") or not payload.get("hypothesis"):
-        raise SdlcError("diagnosis assessment must include the oracle command and root-cause hypothesis")
+        raise MeginError("diagnosis assessment must include the oracle command and root-cause hypothesis")
     if payload.get("record_sha256") != _diagnosis_payload_digest(payload):
-        raise SdlcError("diagnosis assessment digest drifted")
+        raise MeginError("diagnosis assessment digest drifted")
     root = diagnosis_directory(repo)
     try:
         path.relative_to(root)
     except ValueError as exc:
-        raise SdlcError("diagnosis assessment is outside the persistent state") from exc
+        raise MeginError("diagnosis assessment is outside the persistent state") from exc
     evidence_path = _external_path(str(payload.get("evidence_path", "")), repo)
     try:
         evidence_path.relative_to(root)
     except ValueError as exc:
-        raise SdlcError("diagnosis evidence is outside the persistent state") from exc
+        raise MeginError("diagnosis evidence is outside the persistent state") from exc
     if not evidence_path.exists() or not evidence_path.is_file():
-        raise SdlcError("diagnosis evidence is missing")
+        raise MeginError("diagnosis evidence is missing")
     evidence = evidence_path.read_bytes()
     if digest_bytes(evidence) != payload.get("output_sha256") or len(evidence) != payload.get("output_bytes"):
-        raise SdlcError("diagnosis evidence digest drifted")
+        raise MeginError("diagnosis evidence digest drifted")
     if payload.get("disposition") in ("confirmed", "likely") and (payload.get("input_snapshot") != payload.get("output_snapshot") or payload.get("read_only") is not True):
-        raise SdlcError("diagnosis command changed the repository; repair authorization is unavailable")
+        raise MeginError("diagnosis command changed the repository; repair authorization is unavailable")
     return payload, path
 
 
 def load_external_report(value: str | None, repo: Path, *, label: str) -> tuple[dict[str, Any], Path, str]:
     if not value:
-        raise SdlcError(f"{label} requires an external report file")
+        raise MeginError(f"{label} requires an external report file")
     path = _external_path(value, repo)
     payload = read_json(path)
     schema_files = {
         DIAGNOSIS_SCHEMA: "bug-diagnosis-v1.schema.json",
-        WRITER_REPORT_SCHEMA: "sdlc-writer-report-v1.schema.json",
-        REVIEW_REPORT_SCHEMA: "sdlc-review-report-v1.schema.json",
-        KNOWLEDGE_REVIEW_SCHEMA: "sdlc-knowledge-review-v1.schema.json",
+        WRITER_REPORT_SCHEMA: "megin-writer-report-v1.schema.json",
+        REVIEW_REPORT_SCHEMA: "megin-review-report-v1.schema.json",
+        KNOWLEDGE_REVIEW_SCHEMA: "megin-knowledge-review-v1.schema.json",
     }
     schema_name = schema_files.get(payload.get("schema"))
     if schema_name:
         schema_errors = validate_delivery_schema(payload, DELIVERY_SCHEMA_PATH.parent / schema_name)
         if schema_errors:
-            raise SdlcError(f"{label} schema validation failed: {'; '.join(schema_errors[:8])}")
+            raise MeginError(f"{label} schema validation failed: {'; '.join(schema_errors[:8])}")
     return payload, path, digest_bytes(path.read_bytes())
 
 
@@ -1182,7 +1877,7 @@ def normalize_review_test_evidence(
     """Verify reviewer evidence and copy redacted output into persistent state."""
 
     if not isinstance(value, list) or not value:
-        raise SdlcError("review report test evidence must be a non-empty array")
+        raise MeginError("review report test evidence must be a non-empty array")
     evidence_root = review_evidence_root(state, repo).resolve()
     allowed_roots = (
         source_path.parent.resolve(),
@@ -1194,41 +1889,41 @@ def normalize_review_test_evidence(
     round_number = int(state.get("review", {}).get("round") or 0) + 1
     for index, item in enumerate(value, 1):
         if not isinstance(item, dict):
-            raise SdlcError(f"review test evidence item is invalid: {index}")
+            raise MeginError(f"review test evidence item is invalid: {index}")
         if item.get("status") not in ("passed", "verified"):
-            raise SdlcError(f"review test evidence is not passing: {index}")
+            raise MeginError(f"review test evidence is not passing: {index}")
         command = str(item.get("command", "")).strip()
         if not command or command not in commands:
-            raise SdlcError(f"review test evidence uses an unapproved command: {index}")
+            raise MeginError(f"review test evidence uses an unapproved command: {index}")
         output_sha = item.get("output_sha256")
         output_bytes = item.get("output_bytes")
         if not isinstance(output_sha, str) or not SHA256_RE.fullmatch(output_sha):
-            raise SdlcError(f"review test evidence has an invalid output digest: {index}")
+            raise MeginError(f"review test evidence has an invalid output digest: {index}")
         if not isinstance(output_bytes, int) or isinstance(output_bytes, bool) or output_bytes < 0:
-            raise SdlcError(f"review test evidence has an invalid output length: {index}")
+            raise MeginError(f"review test evidence has an invalid output length: {index}")
         if item.get("input_snapshot") != expected_snapshot or item.get("output_snapshot") != expected_snapshot:
-            raise SdlcError(f"review test evidence snapshot is stale: {index}")
+            raise MeginError(f"review test evidence snapshot is stale: {index}")
         evidence_value = item.get("evidence_path")
         if not isinstance(evidence_value, str) or not evidence_value.strip():
-            raise SdlcError(f"review test evidence is missing its raw output path: {index}")
+            raise MeginError(f"review test evidence is missing its raw output path: {index}")
         source_evidence = Path(evidence_value).expanduser()
         if not source_evidence.is_absolute():
             source_evidence = source_path.parent / source_evidence
         source_evidence = source_evidence.resolve()
         if source_evidence in seen_sources:
-            raise SdlcError(f"review raw output is reused for multiple evidence items: {index}")
+            raise MeginError(f"review raw output is reused for multiple evidence items: {index}")
         seen_sources.add(source_evidence)
         if not _path_is_under(source_evidence, allowed_roots):
-            raise SdlcError(f"review raw output is outside the report or persistent evidence roots: {index}")
+            raise MeginError(f"review raw output is outside the report or persistent evidence roots: {index}")
         if not source_evidence.exists() or not source_evidence.is_file():
-            raise SdlcError(f"review raw output is missing: {index}")
+            raise MeginError(f"review raw output is missing: {index}")
         # Evidence written by the controller is redacted before hashing.  This
         # keeps copied reviewer output safe while preserving exact byte-level
         # freshness and digest checks for the persisted artifact.
         raw = source_evidence.read_bytes()
         persisted = redact(raw.decode("utf-8", errors="replace")).encode("utf-8")
         if digest_bytes(persisted) != output_sha or len(persisted) != output_bytes:
-            raise SdlcError(f"review raw output digest does not match the report: {index}")
+            raise MeginError(f"review raw output digest does not match the report: {index}")
         destination = evidence_root / f"review-{round_number}-{index}-{output_sha[:16]}.log"
         write_bytes_atomic(destination, persisted)
         normalized_item = dict(item)
@@ -1331,9 +2026,9 @@ def register_capability(
     """
 
     if kind not in ("writer", "reviewer") or not identity.strip() or not session_id.strip():
-        raise SdlcError("capability identity and session are required")
+        raise MeginError("capability identity and session are required")
     payload = {
-        "schema": "sdlc-capability/v1",
+        "schema": "megin-capability/v1",
         "work_id": state["work_id"],
         "repo_id": state["repo"]["repo_id"],
         "kind": kind,
@@ -1363,38 +2058,38 @@ def validate_capability(
     session_id: str | None = None,
 ) -> None:
     if not path_value or not expected_digest:
-        raise SdlcError("delegated capability record is missing")
+        raise MeginError("delegated capability record is missing")
     path = Path(path_value).expanduser().resolve()
     root = capability_root(state, Path(state["repo"]["path"]))
     try:
         path.relative_to(root)
     except ValueError as exc:
-        raise SdlcError("delegated capability is outside the persistent work state") from exc
+        raise MeginError("delegated capability is outside the persistent work state") from exc
     if not path.exists():
-        raise SdlcError("delegated capability record is missing")
+        raise MeginError("delegated capability record is missing")
     payload = read_json(path)
     stored = payload.pop("capability_sha256", None)
     if stored != expected_digest or digest_json(payload) != expected_digest:
-        raise SdlcError("delegated capability digest drifted")
+        raise MeginError("delegated capability digest drifted")
     if payload.get("work_id") != state.get("work_id") or payload.get("repo_id") != state.get("repo", {}).get("repo_id"):
-        raise SdlcError("delegated capability identity drifted")
+        raise MeginError("delegated capability identity drifted")
     if kind and payload.get("kind") != kind:
-        raise SdlcError("delegated capability kind drifted")
+        raise MeginError("delegated capability kind drifted")
     if kind == "reviewer" and payload.get("read_only") is not True:
-        raise SdlcError("reviewer capability must be read-only")
+        raise MeginError("reviewer capability must be read-only")
     if kind == "writer" and payload.get("read_only") is not False:
-        raise SdlcError("writer capability cannot be read-only")
+        raise MeginError("writer capability cannot be read-only")
     if assignment_id and payload.get("assignment_id") != assignment_id:
-        raise SdlcError("delegated capability assignment drifted")
+        raise MeginError("delegated capability assignment drifted")
     if identity and payload.get("identity") != identity:
-        raise SdlcError("delegated capability identity drifted")
+        raise MeginError("delegated capability identity drifted")
     if session_id and payload.get("session_id") != session_id:
-        raise SdlcError("delegated capability session drifted")
+        raise MeginError("delegated capability session drifted")
 
 
 def validate_work_id(work_id: str) -> str:
     if not WORK_ID_RE.fullmatch(work_id) or not (3 <= len(work_id) <= 64):
-        raise SdlcError("work-id must be 3-64 lowercase letters, digits, and hyphens")
+        raise MeginError("work-id must be 3-64 lowercase letters, digits, and hyphens")
     return work_id
 
 
@@ -1482,38 +2177,43 @@ def explicit_class(request: str, requested: str | None, repo: Path | None = None
     if not requested:
         return result
     if requested not in TASK_CLASSES:
-        raise SdlcError(f"unsupported task class: {requested}")
+        raise MeginError(f"unsupported task class: {requested}")
     if result["task_class"] == "read_only" and requested != "read_only":
-        raise SdlcError("a read-only explanation, assessment, diagnosis, or review cannot be forced into a mutating delivery class")
+        raise MeginError("a read-only explanation, assessment, diagnosis, or review cannot be forced into a mutating delivery class")
     if result["task_class"] == "bug" and requested in ("small", "large"):
-        raise SdlcError("a suspected bug must complete read-only diagnosis before choosing a repair class")
+        raise MeginError("a suspected bug must complete read-only diagnosis before choosing a repair class")
     if requested == "small" and result["task_class"] == "large":
-        raise SdlcError("cannot downgrade an uncertain or architectural request to small; narrow and re-approve it")
+        raise MeginError("cannot downgrade an uncertain or architectural request to small; narrow and re-approve it")
     if requested == "read_only" and result["task_class"] in ("small", "large", "bug"):
-        raise SdlcError("a mutating request cannot be forced into read_only")
+        raise MeginError("a mutating request cannot be forced into read_only")
     result["task_class"] = requested
     result["reason"] = f"explicitly selected {requested}; original exploration: {result['reason']}"
     return result
 
 
 def load_config(repo: Path, *, required: bool = True) -> dict[str, Any] | None:
-    path = repo / ".sdlc" / "config.json"
+    path = repo / ".megin" / "config.json"
     if not path.exists():
+        legacy = repo / ".sdlc" / "config.json"
+        if legacy.exists():
+            raise MeginError(
+                f"legacy project configuration found at {legacy}; run `megin migrate --repo {repo}`"
+            )
         if required:
-            raise SdlcError(f"project is not initialized; run `sdlc init --repo {repo}`")
+            raise MeginError(f"project is not initialized; run `megin init --repo {repo}`")
         return None
     config = read_json(path)
     if config.get("schema") != CONFIG_SCHEMA:
-        raise SdlcError(f"unsupported project configuration schema in {path}")
+        raise MeginError(f"unsupported project configuration schema in {path}")
     if config.get("repo_id") != repo_identity(repo):
-        raise SdlcError(f"project configuration repository identity drifted: {path}")
+        raise MeginError(f"project configuration repository identity drifted: {path}")
     validate_remote_name(config.get("remote"))
     return config
 
 
 def parse_command(value: str) -> list[str]:
     if not isinstance(value, str) or not value.strip():
-        raise SdlcError("test commands must be non-empty strings")
+        raise MeginError("test commands must be non-empty strings")
     try:
         if os.name == "nt":
             # ``shlex.split(..., posix=True)`` treats every backslash as an
@@ -1549,15 +2249,15 @@ def parse_command(value: str) -> list[str]:
         else:
             command = shlex.split(value, posix=True)
     except ValueError as exc:
-        raise SdlcError(f"cannot parse test command {value!r}: {exc}") from exc
+        raise MeginError(f"cannot parse test command {value!r}: {exc}") from exc
     if not command:
-        raise SdlcError("test commands must contain an executable")
+        raise MeginError("test commands must contain an executable")
     return command
 
 
 def validate_command_text(value: str) -> str:
     if redact(value) != value:
-        raise SdlcError("test commands must not contain credential-shaped values; use environment references")
+        raise MeginError("test commands must not contain credential-shaped values; use environment references")
     parse_command(value)
     return value
 
@@ -1578,7 +2278,7 @@ def build_scope(args: argparse.Namespace, config: dict[str, Any] | None) -> dict
         validate_command_text(command)
     knowledge = normalize_paths(getattr(args, "knowledge_path", None) or [])
     if knowledge and any(not allowed_path(path, allowed) for path in knowledge):
-        raise SdlcError("knowledge scope must be contained in the approved allowed paths")
+        raise MeginError("knowledge scope must be contained in the approved allowed paths")
     remote = getattr(args, "remote", None)
     if remote is None and config:
         remote = config.get("remote")
@@ -1592,7 +2292,7 @@ def build_scope(args: argparse.Namespace, config: dict[str, Any] | None) -> dict
     else:
         base_branch = current_branch(Path.cwd())
     base_branch = validate_branch_name(base_branch)
-    title = getattr(args, "title", None) or getattr(args, "request", None) or "SDLC delivery"
+    title = getattr(args, "title", None) or getattr(args, "request", None) or "Megin delivery"
     acceptance = [redact(value) for value in (getattr(args, "acceptance", None) or [title])]
     return {
         "acceptance": acceptance,
@@ -1608,7 +2308,7 @@ def approval_args(args: argparse.Namespace) -> set[str]:
     for value in getattr(args, "approve", None) or []:
         value = value or "integrated"
         if value not in APPROVAL_STAGES:
-            raise SdlcError(f"approval stage must be one of {', '.join(APPROVAL_STAGES)}")
+            raise MeginError(f"approval stage must be one of {', '.join(APPROVAL_STAGES)}")
         values.add(value)
     if getattr(args, "approval_ref", None):
         values.add("integrated")
@@ -1692,35 +2392,35 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
     state = read_json(path)
     schema_errors = validate_delivery_schema(state)
     if schema_errors:
-        raise SdlcError(f"state schema validation failed: {'; '.join(schema_errors[:8])}")
+        raise MeginError(f"state schema validation failed: {'; '.join(schema_errors[:8])}")
     if state.get("schema") != SCHEMA:
-        raise SdlcError(f"state is not a delivery-run/v2 record: {path}")
-    if state.get("plugin") != "sdlc" or not compatible_plugin_version(state.get("plugin_version")):
-        raise SdlcError(
-            f"state is bound to unsupported sdlc plugin {state.get('plugin_version')!r}; current engine is {PLUGIN_VERSION}"
+        raise MeginError(f"state is not a delivery-run/v2 record: {path}")
+    if state.get("plugin") != "megin" or not compatible_plugin_version(state.get("plugin_version")):
+        raise MeginError(
+            f"state is bound to unsupported megin plugin {state.get('plugin_version')!r}; current engine is {PLUGIN_VERSION}"
         )
     if state.get("work_id") != work_id or state.get("repo", {}).get("repo_id") != repo_identity(repo):
-        raise SdlcError(f"state identity mismatch: {path}")
+        raise MeginError(f"state identity mismatch: {path}")
     task_record = state.get("task", {})
     if task_record.get("task_class") == "bug":
         assessment = task_record.get("diagnosis_assessment")
         if not isinstance(assessment, dict) or not assessment.get("path") or not assessment.get("sha256"):
-            raise SdlcError(f"bug run has no bound diagnosis assessment: {path}")
+            raise MeginError(f"bug run has no bound diagnosis assessment: {path}")
         assessment_payload, assessment_path = load_diagnosis_assessment(
             assessment["path"], repo, request_sha256=task_record.get("request_sha256"),
         )
         if digest_bytes(assessment_path.read_bytes()) != assessment.get("sha256"):
-            raise SdlcError(f"diagnosis assessment binding drifted: {path}")
+            raise MeginError(f"diagnosis assessment binding drifted: {path}")
         if assessment_payload.get("disposition") != task_record.get("diagnosis"):
-            raise SdlcError(f"diagnosis disposition drifted: {path}")
+            raise MeginError(f"diagnosis disposition drifted: {path}")
         if assessment.get("disposition") != assessment_payload.get("disposition") or assessment.get("hypothesis") != assessment_payload.get("hypothesis"):
-            raise SdlcError(f"diagnosis assessment summary drifted: {path}")
+            raise MeginError(f"diagnosis assessment summary drifted: {path}")
     try:
         expected_payload = digest_json(candidate_payload(state))
     except (KeyError, TypeError) as exc:
-        raise SdlcError(f"state is missing required approval fields: {path}") from exc
+        raise MeginError(f"state is missing required approval fields: {path}") from exc
     if state.get("approval", {}).get("payload_sha256") != expected_payload:
-        raise SdlcError(f"approval scope digest drifted; re-plan and create a new Work ID: {path}")
+        raise MeginError(f"approval scope digest drifted; re-plan and create a new Work ID: {path}")
     approval = state.get("approval", {})
     expected_stage_digests = {}
     for stage in sorted(set(approval.get("approved_stages", []))):
@@ -1737,24 +2437,24 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
             "ref": (approval.get("refs") or {}).get(stage, []),
         })
     if approval.get("stage_digests") != expected_stage_digests:
-        raise SdlcError(f"approval stage digest drifted; re-plan and create a new Work ID: {path}")
+        raise MeginError(f"approval stage digest drifted; re-plan and create a new Work ID: {path}")
     scope = approval.get("scope", {})
     try:
         configured_base = validate_branch_name(scope.get("publication", {}).get("base_branch") or state.get("repo", {}).get("base_branch"))
-    except SdlcError as exc:
-        raise SdlcError(f"approved base branch is invalid: {path}") from exc
+    except MeginError as exc:
+        raise MeginError(f"approved base branch is invalid: {path}") from exc
     if state.get("repo", {}).get("base_branch") != configured_base or state.get("publication", {}).get("base_branch") != configured_base:
-        raise SdlcError(f"base branch binding drifted: {path}")
+        raise MeginError(f"base branch binding drifted: {path}")
     if any(not allowed_path(item, scope.get("allowed_paths", [])) for item in scope.get("knowledge_scope", [])):
-        raise SdlcError(f"knowledge scope is outside the approved write scope: {path}")
+        raise MeginError(f"knowledge scope is outside the approved write scope: {path}")
     task_ids = [task.get("id") for task in state.get("tasks", [])]
     if len(task_ids) != len(set(task_ids)) or any(not item for item in task_ids):
-        raise SdlcError(f"work package identities are not unique: {path}")
+        raise MeginError(f"work package identities are not unique: {path}")
     task_id_set = set(task_ids)
     for task in state.get("tasks", []):
         dependencies = list(task.get("depends_on", [])) + list(task.get("blocked_by", []))
         if task.get("id") in dependencies or any(dependency not in task_id_set for dependency in dependencies):
-            raise SdlcError(f"work package dependency graph is invalid: {path}")
+            raise MeginError(f"work package dependency graph is invalid: {path}")
     dependency_graph = {
         task.get("id"): set(task.get("depends_on", [])) | set(task.get("blocked_by", []))
         for task in state.get("tasks", [])
@@ -1763,7 +2463,7 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
     visited: set[str] = set()
     def visit_dependency(identifier: str) -> None:
         if identifier in visiting:
-            raise SdlcError(f"work package dependency graph contains a cycle: {path}")
+            raise MeginError(f"work package dependency graph contains a cycle: {path}")
         if identifier in visited:
             return
         visiting.add(identifier)
@@ -1776,21 +2476,21 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
     validate_candidate_bundles(state)
     validate_knowledge_record(state)
     if state.get("repo", {}).get("path") != str(repo):
-        raise SdlcError(f"repository path binding drifted: {path}")
+        raise MeginError(f"repository path binding drifted: {path}")
     workspace = state.get("workspace", {})
     if workspace.get("worktree"):
         worktree = Path(workspace["worktree"]).resolve()
         if not worktree.exists():
-            raise SdlcError(f"delivery worktree is missing: {worktree}")
+            raise MeginError(f"delivery worktree is missing: {worktree}")
         actual_top = Path(git(worktree, "rev-parse", "--show-toplevel").strip()).resolve()
         if actual_top != worktree:
-            raise SdlcError(f"delivery worktree identity drifted: {worktree}")
+            raise MeginError(f"delivery worktree identity drifted: {worktree}")
         if workspace.get("branch") and current_branch(worktree) != workspace["branch"]:
-            raise SdlcError(f"delivery branch identity drifted: {worktree}")
+            raise MeginError(f"delivery branch identity drifted: {worktree}")
     assignments = state.get("assignments", [])
     for assignment in assignments:
         if assignment.get("task_id") not in task_id_set:
-            raise SdlcError(f"writer assignment references an unknown work package: {assignment.get('assignment_id')}")
+            raise MeginError(f"writer assignment references an unknown work package: {assignment.get('assignment_id')}")
         task = task_for_id(state, assignment.get("task_id"))
         if not task or any(
             assignment.get(key) != task.get(key)
@@ -1799,28 +2499,28 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
                 "related_commands", "full_commands", "blocked_by", "depends_on", "evidence_path",
             )
         ):
-            raise SdlcError(f"writer assignment does not match its approved work package: {assignment.get('assignment_id')}")
+            raise MeginError(f"writer assignment does not match its approved work package: {assignment.get('assignment_id')}")
         if not assignment.get("ticket_sha256") or not assignment.get("assignment_sha256"):
-            raise SdlcError(f"writer assignment is missing its authorization ticket: {assignment.get('assignment_id')}")
+            raise MeginError(f"writer assignment is missing its authorization ticket: {assignment.get('assignment_id')}")
         if assignment.get("ticket_sha256"):
             expected_ticket = digest_json(assignment_ticket_payload(state, assignment))
             if expected_ticket != assignment.get("ticket_sha256"):
-                raise SdlcError(f"writer assignment ticket drifted: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer assignment ticket drifted: {assignment.get('assignment_id')}")
             expected_assignment = digest_json(assignment_digest_payload(assignment))
             if assignment.get("assignment_sha256") != expected_assignment:
-                raise SdlcError(f"writer assignment digest drifted: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer assignment digest drifted: {assignment.get('assignment_id')}")
         validate_capability(
             assignment.get("capability_path"), assignment.get("capability_sha256"), state,
             kind="writer", assignment_id=assignment.get("assignment_id"),
             identity=assignment.get("writer_id"), session_id=assignment.get("session_id"),
         )
         if assignment.get("status") == "completed" and not assignment.get("writer_result"):
-            raise SdlcError(f"completed writer assignment has no result report: {assignment.get('assignment_id')}")
+            raise MeginError(f"completed writer assignment has no result report: {assignment.get('assignment_id')}")
         if assignment.get("status") == "active" and assignment.get("ticket_consumed"):
-            raise SdlcError(f"active writer assignment has a consumed ticket: {assignment.get('assignment_id')}")
+            raise MeginError(f"active writer assignment has a consumed ticket: {assignment.get('assignment_id')}")
         if assignment.get("writer_result") is not None:
             if assignment.get("writer_result_sha256") != digest_json(assignment["writer_result"]):
-                raise SdlcError(f"writer result digest drifted: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer result digest drifted: {assignment.get('assignment_id')}")
             result = assignment["writer_result"]
             if (
                 result.get("status") not in ("completed", "needs_revision", "blocked", "awaiting_upstream")
@@ -1833,27 +2533,27 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
                 or result.get("task_id") != assignment.get("task_id")
                 or result.get("snapshot") != assignment.get("completion_snapshot")
             ):
-                raise SdlcError(f"writer result is not bound to its assignment: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer result is not bound to its assignment: {assignment.get('assignment_id')}")
             result_path = Path(assignment["writer_result"].get("evidence_path", "")).expanduser().resolve()
             evidence_root = state_root(state["repo"]["repo_id"], Path(state["repo"]["path"])) / state["repo"]["repo_id"] / state["work_id"] / "evidence"
             try:
                 result_path.relative_to(evidence_root)
             except ValueError as exc:
-                raise SdlcError(f"writer result evidence is outside the persistent work state: {assignment.get('assignment_id')}") from exc
+                raise MeginError(f"writer result evidence is outside the persistent work state: {assignment.get('assignment_id')}") from exc
             if not result_path.exists() or read_json(result_path) != assignment["writer_result"]:
-                raise SdlcError(f"writer result evidence is missing or drifted: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer result evidence is missing or drifted: {assignment.get('assignment_id')}")
             report_path = Path(result.get("report_path", "")).expanduser().resolve()
             try:
                 report_path.relative_to(evidence_root)
             except ValueError as exc:
-                raise SdlcError(f"writer report is outside the persistent work state: {assignment.get('assignment_id')}") from exc
+                raise MeginError(f"writer report is outside the persistent work state: {assignment.get('assignment_id')}") from exc
             if not report_path.exists() or digest_bytes(report_path.read_bytes()) != result.get("report_sha256"):
-                raise SdlcError(f"writer report evidence is missing or drifted: {assignment.get('assignment_id')}")
+                raise MeginError(f"writer report evidence is missing or drifted: {assignment.get('assignment_id')}")
     review = state.get("review", {})
     if review.get("verdict"):
         assignment = next((item for item in assignments if item.get("assignment_id") == review.get("assignment_id")), None)
         if not assignment or review.get("assignment_sha256") != assignment.get("assignment_sha256"):
-            raise SdlcError(f"review is not bound to an assignment: {path}")
+            raise MeginError(f"review is not bound to an assignment: {path}")
         expected_review_ticket = digest_json({
             "work_id": state["work_id"],
             "assignment_id": assignment.get("assignment_id"),
@@ -1871,9 +2571,9 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
             "reviewer_capability_sha256": review.get("reviewer_capability_sha256"),
         })
         if review.get("review_ticket_sha256") != expected_review_ticket:
-            raise SdlcError(f"review ticket drifted: {path}")
+            raise MeginError(f"review ticket drifted: {path}")
         if review.get("reviewer_id") == assignment.get("writer_id") or review.get("reviewer_session") == assignment.get("session_id"):
-            raise SdlcError(f"reviewer is not independent from the writer: {path}")
+            raise MeginError(f"reviewer is not independent from the writer: {path}")
         validate_capability(
             review.get("reviewer_capability_path"), review.get("reviewer_capability_sha256"), state,
             kind="reviewer", assignment_id=review.get("assignment_id"),
@@ -1884,13 +2584,13 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
         try:
             review_report_path.relative_to(review_root)
         except ValueError as exc:
-            raise SdlcError(f"review report is outside the persistent work state: {path}") from exc
+            raise MeginError(f"review report is outside the persistent work state: {path}") from exc
         if not review_report_path.exists() or digest_bytes(review_report_path.read_bytes()) != review.get("report_sha256"):
-            raise SdlcError(f"review report evidence is missing or drifted: {path}")
+            raise MeginError(f"review report evidence is missing or drifted: {path}")
         try:
             review_payload = read_json(review_report_path)
-        except SdlcError as exc:
-            raise SdlcError(f"review report evidence is invalid: {path}") from exc
+        except MeginError as exc:
+            raise MeginError(f"review report evidence is invalid: {path}") from exc
         if (
             review_payload.get("schema") != REVIEW_REPORT_SCHEMA
             or review_payload.get("work_id") != state["work_id"]
@@ -1904,7 +2604,7 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
             or review_payload.get("findings", []) != review.get("findings", [])
             or review_payload.get("test_evidence", []) != review.get("test_evidence", [])
         ):
-            raise SdlcError(f"review report is not bound to the saved review: {path}")
+            raise MeginError(f"review report is not bound to the saved review: {path}")
         review_commands = list(dict.fromkeys(
             list(assignment.get("focused_commands", []))
             + list(assignment.get("related_commands", []))
@@ -1917,13 +2617,13 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
                 [assignment.get("focused_commands", []), assignment.get("related_commands", []), assignment.get("full_commands", [])],
             )
         ):
-            raise SdlcError(f"review test evidence does not cover the approved obligations: {path}")
+            raise MeginError(f"review test evidence does not cover the approved obligations: {path}")
         persisted_review_evidence_root = review_root / "evidence"
         seen_review_evidence: set[Path] = set()
         for item in review_payload.get("test_evidence", []):
             evidence_path = Path(str(item.get("evidence_path", ""))).expanduser().resolve()
             if evidence_path in seen_review_evidence:
-                raise SdlcError(f"review raw test evidence is reused: {path}")
+                raise MeginError(f"review raw test evidence is reused: {path}")
             seen_review_evidence.add(evidence_path)
             if not _review_evidence_item_valid(
                 item,
@@ -1931,50 +2631,50 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
                 expected_snapshot=review.get("snapshot"),
                 evidence_root=persisted_review_evidence_root,
             ):
-                raise SdlcError(f"review raw test evidence is missing, stale, or drifted: {path}")
+                raise MeginError(f"review raw test evidence is missing, stale, or drifted: {path}")
     verification = state.get("verification", {})
     if verification.get("record_sha256") != digest_json(verification_payload(verification)):
-        raise SdlcError(f"verification evidence digest drifted: {path}")
+        raise MeginError(f"verification evidence digest drifted: {path}")
     verification_commands = verification.get("commands", [])
     if not isinstance(verification_commands, list):
-        raise SdlcError(f"verification command evidence is malformed: {path}")
+        raise MeginError(f"verification command evidence is malformed: {path}")
     evidence_root = state_root(state["repo"]["repo_id"], Path(state["repo"]["path"])) / state["repo"]["repo_id"] / state["work_id"] / "evidence"
     approved_commands = approved_verification_commands(state)
     legacy_commands = list(scope.get("test_commands", []))
     for index, record in enumerate(verification_commands, 1):
         if not isinstance(record, dict) or not record.get("evidence_path"):
-            raise SdlcError(f"verification command evidence is missing: {path}")
+            raise MeginError(f"verification command evidence is missing: {path}")
         if index <= len(approved_commands) and record.get("command") != approved_commands[index - 1]:
-            raise SdlcError(f"verification command evidence is not bound to the approved command: {path}")
+            raise MeginError(f"verification command evidence is not bound to the approved command: {path}")
         evidence_path = Path(record["evidence_path"]).expanduser().resolve()
         try:
             evidence_path.relative_to(evidence_root)
         except ValueError as exc:
-            raise SdlcError(f"verification evidence is outside the persistent work state: {path}") from exc
+            raise MeginError(f"verification evidence is outside the persistent work state: {path}") from exc
         if not evidence_path.exists() or not evidence_path.is_file():
-            raise SdlcError(f"verification raw output is missing: {path}")
+            raise MeginError(f"verification raw output is missing: {path}")
         evidence_bytes = evidence_path.read_bytes()
         if digest_bytes(evidence_bytes) != record.get("output_sha256") or len(evidence_bytes) != record.get("output_bytes"):
-            raise SdlcError(f"verification raw output drifted: {path}")
+            raise MeginError(f"verification raw output drifted: {path}")
     recorded_commands = [item.get("command") for item in verification_commands]
     if verification.get("status") == "passed" and recorded_commands not in (approved_commands, legacy_commands):
-        raise SdlcError(f"verification evidence does not cover every approved command: {path}")
+        raise MeginError(f"verification evidence does not cover every approved command: {path}")
     publication = state.get("publication", {})
     if publication.get("push_commit_sha") and publication.get("push_commit_sha") != publication.get("commit_sha"):
-        raise SdlcError(f"publication push evidence is bound to a different commit: {path}")
+        raise MeginError(f"publication push evidence is bound to a different commit: {path}")
     if publication.get("commit_sha"):
         if not workspace.get("worktree"):
-            raise SdlcError(f"committed state has no delivery worktree: {path}")
+            raise MeginError(f"committed state has no delivery worktree: {path}")
         worktree = Path(workspace["worktree"]).resolve()
         if head_sha(worktree) != publication.get("commit_sha"):
-            raise SdlcError(f"saved commit SHA no longer matches the delivery branch: {path}")
+            raise MeginError(f"saved commit SHA no longer matches the delivery branch: {path}")
         expected_snapshot = publication.get("post_commit_snapshot")
         if not expected_snapshot:
-            raise SdlcError(f"committed state is missing its post-commit snapshot: {path}")
+            raise MeginError(f"committed state is missing its post-commit snapshot: {path}")
         current_snapshot = working_tree_snapshot(worktree)
         if current_snapshot != expected_snapshot:
             if not post_commit_product_recovery_allowed(state, worktree):
-                raise SdlcError(f"working tree drifted after the committed review: {path}")
+                raise MeginError(f"working tree drifted after the committed review: {path}")
     return state, path
 
 
@@ -1987,14 +2687,14 @@ def select_work_id(repo: Path, requested: str | None) -> str:
         for path in sorted(directory.glob("*.json")):
             try:
                 load_state(repo, path.stem)
-            except SdlcError:
+            except MeginError:
                 continue
             candidates.append(path.stem)
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:
-        raise SdlcError("no valid v2 run exists; provide --work-id or start a run")
-    raise SdlcError("multiple v2 runs exist; provide --work-id: " + ", ".join(candidates))
+        raise MeginError("no valid v2 run exists; provide --work-id or start a run")
+    raise MeginError("multiple v2 runs exist; provide --work-id: " + ", ".join(candidates))
 
 
 def candidate_revision(state: dict[str, Any]) -> str:
@@ -2074,11 +2774,11 @@ def _candidate_source(repo: Path, value: str | None, generated: str) -> tuple[st
     else:
         source = source.resolve()
     if not source.exists() or not source.is_file():
-        raise SdlcError(f"candidate source file does not exist: {source}")
+        raise MeginError(f"candidate source file does not exist: {source}")
     try:
         raw = source.read_bytes()
     except OSError as exc:
-        raise SdlcError(f"cannot read candidate source file {source}: {exc}") from exc
+        raise MeginError(f"cannot read candidate source file {source}: {exc}") from exc
     text = redact(raw.decode("utf-8", errors="replace"))
     return text, digest_bytes(raw), f"file:{digest_text(str(source))[:32]}"
 
@@ -2216,26 +2916,26 @@ def validate_candidate_bundles(state: dict[str, Any]) -> None:
     for name in names:
         candidate = candidates.get(name)
         if not isinstance(candidate, dict) or not candidate.get("path"):
-            raise SdlcError(f"{effective}-task {name} candidate is missing")
+            raise MeginError(f"{effective}-task {name} candidate is missing")
         path = Path(candidate["path"]).expanduser().resolve()
         expected_root = state_root(state["repo"]["repo_id"], Path(state["repo"]["path"])) / state["repo"]["repo_id"] / state["work_id"]
         try:
             path.relative_to(expected_root)
         except ValueError as exc:
-            raise SdlcError(f"{name} candidate is outside the persistent work state") from exc
+            raise MeginError(f"{name} candidate is outside the persistent work state") from exc
         if not path.exists() or not path.is_file():
-            raise SdlcError(f"{effective}-task {name} candidate is missing: {path}")
+            raise MeginError(f"{effective}-task {name} candidate is missing: {path}")
         try:
             actual = digest_bytes(path.read_bytes())
         except OSError as exc:
-            raise SdlcError(f"cannot read {name} candidate: {path}") from exc
+            raise MeginError(f"cannot read {name} candidate: {path}") from exc
         if actual != candidate.get("sha256"):
-            raise SdlcError(f"{name} candidate digest drifted; re-plan and create a new Work ID")
+            raise MeginError(f"{name} candidate digest drifted; re-plan and create a new Work ID")
         if candidate.get("revision") != candidate_revision(state):
-            raise SdlcError(f"{name} candidate revision is not the active revision")
+            raise MeginError(f"{name} candidate revision is not the active revision")
         candidate_stage = "integrated" if name == "design" else name
         if state.get("approval", {}).get("status") == "approved" and candidate_stage in set(state.get("approval", {}).get("approved_stages", [])) and candidate.get("status") != "approved":
-            raise SdlcError(f"{name} candidate is not marked approved")
+            raise MeginError(f"{name} candidate is not marked approved")
 
 
 def refresh_approval_digests(state: dict[str, Any]) -> None:
@@ -2360,14 +3060,14 @@ def create_worktree(repo: Path, work_id: str, base_sha: str) -> tuple[Path, str]
     parent = repo.parent / f"{repo.name}.worktrees"
     worktree = parent / work_id
     if worktree.exists():
-        raise SdlcError(f"worktree already exists: {worktree}")
+        raise MeginError(f"worktree already exists: {worktree}")
     if git(repo, "show-ref", "--verify", f"refs/heads/{branch}", check=False).strip():
-        raise SdlcError(f"delivery branch already exists: {branch}")
+        raise MeginError(f"delivery branch already exists: {branch}")
     parent.mkdir(parents=True, exist_ok=True)
     result = run_process(("git", "worktree", "add", "-b", branch, str(worktree), base_sha), repo, timeout=120)
     if result.returncode != 0:
         detail = redact((result.stdout or "") + (result.stderr or "")).strip()
-        raise SdlcError(f"cannot create delivery worktree ({result.returncode}): {detail}")
+        raise MeginError(f"cannot create delivery worktree ({result.returncode}): {detail}")
     return worktree.resolve(), branch
 
 
@@ -2403,18 +3103,18 @@ def _work_package_specs(args: argparse.Namespace, repo: Path) -> dict[str, dict[
             raw = path.read_text(encoding="utf-8")
             data = json.loads(raw)
         except (OSError, json.JSONDecodeError) as exc:
-            raise SdlcError(f"work-package file is not valid JSON: {path}") from exc
+            raise MeginError(f"work-package file is not valid JSON: {path}") from exc
         entries = data.get("work_packages") if isinstance(data, dict) and "work_packages" in data else data
         if isinstance(entries, dict):
             entries = [entries]
         if not isinstance(entries, list):
-            raise SdlcError(f"work-package file must contain an object or array: {path}")
+            raise MeginError(f"work-package file must contain an object or array: {path}")
         for entry in entries:
             if not isinstance(entry, dict) or not entry.get("id"):
-                raise SdlcError(f"work-package file contains an invalid entry: {path}")
+                raise MeginError(f"work-package file contains an invalid entry: {path}")
             identifier = str(entry["id"]).strip()
             if identifier in specs:
-                raise SdlcError(f"duplicate work-package specification: {identifier}")
+                raise MeginError(f"duplicate work-package specification: {identifier}")
             specs[identifier] = entry
     return specs
 
@@ -2428,18 +3128,18 @@ def build_work_packages(args: argparse.Namespace, scope: dict[str, Any], repo: P
     for value in requested:
         identifier = str(value).strip()
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", identifier):
-            raise SdlcError("work-package IDs must contain only letters, digits, dots, underscores, or hyphens")
+            raise MeginError("work-package IDs must contain only letters, digits, dots, underscores, or hyphens")
         if identifier in seen:
-            raise SdlcError(f"duplicate work package: {identifier}")
+            raise MeginError(f"duplicate work package: {identifier}")
         seen.add(identifier)
         spec = specs.get(identifier, {})
         acceptance = [redact(str(item)) for item in (spec.get("acceptance") or [f"{item} ({identifier})" for item in scope["acceptance"]])]
         allowed = normalize_paths(spec.get("allowed_paths") or scope["allowed_paths"])
         if any(not allowed_path(item, scope["allowed_paths"]) for item in allowed):
-            raise SdlcError(f"work package {identifier} is outside the approved allowed paths")
+            raise MeginError(f"work package {identifier} is outside the approved allowed paths")
         forbidden = normalize_paths(spec.get("forbidden_paths") or [])
         if any(allowed_path(item, allowed) for item in forbidden):
-            raise SdlcError(f"work package {identifier} forbidden paths overlap its allowed paths")
+            raise MeginError(f"work package {identifier} forbidden paths overlap its allowed paths")
         interfaces = [redact(str(item)) for item in (spec.get("interfaces") or [])]
         focused = [validate_command_text(str(item)) for item in (spec.get("focused_commands") or scope["test_commands"])]
         related = [validate_command_text(str(item)) for item in (spec.get("related_commands") or scope["test_commands"])]
@@ -2448,7 +3148,7 @@ def build_work_packages(args: argparse.Namespace, scope: dict[str, Any], repo: P
             for dependency_key in ("blocked_by", "depends_on"):
                 raw_dependencies = spec.get(dependency_key)
                 if raw_dependencies is not None and not isinstance(raw_dependencies, list):
-                    raise SdlcError(f"work package {identifier} {dependency_key} must be an array")
+                    raise MeginError(f"work package {identifier} {dependency_key} must be an array")
             blocked_by = [str(item).strip() for item in (spec.get("blocked_by") or []) if str(item).strip()]
             depends_on = [str(item).strip() for item in (spec.get("depends_on") or []) if str(item).strip()]
         else:
@@ -2471,18 +3171,18 @@ def build_work_packages(args: argparse.Namespace, scope: dict[str, Any], repo: P
         previous = identifier
     unknown = sorted(set(specs) - seen)
     if unknown:
-        raise SdlcError("work-package file contains packages not requested: " + ", ".join(unknown))
+        raise MeginError("work-package file contains packages not requested: " + ", ".join(unknown))
     known = {task["id"] for task in result}
     for task in result:
         dependencies = list(task.get("depends_on", [])) + list(task.get("blocked_by", []))
         if task["id"] in dependencies or any(item not in known for item in dependencies):
-            raise SdlcError(f"work package {task['id']} has an invalid dependency")
+            raise MeginError(f"work package {task['id']} has an invalid dependency")
     graph = {task["id"]: set(task.get("depends_on", [])) | set(task.get("blocked_by", [])) for task in result}
     visiting: set[str] = set()
     visited: set[str] = set()
     def visit(identifier: str) -> None:
         if identifier in visiting:
-            raise SdlcError("work-package dependency graph contains a cycle")
+            raise MeginError("work-package dependency graph contains a cycle")
         if identifier in visited:
             return
         visiting.add(identifier)
@@ -2511,7 +3211,7 @@ def _new_assignment(
     session_id = f"writer:{writer_id}"
     task = task_for_id(state, task_id) or next_ready_task(state)
     if not task:
-        raise SdlcError("no uncompleted work package is ready for assignment")
+        raise MeginError("no uncompleted work package is ready for assignment")
     baseline_repo = Path(state.get("workspace", {}).get("worktree") or (repo or state["repo"]["path"])).resolve()
     baseline_paths, _ = status_paths(baseline_repo) if baseline_repo.exists() else ([], "")
     baseline_manifest = (
@@ -2564,7 +3264,7 @@ def ensure_assignment(state: dict[str, Any], args: argparse.Namespace, repo: Pat
         return
     task = next_ready_task(state)
     if not task:
-        raise SdlcError("no uncompleted work package is ready for assignment")
+        raise MeginError("no uncompleted work package is ready for assignment")
     task["status"] = "active"
     assignment_id = f"assignment-{len(state.get('assignments', [])) + 1}"
     state.setdefault("assignments", []).append(_new_assignment(state, args, assignment_id, task_id=task["id"], repo=repo))
@@ -2576,17 +3276,17 @@ def append_assignment(state: dict[str, Any], args: argparse.Namespace, repo: Pat
     writer = (previous or {}).get("writer_id", (previous or {}).get("writer"))
     requested = getattr(args, "writer_id", None) or getattr(args, "writer", None)
     if requested and writer and requested != writer:
-        raise SdlcError("a review correction must return to the assigned implementation writer")
+        raise MeginError("a review correction must return to the assigned implementation writer")
     if task_id is None and previous and previous.get("status") == "needs_revision":
         task_id = previous.get("task_id")
     if task_id is None:
         ready = next_ready_task(state)
         if not ready:
-            raise SdlcError("no dependent work package is ready for assignment")
+            raise MeginError("no dependent work package is ready for assignment")
         task_id = ready["id"]
     task = task_for_id(state, task_id)
     if not task:
-        raise SdlcError(f"unknown work package: {task_id}")
+        raise MeginError(f"unknown work package: {task_id}")
     if task.get("status") == "pending":
         task["status"] = "active"
     state.setdefault("assignments", []).append(_new_assignment(state, args, assignment_id, writer=writer, task_id=task_id, repo=repo))
@@ -2610,7 +3310,7 @@ def base_sha_for_state(repo: Path, state: dict[str, Any]) -> str:
         resolved = git(repo, "rev-parse", "--verify", ref, check=False).strip()
         if resolved:
             return resolved
-    raise SdlcError(f"approved base branch does not exist: {branch}")
+    raise MeginError(f"approved base branch does not exist: {branch}")
 
 
 def activate_if_approved(state: dict[str, Any], repo: Path, args: argparse.Namespace) -> None:
@@ -2662,16 +3362,16 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
     repair_class = getattr(args, "repair_class", None)
     diagnosis_assessment: dict[str, Any] | None = None
     if task_class != "bug" and repair_class:
-        raise SdlcError("--repair-class is only valid for a diagnosed bug")
+        raise MeginError("--repair-class is only valid for a diagnosed bug")
     if task_class == "bug":
         diagnosis_file = getattr(args, "diagnosis_file", None)
         if not diagnosis_file:
-            raise SdlcError("bug work requires a read-only --diagnosis-file assessment before a delivery state is created")
+            raise MeginError("bug work requires a read-only --diagnosis-file assessment before a delivery state is created")
         diagnosis_payload, diagnosis_path = load_diagnosis_assessment(diagnosis_file, repo, request)
         if diagnosis_payload.get("disposition") not in ("confirmed", "likely"):
-            raise SdlcError("only confirmed or likely diagnosis assessments can enter a repair workflow")
+            raise MeginError("only confirmed or likely diagnosis assessments can enter a repair workflow")
         if getattr(args, "diagnosis", None) and args.diagnosis != diagnosis_payload.get("disposition"):
-            raise SdlcError("--diagnosis does not match the supplied assessment")
+            raise MeginError("--diagnosis does not match the supplied assessment")
         diagnosis_assessment = {
             "path": str(diagnosis_path),
             "sha256": digest_bytes(diagnosis_path.read_bytes()),
@@ -2682,24 +3382,24 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
         }
         repair_class = repair_class or ("large" if "large" in request.casefold() else "small")
         if repair_class not in ("small", "large"):
-            raise SdlcError("bug repair class must be small or large")
+            raise MeginError("bug repair class must be small or large")
     scope = build_scope(args, {**(config or {}), "repo_path": str(repo)})
     policy = "integrated" if (repair_class or task_class) == "small" else "requirements_and_plan"
     stages = approval_args(args)
     permitted_stages = {"integrated"} if policy == "integrated" else {"requirements", "plan"}
     unexpected_stages = stages - permitted_stages
     if unexpected_stages:
-        raise SdlcError(f"approval stage(s) {', '.join(sorted(unexpected_stages))} do not apply to {policy} workflow")
+        raise MeginError(f"approval stage(s) {', '.join(sorted(unexpected_stages))} do not apply to {policy} workflow")
     if policy == "requirements_and_plan" and "plan" in stages and "requirements" not in stages:
-        raise SdlcError("large-change planning approval requires a prior requirements approval")
+        raise MeginError("large-change planning approval requires a prior requirements approval")
     if policy == "requirements_and_plan" and {"requirements", "plan"}.issubset(stages):
-        raise SdlcError("large-change requirements and plan approvals must be separate resume transitions")
+        raise MeginError("large-change requirements and plan approvals must be separate resume transitions")
     # An explicit --approve without a value is represented as integrated by argparse.
     request_sha = digest_text(request)
     state: dict[str, Any] = {
         "schema": SCHEMA,
         "version": 2,
-        "plugin": "sdlc",
+        "plugin": "megin",
         "plugin_version": PLUGIN_VERSION,
         "work_id": work_id,
         "revision": 0,
@@ -2747,21 +3447,21 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
 
 def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> None:
     if getattr(args, "work_package", None) or getattr(args, "work_package_file", None):
-        raise SdlcError("dispatch packages are fixed when the Work ID is started; create a new Work ID to change them")
+        raise MeginError("dispatch packages are fixed when the Work ID is started; create a new Work ID to change them")
     if state["approval"]["status"] == "approved":
         if any(getattr(args, name, None) for name in ("allowed_path", "test_command", "knowledge_path", "acceptance", "design_file", "requirements_file", "plan_file", "remote", "base_branch", "title")):
-            raise SdlcError("approved scope is immutable; create a new revision instead of changing it")
+            raise MeginError("approved scope is immutable; create a new revision instead of changing it")
         return
     stages = approval_args(args)
     existing_stages = set(state["approval"].get("approved_stages", []))
     permitted_stages = {"integrated"} if state["approval"].get("policy") == "integrated" else {"requirements", "plan"}
     unexpected_stages = stages - permitted_stages
     if unexpected_stages:
-        raise SdlcError(f"approval stage(s) {', '.join(sorted(unexpected_stages))} do not apply to {state['approval'].get('policy')} workflow")
+        raise MeginError(f"approval stage(s) {', '.join(sorted(unexpected_stages))} do not apply to {state['approval'].get('policy')} workflow")
     if state["approval"].get("policy") == "requirements_and_plan" and {"requirements", "plan"}.issubset(stages):
-        raise SdlcError("large-change requirements and plan approvals must be separate resume transitions")
+        raise MeginError("large-change requirements and plan approvals must be separate resume transitions")
     if "plan" in stages and "requirements" not in stages and "requirements" not in existing_stages:
-        raise SdlcError("large-change planning approval requires a prior requirements approval")
+        raise MeginError("large-change planning approval requires a prior requirements approval")
     if stages:
         state["approval"]["approved_stages"] = sorted(existing_stages | stages)
         for stage in stages:
@@ -2775,7 +3475,7 @@ def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> No
         validate_command_text(command)
     proposed_knowledge = normalize_paths(args.knowledge_path) if getattr(args, "knowledge_path", None) else scope.get("knowledge_scope", [])
     if proposed_knowledge and any(not allowed_path(path, proposed_allowed) for path in proposed_knowledge):
-        raise SdlcError("knowledge scope must be contained in the approved allowed paths")
+        raise MeginError("knowledge scope must be contained in the approved allowed paths")
     proposed_acceptance = [redact(value) for value in args.acceptance] if getattr(args, "acceptance", None) else scope.get("acceptance", [])
     scope_changed = (
         proposed_allowed != scope.get("allowed_paths", [])
@@ -2863,7 +3563,7 @@ def cmd_diagnose(args: argparse.Namespace) -> int:
 
 def cmd_init(args: argparse.Namespace) -> int:
     repo = require_git_repo(args.repo)
-    path = repo / ".sdlc" / "config.json"
+    path = repo / ".megin" / "config.json"
     existing = path.exists()
     if existing and not args.force:
         config = load_config(repo, required=True)
@@ -2878,7 +3578,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     remote = validate_remote_name(args.remote) if args.remote is not None else ("origin" if git_remote(repo, "origin") else None)
     config = {
         "schema": CONFIG_SCHEMA,
-        "plugin": "sdlc",
+        "plugin": "megin",
         "plugin_version": PLUGIN_VERSION,
         "repo_id": repo_identity(repo),
         "repo_path": str(repo),
@@ -2902,7 +3602,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         return 0
     if classification["task_class"] == "bug":
         if not args.diagnosis_file:
-            emit({**classification, "run_created": False, "next_action": "run `sdlc diagnose` and re-run with --diagnosis-file <assessment>"}, args)
+            emit({**classification, "run_created": False, "next_action": "run `megin diagnose` and re-run with --diagnosis-file <assessment>"}, args)
             return 0
         assessment, assessment_path = load_diagnosis_assessment(args.diagnosis_file, repo, args.request)
         if assessment.get("disposition") == "not-a-bug":
@@ -2952,7 +3652,7 @@ def validate_writer_report(
 ) -> tuple[dict[str, Any], str, str]:
     payload, source_path, _ = load_external_report(getattr(args, "writer_report", None), worktree, label="writer completion")
     if payload.get("schema") != WRITER_REPORT_SCHEMA:
-        raise SdlcError("writer report must use sdlc-writer-report/v1")
+        raise MeginError("writer report must use megin-writer-report/v1")
     expected_identity = {
         "work_id": state.get("work_id"),
         "assignment_id": assignment.get("assignment_id"),
@@ -2963,13 +3663,13 @@ def validate_writer_report(
     }
     for key, expected in expected_identity.items():
         if payload.get(key) != expected:
-            raise SdlcError(f"writer report {key} is not bound to the current assignment")
+            raise MeginError(f"writer report {key} is not bound to the current assignment")
     writer_status = payload.get("status")
     if writer_status not in ("completed", "needs_revision", "blocked", "awaiting_upstream"):
-        raise SdlcError("writer report has an unsupported status")
+        raise MeginError("writer report has an unsupported status")
     baseline_changes = baseline_manifest_changed(assignment, worktree)
     if baseline_changes:
-        raise SdlcError(
+        raise MeginError(
             "writer changed a path that was already dirty before this assignment: "
             + ", ".join(baseline_changes)
         )
@@ -2984,7 +3684,7 @@ def validate_writer_report(
         )
         for item in changed_paths
     ):
-        raise SdlcError("writer report contains paths outside the task-specific dispatch package")
+        raise MeginError("writer report contains paths outside the task-specific dispatch package")
     current_paths, _ = status_paths(worktree)
     current_violations = [
         item for item in current_paths
@@ -2995,14 +3695,14 @@ def validate_writer_report(
         )
     ]
     if current_violations:
-        raise SdlcError("writer changed paths outside the task-specific dispatch package: " + ", ".join(current_violations))
+        raise MeginError("writer changed paths outside the task-specific dispatch package: " + ", ".join(current_violations))
     if changed_paths != current_paths:
-        raise SdlcError("writer report changed paths do not match the current worktree")
+        raise MeginError("writer report changed paths do not match the current worktree")
     snapshot = working_tree_snapshot(worktree)
     if payload.get("snapshot") != snapshot:
-        raise SdlcError("writer report snapshot does not match the current worktree")
+        raise MeginError("writer report snapshot does not match the current worktree")
     if payload.get("changed_paths") is None or not isinstance(payload.get("changed_paths"), list):
-        raise SdlcError("writer report must include changed paths")
+        raise MeginError("writer report must include changed paths")
     approved_commands = list(dict.fromkeys(
         list(assignment.get("focused_commands", []))
         + list(assignment.get("related_commands", []))
@@ -3015,7 +3715,7 @@ def validate_writer_report(
             [assignment.get("focused_commands", []), assignment.get("related_commands", [])],
         )
     ):
-        raise SdlcError("writer report must include passing focused and related test evidence")
+        raise MeginError("writer report must include passing focused and related test evidence")
     stored_path, stored_sha = persist_report(
         state, worktree, payload, category="evidence", name=f"{assignment['assignment_id']}-writer-report.json",
     )
@@ -3032,10 +3732,10 @@ def validate_review_report(
     product_snapshot: str,
 ) -> tuple[dict[str, Any], str, str]:
     if getattr(args, "finding", None) or getattr(args, "finding_key", None):
-        raise SdlcError("review findings must be supplied by the external --review-report")
+        raise MeginError("review findings must be supplied by the external --review-report")
     payload, source_path, _ = load_external_report(getattr(args, "review_report", None), worktree, label="review")
     if payload.get("schema") != REVIEW_REPORT_SCHEMA:
-        raise SdlcError("review report must use sdlc-review-report/v1")
+        raise MeginError("review report must use megin-review-report/v1")
     expected_identity = {
         "work_id": state.get("work_id"),
         "assignment_id": assignment.get("assignment_id"),
@@ -3048,20 +3748,20 @@ def validate_review_report(
     }
     for key, expected in expected_identity.items():
         if payload.get(key) != expected:
-            raise SdlcError(f"review report {key} is not bound to the current assignment snapshot")
+            raise MeginError(f"review report {key} is not bound to the current assignment snapshot")
     report_paths = normalize_paths(payload.get("paths", []))
     current_paths, _ = status_paths(worktree)
     if report_paths != current_paths:
-        raise SdlcError("review report paths do not match the current worktree")
+        raise MeginError("review report paths do not match the current worktree")
     if payload.get("requirements_verdict") not in ("APPROVED", "CHANGES_REQUIRED", "BLOCKED"):
-        raise SdlcError("review report must include a requirements verdict")
+        raise MeginError("review report must include a requirements verdict")
     if payload.get("quality_verdict") not in ("APPROVED", "CHANGES_REQUIRED", "BLOCKED"):
-        raise SdlcError("review report must include a quality verdict")
+        raise MeginError("review report must include a quality verdict")
     if verdict == "APPROVED" and (payload.get("requirements_verdict") != "APPROVED" or payload.get("quality_verdict") != "APPROVED"):
-        raise SdlcError("an approved review requires both requirements and quality verdicts to be APPROVED")
+        raise MeginError("an approved review requires both requirements and quality verdicts to be APPROVED")
     raw_findings = payload.get("findings", [])
     if not isinstance(raw_findings, list):
-        raise SdlcError("review report findings must be an array")
+        raise MeginError("review report findings must be an array")
     approved_commands = list(dict.fromkeys(
         list(assignment.get("focused_commands", []))
         + list(assignment.get("related_commands", []))
@@ -3082,23 +3782,23 @@ def validate_review_report(
             [assignment.get("focused_commands", []), assignment.get("related_commands", []), assignment.get("full_commands", [])],
         )
     ):
-        raise SdlcError("review report must include passing focused, related, and full test evidence")
+        raise MeginError("review report must include passing focused, related, and full test evidence")
     normalized_findings: list[dict[str, str]] = []
     seen: set[str] = set()
     for item in raw_findings:
         if isinstance(item, str):
             item = {"key": stable_finding_key(item), "text": item}
         if not isinstance(item, dict) or not item.get("key") or not item.get("text"):
-            raise SdlcError("each review finding must include a stable key and text")
+            raise MeginError("each review finding must include a stable key and text")
         key = str(item["key"]).strip()
         if key in seen:
-            raise SdlcError("review findings contain duplicate stable keys")
+            raise MeginError("review findings contain duplicate stable keys")
         seen.add(key)
         finding = {"key": key, "text": redact(str(item["text"]))}
         if item.get("severity") is not None:
             severity = str(item["severity"]).strip().lower()
             if severity not in ("blocking", "major", "minor", "advisory"):
-                raise SdlcError("review finding severity is unsupported")
+                raise MeginError("review finding severity is unsupported")
             finding["severity"] = severity
         for field in ("path", "evidence", "correction"):
             if item.get(field) is not None:
@@ -3107,7 +3807,7 @@ def validate_review_report(
     if verdict == "APPROVED" and any(
         finding.get("severity") in ("blocking", "major") for finding in normalized_findings
     ):
-        raise SdlcError("an APPROVED review cannot contain blocking or major findings")
+        raise MeginError("an APPROVED review cannot contain blocking or major findings")
     payload = dict(payload)
     payload["findings"] = normalized_findings
     payload["test_evidence"] = normalized_test_evidence
@@ -3128,7 +3828,7 @@ def validate_knowledge_review_report(
         getattr(args, "knowledge_report", None), worktree, label="knowledge review",
     )
     if payload.get("schema") != KNOWLEDGE_REVIEW_SCHEMA:
-        raise SdlcError("knowledge report must use sdlc-knowledge-review/v1")
+        raise MeginError("knowledge report must use megin-knowledge-review/v1")
     expected = {
         "work_id": state.get("work_id"),
         "reviewer_id": reviewer_id,
@@ -3144,22 +3844,22 @@ def validate_knowledge_review_report(
         if key == "scope":
             try:
                 report_value = normalize_paths(report_value or [])
-            except SdlcError:
-                raise SdlcError("knowledge report scope is invalid")
+            except MeginError:
+                raise MeginError("knowledge report scope is invalid")
         if report_value != value:
-            raise SdlcError(f"knowledge report {key} is not bound to the current candidate")
+            raise MeginError(f"knowledge report {key} is not bound to the current candidate")
     approved_commands = list(state.get("approval", {}).get("scope", {}).get("test_commands", []))
     if not _report_commands_passed(payload.get("test_evidence"), approved_commands):
-        raise SdlcError("knowledge report must include passing evidence for an approved test command")
+        raise MeginError("knowledge report must include passing evidence for an approved test command")
     claim_evidence = payload.get("claim_evidence", [])
     if not isinstance(claim_evidence, list) or len(claim_evidence) < len(candidate_payload.get("claims", [])):
-        raise SdlcError("knowledge report must include evidence for every candidate claim")
+        raise MeginError("knowledge report must include evidence for every candidate claim")
     if claim_evidence and not _report_commands_passed(claim_evidence):
-        raise SdlcError("knowledge claim evidence must be passing")
+        raise MeginError("knowledge claim evidence must be passing")
     claim_paths = {str(claim.get("path")) for claim in candidate_payload.get("claims", []) if claim.get("path")}
     reported_claim_paths = {str(item.get("path")) for item in claim_evidence if isinstance(item, dict) and item.get("path")}
     if claim_paths and not claim_paths.issubset(reported_claim_paths):
-        raise SdlcError("knowledge report claim evidence does not cover every candidate path")
+        raise MeginError("knowledge report claim evidence does not cover every candidate path")
     sanitized = redact_value(payload)
     sanitized["scope"] = expected["scope"]
     sanitized["source_path"] = str(source_path)
@@ -3177,12 +3877,12 @@ def record_verification(state: dict[str, Any], repo: Path) -> None:
         verification = {"status": "failed", "commands": [], "snapshot": None, "error": "approved verification has no test commands"}
         state["verification"] = verification
         refresh_verification_digest(state)
-        raise SdlcError("verification requires at least one approved test command")
+        raise MeginError("verification requires at least one approved test command")
     outcomes: list[dict[str, Any]] = []
     try:
         for index, command in enumerate(commands, 1):
             outcomes.append(capture_test(repo, state, command, index))
-    except SdlcError as exc:
+    except MeginError as exc:
         state["verification"] = {"status": "failed", "commands": outcomes, "snapshot": None, "error": redact(str(exc))}
         refresh_verification_digest(state)
         raise
@@ -3192,7 +3892,7 @@ def record_verification(state: dict[str, Any], repo: Path) -> None:
             "error": "one or more approved verification commands failed, were skipped, or changed the working tree",
         }
         refresh_verification_digest(state)
-        raise SdlcError("one or more approved verification commands failed, were skipped, or changed the working tree")
+        raise MeginError("one or more approved verification commands failed, were skipped, or changed the working tree")
     verification_snapshot = working_tree_snapshot(repo)
     review_snapshot = state.get("review", {}).get("snapshot")
     knowledge = state.get("knowledge", {})
@@ -3212,7 +3912,7 @@ def record_verification(state: dict[str, Any], repo: Path) -> None:
             "error": "working tree changed after review; obtain a fresh review before verification",
         }
         refresh_verification_digest(state)
-        raise SdlcError("working tree changed after review; obtain a fresh review before verification")
+        raise MeginError("working tree changed after review; obtain a fresh review before verification")
     state["verification"] = {
         "status": "passed", "commands": outcomes, "snapshot": verification_snapshot, "verified_at": now()
     }
@@ -3226,13 +3926,13 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
     worktree = Path(state["workspace"]["worktree"]) if state.get("workspace", {}).get("worktree") else repo
     if getattr(args, "writer_complete", False):
         if state.get("phase") != "implementation" or not state.get("assignments"):
-            raise SdlcError("writer completion requires an active implementation assignment")
+            raise MeginError("writer completion requires an active implementation assignment")
         if state["assignments"][-1].get("status") in ("needs_revision", "blocked"):
             append_assignment(state, args, repo)
         assignment = state["assignments"][-1]
         task = assignment_task(state, assignment)
         if not task:
-            raise SdlcError("writer assignment references an unknown work package")
+            raise MeginError("writer assignment references an unknown work package")
         if task.get("status") == "completed" and assignment.get("status") == "completed":
             _writer_identity(args, assignment)
             validate_capability(
@@ -3302,7 +4002,7 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
             state["status"] = "blocked"
             state["next_action"] = "return out-of-scope changes to the approved writer package"
             append_event(state, "writer_scope_blocked", phase="implementation", status="blocked", assignment_id=assignment.get("assignment_id"), paths=violations)
-            raise SdlcError("writer changed paths outside the task-specific dispatch package: " + ", ".join(violations))
+            raise MeginError("writer changed paths outside the task-specific dispatch package: " + ", ".join(violations))
         completion_snapshot = working_tree_snapshot(worktree)
         assignment["completion_snapshot"] = completion_snapshot
         result_path = state_root(state["repo"]["repo_id"], Path(state["repo"]["path"])) / state["repo"]["repo_id"] / state["work_id"] / "evidence" / f"{assignment['assignment_id']}-writer.json"
@@ -3327,19 +4027,19 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
         assignment = state.get("assignments", [])[-1] if state.get("assignments") else None
         task = assignment_task(state, assignment)
         if not assignment or not task or task.get("status") != "completed":
-            raise SdlcError("review approval requires the current writer to report completion first")
+            raise MeginError("review approval requires the current writer to report completion first")
         reviewer = getattr(args, "reviewer_id", None)
         if not reviewer:
-            raise SdlcError("an independent review must include --reviewer-id")
+            raise MeginError("an independent review must include --reviewer-id")
         if assignment.get("status") != "completed":
-            raise SdlcError("review must reference the completed active assignment")
+            raise MeginError("review must reference the completed active assignment")
         writer_id = assignment.get("writer_id") or assignment.get("writer")
         reviewer_session = getattr(args, "reviewer_session", None) or f"reviewer:{reviewer}"
         if reviewer == writer_id or reviewer_session == (assignment.get("session_id") or assignment.get("session")):
-            raise SdlcError("reviewer identity/session must be independent from the implementation writer")
+            raise MeginError("reviewer identity/session must be independent from the implementation writer")
         previous_review = state.get("review", {})
         if previous_review.get("reviewer_session") and reviewer_session == previous_review.get("reviewer_session"):
-            raise SdlcError("each review round requires a fresh reviewer session")
+            raise MeginError("each review round requires a fresh reviewer session")
         reviewer_capability_path, reviewer_capability_sha = register_capability(
             state, repo, kind="reviewer", identity=reviewer, session_id=reviewer_session,
             assignment_id=assignment.get("assignment_id"), read_only=True,
@@ -3347,7 +4047,7 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
         paths, snapshot = status_paths(worktree)
         completion_snapshot = assignment.get("completion_snapshot")
         if completion_snapshot and snapshot != completion_snapshot:
-            raise SdlcError(
+            raise MeginError(
                 "working tree changed after writer completion; obtain a new writer report before review"
             )
         product_snapshot = working_tree_snapshot(worktree, exclude=state.get("knowledge", {}).get("scope", []))
@@ -3404,7 +4104,7 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
             else:
                 next_task = next_ready_task(state)
                 if not next_task:
-                    raise SdlcError("review approved a task but no dependent work package is ready")
+                    raise MeginError("review approved a task but no dependent work package is ready")
                 append_assignment(state, args, repo, task_id=next_task.get("id"))
                 state["phase"] = "implementation"
                 state["next_action"] = "implementation writer executes the next uncompleted work package"
@@ -3446,16 +4146,16 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
             state["knowledge"]["status"] = "not_needed"
         else:
             if state.get("review", {}).get("verdict") != "APPROVED":
-                raise SdlcError("knowledge review requires an approved fresh code review")
+                raise MeginError("knowledge review requires an approved fresh code review")
             if state.get("verification", {}).get("status") not in ("passed", "verified"):
-                raise SdlcError("knowledge review requires fresh verification")
+                raise MeginError("knowledge review requires fresh verification")
             reviewer = getattr(args, "reviewer_id", None)
             if not reviewer:
-                raise SdlcError("a knowledge review must include --reviewer-id")
+                raise MeginError("a knowledge review must include --reviewer-id")
             assignment = state.get("assignments", [])[-1]
             writer_id = assignment.get("writer_id") or assignment.get("writer")
             if reviewer == writer_id:
-                raise SdlcError("knowledge reviewer identity must be independent from the implementation writer")
+                raise MeginError("knowledge reviewer identity must be independent from the implementation writer")
             candidate = create_knowledge_candidate(state, worktree)
             payload, lint_errors = lint_knowledge_candidate(state, worktree)
             snapshot_before = knowledge_snapshot(worktree, state["knowledge"]["scope"])
@@ -3465,10 +4165,10 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
             state["knowledge"]["conflicts"] = []
             if lint_errors:
                 state["knowledge"]["status"] = "blocked"
-                raise SdlcError("knowledge candidate lint failed: " + "; ".join(lint_errors))
+                raise MeginError("knowledge candidate lint failed: " + "; ".join(lint_errors))
             reviewer_session = getattr(args, "reviewer_session", None) or f"reviewer:{reviewer}"
             if reviewer_session == (assignment.get("session_id") or assignment.get("session")):
-                raise SdlcError("knowledge reviewer session must be independent from the implementation writer")
+                raise MeginError("knowledge reviewer session must be independent from the implementation writer")
             knowledge_report, knowledge_report_path, knowledge_report_sha = validate_knowledge_review_report(
                 state, worktree, args, reviewer, reviewer_session, candidate, snapshot_before, snapshot_before,
             )
@@ -3484,9 +4184,9 @@ def apply_progress_flags(state: dict[str, Any], repo: Path, args: argparse.Names
             if state.get("knowledge", {}).get("status") == "promoted":
                 return
             if state.get("knowledge", {}).get("status") != "reviewed":
-                raise SdlcError("knowledge promotion requires a reviewed candidate")
+                raise MeginError("knowledge promotion requires a reviewed candidate")
             if state.get("verification", {}).get("status") not in ("passed", "verified"):
-                raise SdlcError("knowledge promotion requires fresh verification")
+                raise MeginError("knowledge promotion requires fresh verification")
             promote_knowledge(state, worktree)
             append_event(state, "knowledge_promoted", phase="delivery", status="active")
         else:
@@ -3499,7 +4199,7 @@ def apply_escalation(state: dict[str, Any], args: argparse.Namespace) -> None:
     task = state["task"]
     current = task.get("repair_class") if task.get("task_class") == "bug" else task.get("task_class")
     if current != "small":
-        raise SdlcError("only a small task can be escalated to the large-change path")
+        raise MeginError("only a small task can be escalated to the large-change path")
     state.setdefault("superseded_approvals", []).append({
         "policy": state["approval"].get("policy"),
         "stages": list(state["approval"].get("approved_stages", [])),
@@ -3537,7 +4237,7 @@ def acquire_state_lock(path: Path) -> Path:
         os.write(descriptor, str(os.getpid()).encode("ascii", errors="ignore"))
         os.close(descriptor)
     except FileExistsError as exc:
-        raise SdlcError(f"state mutation is already in progress: {path.stem}") from exc
+        raise MeginError(f"state mutation is already in progress: {path.stem}") from exc
     except Exception:
         if descriptor >= 0:
             try:
@@ -3563,7 +4263,7 @@ def _cmd_resume_locked(args: argparse.Namespace, repo: Path) -> int:
     load_config(repo, required=True)
     state, path = load_state(repo, args.work_id)
     if getattr(args, "request", "") and redact(args.request) != state.get("task", {}).get("request"):
-        raise SdlcError("request differs from the approved Work ID candidate; start a new Work ID")
+        raise MeginError("request differs from the approved Work ID candidate; start a new Work ID")
     apply_escalation(state, args)
     apply_approval_inputs(state, args)
     materialize_candidate_bundles(state, repo, args)
@@ -3572,7 +4272,7 @@ def _cmd_resume_locked(args: argparse.Namespace, repo: Path) -> int:
     progress_repo = Path(state["workspace"]["worktree"]) if state.get("workspace", {}).get("worktree") else repo
     try:
         apply_progress_flags(state, progress_repo, args)
-    except SdlcError:
+    except MeginError:
         if state.get("verification", {}).get("status") == "failed":
             state["status"] = "blocked"
             state["phase"] = "verification"
@@ -3606,14 +4306,14 @@ def _writer_identity(args: argparse.Namespace, assignment: dict[str, Any]) -> tu
     writer = requested or legacy or assignment.get("writer_id") or assignment.get("writer")
     expected = assignment.get("writer_id") or assignment.get("writer")
     if writer != expected:
-        raise SdlcError("writer identity does not match the active assignment")
+        raise MeginError("writer identity does not match the active assignment")
     ticket = getattr(args, "writer_ticket", None)
     if not ticket:
-        raise SdlcError("writer completion requires the current assignment --writer-ticket")
+        raise MeginError("writer completion requires the current assignment --writer-ticket")
     if ticket != assignment.get("ticket_sha256"):
-        raise SdlcError("writer assignment ticket is invalid or already belongs to another assignment")
+        raise MeginError("writer assignment ticket is invalid or already belongs to another assignment")
     if assignment.get("ticket_consumed"):
-        raise SdlcError("writer assignment ticket has already been consumed")
+        raise MeginError("writer assignment ticket has already been consumed")
     return str(writer), str(ticket)
 
 
@@ -3651,7 +4351,7 @@ def _review_ticket(
     })
     supplied = getattr(args, "review_ticket", None)
     if supplied and supplied != "auto" and supplied != expected:
-        raise SdlcError("review ticket is invalid or does not match the current assignment snapshot")
+        raise MeginError("review ticket is invalid or does not match the current assignment snapshot")
     return expected
 
 
@@ -3670,7 +4370,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             try:
                 state, validated_path = load_state(repo, path.stem)
                 records.append(state_summary(state, validated_path))
-            except SdlcError:
+            except MeginError:
                 invalid.append({"path": str(path), "reason": "invalid v2 state; inspect with doctor --work-id"})
     emit({"repo": str(repo), "repo_id": repo_identity(repo), "state_root": str(directory.parent), "runs": records, "invalid_runs": invalid}, args)
     return 0
@@ -3682,24 +4382,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     try:
         repo = require_git_repo(requested)
         checks.append({"name": "git_repository", "ok": True, "path": str(repo)})
-    except SdlcError as exc:
+    except MeginError as exc:
         checks.append({"name": "git_repository", "ok": False, "detail": str(exc)})
         emit({"ok": False, "checks": checks}, args)
         return 1
     config_error = None
     try:
         config = load_config(repo, required=False)
-    except SdlcError as exc:
+    except MeginError as exc:
         config = None
         config_error = str(exc)
-    config_check = {"name": "project_config", "ok": config is not None, "path": str(repo / ".sdlc" / "config.json")}
+    config_check = {"name": "project_config", "ok": config is not None, "path": str(repo / ".megin" / "config.json")}
     if config_error:
         config_check["detail"] = config_error
     checks.append(config_check)
     try:
         root = state_root(repo_identity(repo), repo)
         checks.append({"name": "state_root_outside_repo", "ok": True, "path": str(root)})
-    except SdlcError as exc:
+    except MeginError as exc:
         checks.append({"name": "state_root_outside_repo", "ok": False, "detail": str(exc)})
     checks.append({"name": "python", "ok": True, "version": sys.version.split()[0]})
     checks.append({"name": "rg", "ok": shutil.which("rg") is not None})
@@ -3710,14 +4410,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     invalid_runs = []
     try:
         directory = state_directory(repo)
-    except SdlcError:
+    except MeginError:
         directory = None
     if directory and directory.exists():
         for path in sorted(directory.glob("*.json")):
             try:
                 state, validated_path = load_state(repo, path.stem)
                 runs.append(state_summary(state, validated_path))
-            except SdlcError:
+            except MeginError:
                 invalid_runs.append({"path": str(path), "reason": "invalid v2 state"})
     if args.work_id:
         try:
@@ -3739,7 +4439,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             checks.append({"name": "publication_destination", "ok": remote_ok, "detail": "configured remote matches the approved destination"})
             if state.get("review", {}).get("verdict"):
                 checks.append({"name": "independent_review_binding", "ok": bool(state["review"].get("review_ticket_sha256")) and state["review"].get("reviewer_id") != (assignments[-1].get("writer_id") if assignments else None), "detail": "review has a ticket and a distinct reviewer"})
-        except SdlcError as exc:
+        except MeginError as exc:
             checks.append({"name": "requested_run", "ok": False, "detail": str(exc)})
     if invalid_runs:
         checks.append({"name": "v2_state_integrity", "ok": False, "invalid_runs": invalid_runs})
@@ -3782,7 +4482,7 @@ def verify_scope(repo: Path, allowed: Sequence[str]) -> list[str]:
     paths, _ = status_paths(repo)
     violations = [path for path in paths if not allowed_path(path, allowed)]
     if violations:
-        raise SdlcError("working tree contains paths outside approved scope: " + ", ".join(violations))
+        raise MeginError("working tree contains paths outside approved scope: " + ", ".join(violations))
     return paths
 
 
@@ -3810,7 +4510,7 @@ def recover_commit(state: dict[str, Any], repo: Path) -> bool:
     if head_sha(repo) == base:
         return False
     subject = git(repo, "log", "-1", "--format=%s", check=False).strip()
-    prefix = f"sdlc({state['work_id']}):"
+    prefix = f"megin({state['work_id']}):"
     if not subject.startswith(prefix):
         return False
     changed = [normalize_rel(item) for item in git(repo, "diff", "--name-only", f"{base}..HEAD", check=False).splitlines() if item.strip()]
@@ -3834,14 +4534,14 @@ def recover_commit(state: dict[str, Any], repo: Path) -> bool:
 def finish_publication(state: dict[str, Any], repo: Path, args: argparse.Namespace) -> None:
     publication = state["publication"]
     if publication.get("commit_sha") and head_sha(repo) != publication.get("commit_sha"):
-        raise SdlcError("saved commit SHA no longer matches the delivery branch; publication is blocked")
+        raise MeginError("saved commit SHA no longer matches the delivery branch; publication is blocked")
     if publication.get("state") == "draft_pr_created":
         state["next_action"] = "merge/deploy/cleanup require separate authorization"
         return
     requested_remote = validate_remote_name(getattr(args, "remote", None))
     approved_remote = publication.get("remote")
     if requested_remote and requested_remote != approved_remote:
-        raise SdlcError("finish remote differs from the approved publication destination; re-approve the scope")
+        raise MeginError("finish remote differs from the approved publication destination; re-approve the scope")
     remote = approved_remote
     branch = state["workspace"].get("branch")
     if remote:
@@ -3882,9 +4582,9 @@ def finish_publication(state: dict[str, Any], repo: Path, args: argparse.Namespa
         publication["reason"] = "GitHub CLI (gh) is unavailable after push"
         state["next_action"] = "install/authenticate gh and rerun finish --publish"
         return
-    title = publication.get("title") or f"SDLC delivery {state['work_id']}"
+    title = publication.get("title") or f"Megin delivery {state['work_id']}"
     body = (
-        f"SDLC delivery {state['work_id']}\n\n"
+        f"Megin delivery {state['work_id']}\n\n"
         f"Problem: {redact(state['task'].get('request', ''))}\n"
         "Result: approved implementation reviewed and verified\n"
         f"Verification: {state['verification'].get('status')}\n"
@@ -3947,41 +4647,41 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
     state, path = load_state(repo, args.work_id)
     requested_remote = validate_remote_name(getattr(args, "remote", None))
     if requested_remote and requested_remote != state.get("publication", {}).get("remote"):
-        raise SdlcError("finish remote differs from the approved publication destination; re-approve the scope")
+        raise MeginError("finish remote differs from the approved publication destination; re-approve the scope")
     if not state.get("workspace", {}).get("worktree"):
-        raise SdlcError("finish requires an approved run with a delivery worktree")
+        raise MeginError("finish requires an approved run with a delivery worktree")
     worktree = Path(state["workspace"]["worktree"]).resolve()
     if not worktree.exists():
-        raise SdlcError(f"delivery worktree is missing: {worktree}")
+        raise MeginError(f"delivery worktree is missing: {worktree}")
     # These flags represent evidence returned by independent sessions.  They never grant
     # write access; they only record the externally obtained verdict before preflight.
     if args.review_approved or args.review_verdict or args.verified or args.knowledge_reviewed or args.knowledge_promoted:
         try:
             apply_progress_flags(state, worktree, args)
-        except SdlcError:
+        except MeginError:
             if state.get("verification", {}).get("status") == "failed":
                 state["status"] = "blocked"
                 state["phase"] = "verification"
                 save_state(state, path)
             raise
     if state.get("review", {}).get("verdict") != "APPROVED":
-        raise SdlcError("finish is blocked until a fresh independent reviewer records APPROVED")
+        raise MeginError("finish is blocked until a fresh independent reviewer records APPROVED")
     if not all_tasks_completed(state):
-        raise SdlcError("finish is blocked until every dependent work package has been reviewed")
+        raise MeginError("finish is blocked until every dependent work package has been reviewed")
     allowed = state["approval"]["scope"].get("allowed_paths", [])
     if not allowed:
-        raise SdlcError("finish is blocked because approval has no allowed paths")
+        raise MeginError("finish is blocked because approval has no allowed paths")
     knowledge_conflict_pending = bool(
         state["knowledge"].get("scope")
         and state["knowledge"].get("status") == "blocked"
         and state["knowledge"].get("conflicts")
     )
     if state["knowledge"].get("scope") and state["knowledge"].get("status") not in ("reviewed", "promoted") and not knowledge_conflict_pending:
-        raise SdlcError("finish is blocked until the approved knowledge scope has a fresh review")
+        raise MeginError("finish is blocked until the approved knowledge scope has a fresh review")
     if args.rerun_tests or state["verification"].get("status") not in ("passed", "verified"):
         try:
             record_verification(state, worktree)
-        except SdlcError as exc:
+        except MeginError as exc:
             state["status"] = "blocked"
             state["phase"] = "verification"
             state["next_action"] = "fix the verification command or environment before retrying finish"
@@ -3994,7 +4694,7 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
         # candidate; both paths remain bound to the original approved scope.
         try:
             promote_knowledge(state, worktree)
-        except SdlcError:
+        except MeginError:
             if state["knowledge"].get("status") == "blocked" and state["knowledge"].get("conflicts"):
                 knowledge_conflict_pending = True
                 state["next_action"] = "deliver the product and resolve the pending knowledge conflict before updating canonical knowledge"
@@ -4026,14 +4726,14 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
             state["next_action"] = "rerun the approved verification commands after the worktree returns to the reviewed snapshot"
             append_event(state, "verification_stale", phase="verification", status="blocked")
             save_state(state, path)
-            raise SdlcError("verification evidence is stale for the current worktree; rerun the approved tests")
+            raise MeginError("verification evidence is stale for the current worktree; rerun the approved tests")
     if review.get("snapshot") and review["snapshot"] != current_snapshot:
         product_scope = state.get("knowledge", {}).get("scope", [])
         product_snapshot = working_tree_snapshot(worktree, exclude=product_scope) if product_scope else None
         if not product_scope or not review.get("product_snapshot") or product_snapshot != review.get("product_snapshot"):
-            raise SdlcError("working tree changed after review; obtain a fresh review before finishing")
+            raise MeginError("working tree changed after review; obtain a fresh review before finishing")
         if state.get("knowledge", {}).get("status") not in ("reviewed", "promoted") and not knowledge_conflict_pending:
-            raise SdlcError("working tree changed after review outside an approved knowledge handoff")
+            raise MeginError("working tree changed after review outside an approved knowledge handoff")
         knowledge_conflict_pending = True
     publication = state["publication"]
     if publication.get("commit_sha"):
@@ -4041,7 +4741,7 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
         if expected and expected != current_snapshot:
             knowledge_conflict = post_commit_product_recovery_allowed(state, worktree)
             if not knowledge_conflict:
-                raise SdlcError("working tree changed after the committed review; create a new delivery run")
+                raise MeginError("working tree changed after the committed review; create a new delivery run")
     else:
         recover_commit(state, worktree)
     publication = state["publication"]
@@ -4064,21 +4764,21 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
         ]
     if not publication.get("commit_sha"):
         if not commit_allowed:
-            raise SdlcError("finish found no product paths to commit while knowledge has a pending conflict")
+            raise MeginError("finish found no product paths to commit while knowledge has a pending conflict")
         result = run_process(("git", "add", "-A", "--", *commit_allowed), worktree, timeout=60, check=False)
         if result.returncode != 0:
-            raise SdlcError(f"git add failed ({result.returncode})")
+            raise MeginError(f"git add failed ({result.returncode})")
         staged = git(worktree, "diff", "--cached", "--name-only", "-z").split("\0")
         staged = [normalize_rel(item) for item in staged if item]
         if not staged:
-            raise SdlcError("finish found no approved changes to commit")
+            raise MeginError("finish found no approved changes to commit")
         if any(not allowed_path(item, allowed) for item in staged):
-            raise SdlcError("git staging selected a path outside approved scope")
+            raise MeginError("git staging selected a path outside approved scope")
         title = publication.get("title") or state["task"]["request"]
-        message = f"sdlc({state['work_id']}): {title[:160]}".replace("\n", " ")
+        message = f"megin({state['work_id']}): {title[:160]}".replace("\n", " ")
         commit = run_process(("git", "commit", "-m", message), worktree, timeout=120, check=False)
         if commit.returncode != 0:
-            raise SdlcError(f"git commit failed ({commit.returncode}): {redact((commit.stdout or '') + (commit.stderr or '')).strip()}")
+            raise MeginError(f"git commit failed ({commit.returncode}): {redact((commit.stdout or '') + (commit.stderr or '')).strip()}")
         publication["commit_sha"] = head_sha(worktree)
         publication["state"] = "committed"
         publication["changed_paths"] = staged
@@ -4140,7 +4840,7 @@ def add_approval_options(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="sdlc", description="Portable evidence-driven SDLC delivery")
+    parser = argparse.ArgumentParser(prog="megin", description="Portable evidence-driven Megin delivery")
     sub = parser.add_subparsers(dest="command", required=True)
     classify_parser = sub.add_parser("classify", help="classify a request without mutation")
     classify_parser.add_argument("--request", required=True)
@@ -4157,6 +4857,13 @@ def build_parser() -> argparse.ArgumentParser:
     diagnose_parser.add_argument("--environment", action="append", help="safe environment/context labels")
     add_output(diagnose_parser)
 
+    migrate_parser = sub.add_parser("migrate", help="migrate a legacy sdlc project to Megin")
+    add_repo(migrate_parser)
+    migrate_parser.add_argument("--from-state-root", help="legacy sdlc state root")
+    migrate_parser.add_argument("--to-state-root", help="new Megin state root")
+    migrate_parser.add_argument("--dry-run", action="store_true", help="validate and report without publishing changes")
+    add_output(migrate_parser)
+
     init_parser = sub.add_parser("init", help="opt a target repository into the portable workflow")
     add_repo(init_parser)
     init_parser.add_argument("--base-branch")
@@ -4172,7 +4879,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_parser.add_argument("--task-class", choices=TASK_CLASSES)
     start_parser.add_argument("--repair-class", choices=("small", "large"))
     start_parser.add_argument("--diagnosis", choices=("confirmed", "likely", "not-a-bug"))
-    start_parser.add_argument("--diagnosis-file", help="validated read-only bug assessment produced by sdlc diagnose")
+    start_parser.add_argument("--diagnosis-file", help="validated read-only bug assessment produced by megin diagnose")
     add_approval_options(start_parser)
     add_output(start_parser)
 
@@ -4242,6 +4949,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return {
             "classify": cmd_classify,
             "diagnose": cmd_diagnose,
+            "migrate": cmd_migrate,
             "init": cmd_init,
             "start": cmd_start,
             "resume": cmd_resume,
@@ -4249,11 +4957,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "doctor": cmd_doctor,
             "finish": cmd_finish,
         }[args.command](args)
-    except SdlcError as exc:
-        print(f"sdlc: {exc}", file=sys.stderr)
+    except MeginError as exc:
+        print(f"megin: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
-        print("sdlc: interrupted; state was not reset", file=sys.stderr)
+        print("megin: interrupted; state was not reset", file=sys.stderr)
         return 130
 
 

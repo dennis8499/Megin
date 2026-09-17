@@ -1,4 +1,4 @@
-# SDLC 操作手冊
+# Megin 操作手冊
 
 本手冊集中說明 portable v2 與 repository-local legacy v1 的開始、續跑、診斷、Blocked、Complete 與安全復原。規則細節仍以 [Delivery Orchestrator](.agents/skills/delivery-orchestrator/SKILL.md)、[v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)、[stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md)及各階段的 `delivery-protocol.md` 為準。
 
@@ -7,15 +7,15 @@
 先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立 worktree 或寫入產品：
 
 ```console
-codex plugin install ./plugins/sdlc
+codex plugin install ./plugins/megin
 ```
 
 在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀 task classification：
 
 ```console
-sdlc init --repo <target-repo>
-sdlc doctor --repo <target-repo>
-sdlc start --repo <target-repo> --request "<request>"
+megin init --repo <target-repo>
+megin doctor --repo <target-repo>
+megin start --repo <target-repo> --request "<request>"
 ```
 
 分類與 gate policy：
@@ -35,23 +35,23 @@ blocking finding 回交同一 writer，沿用 bounded fix loop。
 續跑與收尾：
 
 ```console
-sdlc status --repo <target-repo> --work-id <work-id>
-sdlc resume --repo <target-repo> --work-id <work-id>
-sdlc finish --repo <target-repo> --work-id <work-id>
+megin status --repo <target-repo> --work-id <work-id>
+megin resume --repo <target-repo> --work-id <work-id>
+megin finish --repo <target-repo> --work-id <work-id>
 ```
 
 小任務的核准、派工與審查可用下列最小循序操作表示；每個結果都會寫入外部 v2 state：
 
 ```console
-sdlc start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
-sdlc resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-sdlc resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
-sdlc finish --repo <target-repo> --work-id <work-id>
+megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
+megin resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+megin resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+megin finish --repo <target-repo> --work-id <work-id>
 ```
 
 大型變更在不同的 `resume` 呼叫分別帶入 `--approve requirements` 與 `--approve plan`；疑似
 BUG 先以 `diagnose` 的唯讀命令與根因假設保存 assessment，再以 `--diagnosis-file` 綁定修復。來源 checkout 可用
-`python -X utf8 -B plugins/sdlc/scripts/validate.py` 驗證 manifest、技能、schema 與 state。
+`python -X utf8 -B plugins/megin/scripts/validate.py` 驗證 manifest、技能、schema 與 state。
 
 `finish` 先檢查 approved scope、review snapshot 與 automatic knowledge review，再只 stage／
 commit 核准 paths；只有已核准 remote／認證可用時才 push 並建立或重用該 branch 的 draft PR。缺少 remote、
@@ -60,6 +60,19 @@ deployment、cleanup 與刪除 worktree 永遠是獨立動作。runtime state、
 raw outputs 與 publication state 存在 repository 外的持久化 state root；`doctor` 顯示實際路徑。
 
 v2 操作的詳細 writer／Reviewer／knowledge／finish 規則見 [v2 派工、審查與交付收尾契約](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md)。
+
+## 從舊版設定遷移
+
+Megin 不提供舊 CLI 別名，也不會直接讀取 `.sdlc/config.json`。若 repository 仍使用舊設定，先以 dry-run 檢查來源、目的地、工作項目、檔案數與衝突，再執行遷移：
+
+```console
+megin migrate --repo <target-repo> --dry-run
+megin migrate --repo <target-repo>
+megin migrate --repo <target-repo> \
+  --from-state-root <old-state-root> --to-state-root <new-state-root>
+```
+
+未指定 state root 時，舊來源預設為 Windows `%LOCALAPPDATA%/sdlc/state` 或 POSIX `$XDG_STATE_HOME/sdlc`，新目的地則對應 `megin`。遷移會先 staging 與驗證，再發布設定和 state；成功後保留可復原的 `.sdlc.migrated-<digest>` 與舊 state backup，不自動刪除。原始 request、command、event 與 raw evidence 不改寫；受路徑或 identity 影響的衍生 digest 會重算。重跑已完成的遷移會回報 `already_migrated`，任何目的地衝突、lock、損毀或 redirect 都會 fail closed。
 
 ## Repository-local v1 開始一筆工作（legacy）
 
@@ -131,7 +144,7 @@ Blocked 表示 workspace、能力、工具、資料完整性或外部前提無�
 v2 `doctor` 另會指出 `task_class`、approval／scope drift、writer lock、reviewer capability
 與 publication state。`WRITER_ASSIGNMENT_CONFLICT`、`SCOPE_DRIFT`、`REVIEW_REQUIRED`、
 `KNOWLEDGE_CONFLICT` 或 `PUBLICATION_PENDING` 都保留 state 與 evidence；修復後用
-`sdlc resume`／`sdlc finish` 從最早未完成 action 續跑，不複製舊 approval 或重複 commit／PR。
+`megin resume`／`megin finish` 從最早未完成 action 續跑，不複製舊 approval 或重複 commit／PR。
 
 ## Complete（v1 與 v2）
 
@@ -177,9 +190,9 @@ Archive是deterministic、create-only，manifest逐檔保存hash與run／repo／
    ```
 3. **registry、record 或正式 evidence 遺失：** 先驗證綁定同一run／repo／worktree的archive並匯入quarantine；成功只提供resume evidence，不繼承approval。沒有完整可信archive時，保留舊worktree與未提交修改，另建新Work ID，從Requirements重新驗證。安全重建不自動複製產品差異，也不繼承舊核准。
 
-v2 runtime state 遺失或損壞時，先用 `sdlc doctor --repo <target-repo> --work-id <work-id>`
+v2 runtime state 遺失或損壞時，先用 `megin doctor --repo <target-repo> --work-id <work-id>`
 保存診斷；不要刪除 state root、worktree 或 branch，也不要把 v1 host-temp registry 複製成
 v2 state。只有能以 repository identity、Work ID、assignment、scope digest 與現有 diff
-證明 continuity 時，才由 `sdlc resume` 續跑；否則建立新 v2 Work ID，重新取得所需 gate。
+證明 continuity 時，才由 `megin resume` 續跑；否則建立新 v2 Work ID，重新取得所需 gate。
 
 本專案不提供核准流程重設或歷史record批次修補；archive也不能把不同identity或不完整run變成可續跑狀態。

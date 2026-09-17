@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://local.sdlc/delivery-run-v2.schema.json",
-  "title": "Portable SDLC delivery run v2",
+  "$id": "https://local.megin/delivery-run-v2.schema.json",
+  "title": "Portable Megin delivery run v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "version", "plugin", "plugin_version", "work_id", "revision", "repo", "task", "approval", "workspace", "phase", "status", "tasks", "assignments", "review", "verification", "knowledge", "candidates", "publication", "events", "next_action", "created_at", "updated_at"],
   "properties": {
     "schema": {"const": "delivery-run/v2"},
     "version": {"const": 2},
-    "plugin": {"const": "sdlc"},
+    "plugin": {"const": "megin"},
     "plugin_version": {"type": "string", "minLength": 1},
     "work_id": {"$ref": "#/$defs/workId"},
     "revision": {"type": "integer", "minimum": 0},

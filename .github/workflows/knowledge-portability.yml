@@ -5,7 +5,7 @@ on:
   pull_request:
     paths:
       - ".agents/skills/**"
-      - "plugins/sdlc/**"
+      - "plugins/megin/**"
       - "docs/**"
       - "README.md"
       - "OPERATIONS.md"
@@ -39,13 +39,13 @@ jobs:
           python -X utf8 -B
           .agents/skills/project-knowledge/scripts/run_quick_checks.py
           > knowledge-quick.json
-      - name: Validate portable sdlc plugin and v2 CLI
-        if: hashFiles('plugins/sdlc/.codex-plugin/plugin.json') != ''
+      - name: Validate portable megin plugin and v2 CLI
+        if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
         shell: bash
         run: |
-          python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/sdlc/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'sdlc'; assert m['skills'] == './skills/'"
-          python -X utf8 -B plugins/sdlc/scripts/sdlc.py --help
-          python -X utf8 -B -m unittest discover -s plugins/sdlc/tests -p 'test_*.py'
+          python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
+          python -X utf8 -B plugins/megin/scripts/megin.py --help
+          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -98,11 +98,11 @@ jobs:
           python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . --force > tgrep-index-windows.json
           python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepWindowsParityTests
       - name: Run portable v2 CLI smoke tests on both operating systems
-        if: hashFiles('plugins/sdlc/.codex-plugin/plugin.json') != ''
+        if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
         shell: bash
         run: |
-          python -X utf8 -B plugins/sdlc/scripts/sdlc.py --help
-          python -X utf8 -B -m unittest discover -s plugins/sdlc/tests -p 'test_*.py'
+          python -X utf8 -B plugins/megin/scripts/megin.py --help
+          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
       - name: Benchmark cold and warm queries with portability oracle
         shell: bash
         run: >-

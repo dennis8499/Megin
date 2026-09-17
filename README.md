@@ -1,7 +1,7 @@
-# SDLC Delivery System
+# Megin Delivery System
 
 這個 repository 同時提供兩條相容路徑：既有的 repository-local Skills 與 `delivery-run/v1`
-治理流程，以及可跨專案安裝的 `sdlc` plugin 與 `delivery-run/v2` workflow。兩者都把需求探索、
+治理流程，以及可跨專案安裝的 `megin` plugin 與 `delivery-run/v2` workflow。兩者都把需求探索、
 技術規劃、實作、BUG 分診、Project Knowledge、核准與可追溯 evidence 串成一條可驗證的流程。
 v2 另依任務大小分流，支援受監督的單一 implementation writer、fresh review、automatic
 knowledge review 與 Git finish handoff。
@@ -14,7 +14,7 @@ knowledge review 與 Git finish handoff。
 - 依流程工作的 Contributor／AI Agent
 - 需要判讀測試、CI、metrics 與 evidence 的 CI Reviewer
 
-## Portable `sdlc` plugin（v2）
+## Portable `megin` plugin（v2）
 
 這個 v2 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)，
 保留本 repository 原有的 Work ID、來源追溯、核准綁定與 v1 相容性。
@@ -23,15 +23,15 @@ knowledge review 與 Git finish handoff。
 repository 初始化設定或寫入程式碼：
 
 ~~~console
-codex plugin install ./plugins/sdlc
+codex plugin install ./plugins/megin
 ~~~
 
 進入目標 repository 後，初始化一次專案 binding，再讓 `start` 先做唯讀分類：
 
 ~~~console
-sdlc init --repo .
-sdlc doctor --repo .
-sdlc start --repo . --request "<request>"
+megin init --repo .
+megin doctor --repo .
+megin start --repo . --request "<request>"
 ~~~
 
 `start` 會將請求分類為 `read_only`、`small`、`large` 或 `bug`。read-only 只回報 evidence；
@@ -42,10 +42,20 @@ Planning approvals；bug 先完成唯讀 diagnosis，再依影響進入 small �
 核准後可由 `status`／`resume` 續跑，完成 review 後使用 `finish`：
 
 ~~~console
-sdlc status --repo . --work-id <work-id>
-sdlc resume --repo . --work-id <work-id>
-sdlc finish --repo . --work-id <work-id>
+megin status --repo . --work-id <work-id>
+megin resume --repo . --work-id <work-id>
+megin finish --repo . --work-id <work-id>
 ~~~
+
+若目標 repository 尚留有舊版 `.sdlc/config.json` 或舊 state，可先預覽並執行一次性遷移：
+
+~~~console
+megin migrate --repo <target-repo> --dry-run
+megin migrate --repo <target-repo>
+megin migrate --repo <target-repo> --from-state-root <old-state-root> --to-state-root <new-state-root>
+~~~
+
+遷移會將設定、持久化 state、reports、capabilities 與診斷路徑轉成 Megin 格式，重算受路徑／identity 影響的衍生 digest，並保留 `.sdlc.migrated-<digest>` 與 state backup。`--dry-run` 不寫入檔案；一般 `megin` 命令不會讀取舊設定，遇到它只會提示執行 `megin migrate`。遷移成功後再次執行會回報 `already_migrated`。
 
 v2 runtime state、dispatch assignment、review reports、測試 raw outputs 與 publication state
 位於 plugin 管理的 repository 外部持久化 state root；`doctor` 會顯示實際 state path。目標
@@ -85,7 +95,7 @@ rg --version
 
 ~~~console
 git clone <repository-url>
-cd SDLC
+cd Megin
 ~~~
 
 執行快速 gate：
@@ -230,26 +240,26 @@ checkout、branch switch、Git index 或 binary 變更後，重新執行上述�
 implementation、review、knowledge 與 Git handoff 的唯一收尾入口：
 
 ~~~console
-sdlc init --repo <target-repo>
-sdlc doctor --repo <target-repo>
-sdlc start --repo <target-repo> --request "<request>"
-sdlc status --repo <target-repo> --work-id <work-id>
-sdlc resume --repo <target-repo> --work-id <work-id>
-sdlc finish --repo <target-repo> --work-id <work-id>
+megin init --repo <target-repo>
+megin doctor --repo <target-repo>
+megin start --repo <target-repo> --request "<request>"
+megin status --repo <target-repo> --work-id <work-id>
+megin resume --repo <target-repo> --work-id <work-id>
+megin finish --repo <target-repo> --work-id <work-id>
 ~~~
 
 Approval and execution results are recorded explicitly. For a small task, bind the allowed
 paths and tests to one integrated approval, then record the writer and fresh reviewer results:
 
 ~~~console
-sdlc start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
-sdlc resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-sdlc resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
-sdlc finish --repo <target-repo> --work-id <work-id>
+megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
+megin resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+megin resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+megin finish --repo <target-repo> --work-id <work-id>
 ~~~
 
 Large work uses `--approve requirements` and `--approve plan` on separate approval steps. Bug
-repair first runs `sdlc diagnose` with a read-only oracle and falsifiable hypothesis, then passes
+repair first runs `megin diagnose` with a read-only oracle and falsifiable hypothesis, then passes
 `--diagnosis-file <assessment>` to `start`; otherwise `start` remains a read-only diagnosis response.
 Writer／Reviewer／knowledge completion reports are external, snapshot-bound JSON evidence. The dependency-free self-check is
 `python -X utf8 -B <plugin-root>/scripts/validate.py`.
@@ -328,17 +338,17 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py reco
 Plugin release 前至少要在乾淨的 Git repository 驗證 manifest、CLI 與 state isolation；
 驗證範圍包含四種 task class、small／large gate policy、single-writer lock、fresh
 Reviewer、automatic knowledge review、finish idempotency，以及 Windows／Linux parity。
-Plugin 的 validator／test entrypoint 位於 `plugins/sdlc/`，執行方式以該 plugin 的
+Plugin 的 validator／test entrypoint 位於 `plugins/megin/`，執行方式以該 plugin 的
 README 或 `doctor` 輸出為準；它們不得把 runtime state 寫回目標 repository。
 
 ~~~console
 # 在 plugin source checkout 驗證 manifest 與 portable CLI
-python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/sdlc/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'sdlc'; assert m['skills'] == './skills/'"
-python -X utf8 -B plugins/sdlc/scripts/sdlc.py --help
-python -X utf8 -B -m unittest discover -s plugins/sdlc/tests -p "test_*.py"
+python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
+python -X utf8 -B plugins/megin/scripts/megin.py --help
+python -X utf8 -B -m unittest discover -s plugins/megin/tests -p "test_*.py"
 ~~~
 
-若 plugin 尚未安裝，先使用前面的 `codex plugin install ./plugins/sdlc`；上述命令不會
+若 plugin 尚未安裝，先使用前面的 `codex plugin install ./plugins/megin`；上述命令不會
 取代目標專案自己的 build／test。v2 `finish` 的 commit／push／draft PR evidence 也要
 納入 CI artifact；沒有 remote 或 credentials 的測試應驗證 `publication_pending` 可續跑。
 
@@ -396,7 +406,7 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/run_full_suite.py --s
 python -X utf8 -B .agents/skills/project-knowledge/scripts/measure_search_quality.py --repo .
 ~~~
 
-CI 位於 [.github/workflows/knowledge-portability.yml](.github/workflows/knowledge-portability.yml)：先執行 quick job，成功後才執行 Windows／Linux 完整矩陣，最後比較跨平台報告。.agents/skills/**、plugins/sdlc/**、docs/**、README.md、OPERATIONS.md、.gitattributes 與 workflow 變更都會觸發相關檢查；若存在 plugin manifest，quick／platform jobs 也會執行 portable v2 validator 與 CLI tests。
+CI 位於 [.github/workflows/knowledge-portability.yml](.github/workflows/knowledge-portability.yml)：先執行 quick job，成功後才執行 Windows／Linux 完整矩陣，最後比較跨平台報告。.agents/skills/**、plugins/megin/**、docs/**、README.md、OPERATIONS.md、.gitattributes 與 workflow 變更都會觸發相關檢查；若存在 plugin manifest，quick／platform jobs 也會執行 portable v2 validator 與 CLI tests。
 
 ## 常見診斷與安全處理
 
@@ -427,7 +437,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 
 ~~~text
 .
-├── plugins/sdlc/                    # portable v2 plugin、CLI、schemas、skills
+├── plugins/megin/                    # portable v2 plugin、CLI、schemas、skills
 ├── .agents/skills/                 # repository-local Skills、contracts、scripts、schemas
 ├── docs/work/<work_id>/            # Requirements、Plan 與工作交接 artifacts
 ├── docs/knowledge/                 # canonical knowledge 與 provenance sidecars

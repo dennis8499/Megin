@@ -480,9 +480,9 @@ def execute_profile_item(
         }
     )
     if validation_profile is not None:
-        environment["SDLC_RUNNER_VALIDATION_PROFILE"] = validation_profile
+        environment["MEGIN_RUNNER_VALIDATION_PROFILE"] = validation_profile
     else:
-        environment.pop("SDLC_RUNNER_VALIDATION_PROFILE", None)
+        environment.pop("MEGIN_RUNNER_VALIDATION_PROFILE", None)
     started = time.perf_counter()
     try:
         completed = subprocess.run(

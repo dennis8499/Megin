@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://local.sdlc/bug-diagnosis-v1.schema.json",
+  "$id": "https://local.megin/bug-diagnosis-v1.schema.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "repo_id", "request", "request_sha256", "command", "disposition", "hypothesis", "exit_code", "output_sha256", "output_bytes", "evidence_path", "input_snapshot", "output_snapshot", "read_only", "created_at", "record_sha256"],

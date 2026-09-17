@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://local.sdlc/knowledge-candidate-v2.schema.json",
-  "title": "Portable SDLC knowledge candidate v2",
+  "$id": "https://local.megin/knowledge-candidate-v2.schema.json",
+  "title": "Portable Megin knowledge candidate v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "work_id", "revision", "scope", "sources", "certainty", "claims", "created_at"],

@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 import importlib.util
 
 
-SCRIPT = Path(__file__).parents[1] / "scripts" / "sdlc.py"
-_SPEC = importlib.util.spec_from_file_location("sdlc_engine", SCRIPT)
+SCRIPT = Path(__file__).parents[1] / "scripts" / "megin.py"
+# Explicit legacy-token allowlist: these values belong only to migration
+# fixtures and must not leak into the normal Megin lifecycle tests.
+MIGRATION_LEGACY_ALLOWLIST = {
+    "config_schema": "sdlc-project/v1",
+    "plugin": "sdlc",
+    "config_dir": ".sdlc",
+    "capability_schema": "sdlc-capability/v1",
+    "writer_report_schema": "sdlc-writer-report/v1",
+    "review_report_schema": "sdlc-review-report/v1",
+}
+_SPEC = importlib.util.spec_from_file_location("megin_engine", SCRIPT)
 assert _SPEC and _SPEC.loader
 ENGINE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(ENGINE)
@@ -24,12 +36,12 @@ class PortableCliTests(unittest.TestCase):
         self.repo = self.root / "project with 中文"
         self.repo.mkdir()
         self.env = os.environ.copy()
-        self.env["SDLC_STATE_ROOT"] = str(self.root / "state")
-        self.previous_state_root = os.environ.get("SDLC_STATE_ROOT")
-        os.environ["SDLC_STATE_ROOT"] = self.env["SDLC_STATE_ROOT"]
+        self.env["MEGIN_STATE_ROOT"] = str(self.root / "state")
+        self.previous_state_root = os.environ.get("MEGIN_STATE_ROOT")
+        os.environ["MEGIN_STATE_ROOT"] = self.env["MEGIN_STATE_ROOT"]
         self.git("init", "-q", "-b", "main")
-        self.git("config", "user.email", "sdlc@example.invalid")
-        self.git("config", "user.name", "SDLC Test")
+        self.git("config", "user.email", "megin@example.invalid")
+        self.git("config", "user.name", "Megin Test")
         (self.repo / "README.md").write_text("seed\n", encoding="utf-8")
         self.git("add", "README.md")
         self.git("commit", "-qm", "seed")
@@ -48,9 +60,9 @@ class PortableCliTests(unittest.TestCase):
         except (AssertionError, OSError):
             pass
         if self.previous_state_root is None:
-            os.environ.pop("SDLC_STATE_ROOT", None)
+            os.environ.pop("MEGIN_STATE_ROOT", None)
         else:
-            os.environ["SDLC_STATE_ROOT"] = self.previous_state_root
+            os.environ["MEGIN_STATE_ROOT"] = self.previous_state_root
         self.temp.cleanup()
 
     def git(self, *args: str, cwd: Path | None = None) -> str:
@@ -66,6 +78,38 @@ class PortableCliTests(unittest.TestCase):
     def cli_raw(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run([sys.executable, str(SCRIPT), *args], env=self.env, text=True, encoding="utf-8", capture_output=True)
 
+    def set_state_root(self, path: Path) -> None:
+        self.env["MEGIN_STATE_ROOT"] = str(path)
+        os.environ["MEGIN_STATE_ROOT"] = str(path)
+
+    def legacyize_config(self) -> None:
+        config_dir = self.repo / ".megin"
+        config_path = config_dir / "config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config["schema"] = MIGRATION_LEGACY_ALLOWLIST["config_schema"]
+        config["plugin"] = MIGRATION_LEGACY_ALLOWLIST["plugin"]
+        config["plugin_version"] = "0.1.0"
+        legacy_dir = self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]
+        config_dir.rename(legacy_dir)
+        (legacy_dir / "config.json").write_text(json.dumps(config, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+    def prepare_legacy_run(self) -> tuple[Path, Path, Path]:
+        source_root = self.root / "legacy-state"
+        target_root = self.root / "megin-state"
+        self.set_state_root(source_root)
+        self.cli("init", "--repo", str(self.repo))
+        pending = self.cli(
+            "start", "--repo", str(self.repo), "--request", "修正 README 文字",
+            "--work-id", "work-migrate", "--task-class", "small", "--allowed-path", "README.md",
+        )
+        state_path = Path(pending["state_path"])
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["plugin"] = MIGRATION_LEGACY_ALLOWLIST["plugin"]
+        state["plugin_version"] = "0.1.0"
+        state_path.write_text(json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        self.legacyize_config()
+        return source_root, target_root, state_path
+
     def writer_complete(self, work_id: str) -> dict:
         status = self.cli("status", "--repo", str(self.repo), "--work-id", work_id)
         assignment = status["current"]
@@ -73,7 +117,7 @@ class PortableCliTests(unittest.TestCase):
         paths, snapshot = ENGINE.status_paths(worktree)
         report_path = self.root / f"{work_id}-writer-report.json"
         report_path.write_text(json.dumps({
-            "schema": "sdlc-writer-report/v1",
+            "schema": "megin-writer-report/v1",
             "work_id": work_id,
             "assignment_id": assignment["assignment_id"],
             "assignment_sha256": assignment["assignment_sha256"],
@@ -120,7 +164,7 @@ class PortableCliTests(unittest.TestCase):
                 "output_snapshot": snapshot,
             })
         report_path.write_text(json.dumps({
-            "schema": "sdlc-review-report/v1",
+            "schema": "megin-review-report/v1",
             "work_id": work_id,
             "assignment_id": assignment["assignment_id"],
             "assignment_sha256": assignment["assignment_sha256"],
@@ -157,7 +201,7 @@ class PortableCliTests(unittest.TestCase):
         snapshot = ENGINE.knowledge_snapshot(worktree, state["knowledge"]["scope"])
         report_path = self.root / f"{work_id}-knowledge-review.json"
         report_path.write_text(json.dumps({
-            "schema": "sdlc-knowledge-review/v1",
+            "schema": "megin-knowledge-review/v1",
             "work_id": work_id,
             "reviewer_id": reviewer,
             "reviewer_session": session,
@@ -436,7 +480,7 @@ class PortableCliTests(unittest.TestCase):
 
     def test_windows_style_test_command_is_accepted_without_losing_backslashes(self) -> None:
         self.cli("init", "--repo", str(self.repo), "--test-command", r"python .\tests\run.py")
-        config = json.loads((self.repo / ".sdlc" / "config.json").read_text(encoding="utf-8"))
+        config = json.loads((self.repo / ".megin" / "config.json").read_text(encoding="utf-8"))
         self.assertEqual(config["test_commands"], [r"python .\tests\run.py"])
 
     def test_read_only_request_cannot_be_forced_into_a_mutating_run(self) -> None:
@@ -537,7 +581,7 @@ class PortableCliTests(unittest.TestCase):
         worktree = Path(active["worktree"])
         worktree.joinpath("README.md").write_text("committed bytes\n", encoding="utf-8")
         self.git("add", "README.md", cwd=worktree)
-        self.git("commit", "-qm", "sdlc(work-recovery-dirty): committed bytes", cwd=worktree)
+        self.git("commit", "-qm", "megin(work-recovery-dirty): committed bytes", cwd=worktree)
         worktree.joinpath("uncommitted.txt").write_text("ambiguous\n", encoding="utf-8")
         state, _ = ENGINE.load_state(self.repo, "work-recovery-dirty")
         self.assertFalse(ENGINE.recover_commit(state, worktree))
@@ -631,7 +675,7 @@ class PortableCliTests(unittest.TestCase):
         paths, snapshot = ENGINE.status_paths(worktree)
         report_path = self.root / "writer-blocked.json"
         report_path.write_text(json.dumps({
-            "schema": "sdlc-writer-report/v1", "work_id": "work-writer-blocked",
+            "schema": "megin-writer-report/v1", "work_id": "work-writer-blocked",
             "assignment_id": assignment["assignment_id"], "assignment_sha256": assignment["assignment_sha256"],
             "writer_id": assignment["writer_id"], "session_id": assignment["session_id"],
             "ticket_sha256": assignment["ticket_sha256"], "status": "blocked",
@@ -672,6 +716,243 @@ class PortableCliTests(unittest.TestCase):
         resumed = self.cli("status", "--repo", str(self.repo), "--work-id", "work-knowledge-conflict")
         self.assertEqual(resumed["status"], "active")
         self.assertEqual(resumed["publication"], "publication_pending")
+
+    def test_migrate_dry_run_is_non_mutating_and_reports_manifest(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        self.legacyize_config()
+        source_root = self.root / "legacy-state"
+        target_root = self.root / "megin-state"
+        result = self.cli(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root), "--dry-run",
+        )
+        self.assertEqual(result["schema"], "megin-migration/v1")
+        self.assertEqual(result["status"], "dry_run")
+        self.assertRegex(result["migration_id"], r"^[0-9a-f]{64}$")
+        self.assertEqual(result["file_count"], 1)
+        self.assertEqual(result["source"]["state_root"], str(source_root.resolve()))
+        self.assertEqual(result["target"]["state_root"], str(target_root.resolve()))
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"] / "config.json").exists())
+        self.assertFalse((self.repo / ".megin").exists())
+        self.assertFalse(target_root.exists())
+        self.assertIsNone(result["backup"]["state"])
+
+    def test_migrate_converts_state_paths_preserves_digests_and_is_idempotent(self) -> None:
+        source_root, target_root, legacy_state_path = self.prepare_legacy_run()
+        old_state = json.loads(legacy_state_path.read_text(encoding="utf-8"))
+        old_candidate = Path(old_state["candidates"]["design"]["path"])
+        old_candidate_bytes = old_candidate.read_bytes()
+        result = self.cli(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(result["status"], "migrated")
+        self.assertEqual(result["work_ids"], ["work-migrate"])
+        self.assertGreaterEqual(result["file_count"], 3)
+        self.assertTrue(Path(result["backup"]["config"]).is_dir())
+        self.assertTrue(Path(result["backup"]["state"]).is_dir())
+        self.assertFalse((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]).exists())
+        self.assertTrue((self.repo / ".megin" / "config.json").exists())
+        self.assertFalse(legacy_state_path.exists())
+
+        self.set_state_root(target_root)
+        migrated = self.cli("status", "--repo", str(self.repo), "--work-id", "work-migrate")
+        migrated_path = Path(migrated["state_path"])
+        state = json.loads(migrated_path.read_text(encoding="utf-8"))
+        self.assertEqual(state["plugin"], "megin")
+        self.assertEqual(state["plugin_version"], "0.2.0")
+        candidate = state["candidates"]["design"]
+        candidate_path = Path(candidate["path"])
+        self.assertTrue(str(candidate_path).startswith(str(target_root.resolve())))
+        self.assertEqual(candidate_path.read_bytes(), old_candidate_bytes)
+        self.assertEqual(candidate["sha256"], ENGINE.digest_bytes(old_candidate_bytes))
+        self.assertEqual(state["task"]["request"], old_state["task"]["request"])
+        self.assertEqual(ENGINE.load_state(self.repo, "work-migrate")[0]["plugin"], "megin")
+
+        again = self.cli(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(again["status"], "already_migrated")
+        self.assertEqual(again["work_ids"], ["work-migrate"])
+
+    def test_migrate_converts_persisted_report_and_capability_schemas(self) -> None:
+        source_root = self.root / "legacy-state"
+        target_root = self.root / "megin-state"
+        self.set_state_root(source_root)
+        self.cli("init", "--repo", str(self.repo))
+        active = self.cli(
+            "start", "--repo", str(self.repo), "--request", "修正 README 文字",
+            "--work-id", "work-migrate-reports", "--task-class", "small",
+            "--allowed-path", "README.md", "--approve",
+        )
+        worktree = Path(active["worktree"])
+        (worktree / "README.md").write_text("migrated reports\n", encoding="utf-8")
+        self.writer_complete("work-migrate-reports")
+        self.review("work-migrate-reports")
+        state_path = Path(self.cli("status", "--repo", str(self.repo), "--work-id", "work-migrate-reports")["state_path"])
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+
+        capability_paths: list[Path] = []
+        for assignment in state["assignments"]:
+            capability_paths.append(Path(assignment["capability_path"]))
+        capability_paths.append(Path(state["review"]["reviewer_capability_path"]))
+        for capability_path in capability_paths:
+            payload = json.loads(capability_path.read_text(encoding="utf-8"))
+            payload["schema"] = MIGRATION_LEGACY_ALLOWLIST["capability_schema"]
+            payload.pop("capability_sha256", None)
+            digest = ENGINE.digest_json(payload)
+            payload["capability_sha256"] = digest
+            capability_path.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+            for assignment in state["assignments"]:
+                if Path(assignment["capability_path"]).resolve() == capability_path.resolve():
+                    assignment["capability_sha256"] = digest
+            if Path(state["review"]["reviewer_capability_path"]).resolve() == capability_path.resolve():
+                state["review"]["reviewer_capability_sha256"] = digest
+
+        writer_result = state["assignments"][0]["writer_result"]
+        writer_report_path = Path(writer_result["report_path"])
+        writer_report = json.loads(writer_report_path.read_text(encoding="utf-8"))
+        writer_report["schema"] = MIGRATION_LEGACY_ALLOWLIST["writer_report_schema"]
+        writer_report_path.write_text(json.dumps(writer_report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        review_report_path = Path(state["review"]["report_path"])
+        review_report = json.loads(review_report_path.read_text(encoding="utf-8"))
+        review_report["schema"] = MIGRATION_LEGACY_ALLOWLIST["review_report_schema"]
+        review_report_path.write_text(json.dumps(review_report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        state["plugin"] = MIGRATION_LEGACY_ALLOWLIST["plugin"]
+        state["plugin_version"] = "0.1.0"
+        state_path.write_text(json.dumps(state, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        self.legacyize_config()
+
+        result = self.cli(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(result["status"], "migrated")
+        self.set_state_root(target_root)
+        migrated = ENGINE.load_state(self.repo, "work-migrate-reports")[0]
+        for assignment in migrated["assignments"]:
+            capability = json.loads(Path(assignment["capability_path"]).read_text(encoding="utf-8"))
+            self.assertEqual(capability["schema"], "megin-capability/v1")
+            ENGINE.validate_capability(
+                assignment["capability_path"], assignment["capability_sha256"], migrated,
+                kind="writer", assignment_id=assignment["assignment_id"],
+                identity=assignment["writer_id"], session_id=assignment["session_id"],
+            )
+        ENGINE.validate_capability(
+            migrated["review"]["reviewer_capability_path"], migrated["review"]["reviewer_capability_sha256"], migrated,
+            kind="reviewer", assignment_id=migrated["review"]["assignment_id"],
+            identity=migrated["review"]["reviewer_id"], session_id=migrated["review"]["reviewer_session"],
+        )
+        self.assertEqual(json.loads(Path(migrated["assignments"][0]["writer_result"]["report_path"]).read_text(encoding="utf-8"))["schema"], "megin-writer-report/v1")
+        self.assertEqual(json.loads(Path(migrated["review"]["report_path"]).read_text(encoding="utf-8"))["schema"], "megin-review-report/v1")
+
+    def test_normal_commands_reject_legacy_config_with_migration_hint(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        self.legacyize_config()
+        result = self.cli_raw("status", "--repo", str(self.repo))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("megin migrate --repo", result.stderr)
+        self.assertNotIn('"runs"', result.stdout)
+
+    def test_migrate_fails_closed_on_destination_conflict(self) -> None:
+        source_root, target_root, _ = self.prepare_legacy_run()
+        target_state = target_root / ENGINE.repo_identity(self.repo)
+        target_state.mkdir(parents=True)
+        marker = target_state / "keep.txt"
+        marker.write_text("destination belongs to another run\n", encoding="utf-8")
+        result = self.cli_raw(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(result.returncode, 3)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "megin-migration/v1")
+        self.assertEqual(payload["status"], "blocked")
+        self.assertTrue(payload["conflicts"])
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"] / "config.json").exists())
+        self.assertFalse((self.repo / ".megin").exists())
+        self.assertEqual(marker.read_text(encoding="utf-8"), "destination belongs to another run\n")
+
+    def test_migrate_fails_closed_on_lock_and_malformed_state(self) -> None:
+        source_root, target_root, state_path = self.prepare_legacy_run()
+        lock = state_path.parent / "work-migrate.json.lock"
+        lock.write_text("active\n", encoding="utf-8")
+        locked = self.cli_raw(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(locked.returncode, 3)
+        self.assertIn("lock", json.loads(locked.stdout)["conflicts"][0])
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]).exists())
+        self.assertFalse((self.repo / ".megin").exists())
+        lock.unlink()
+
+        state_path.write_text("{ malformed", encoding="utf-8")
+        malformed = self.cli_raw(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(malformed.returncode, 3)
+        self.assertIn("malformed", json.loads(malformed.stdout)["conflicts"][0])
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]).exists())
+        self.assertFalse((self.repo / ".megin").exists())
+
+    def test_migrate_rejects_redirected_state_inputs(self) -> None:
+        source_root, target_root, state_path = self.prepare_legacy_run()
+        redirected = state_path.parent / "redirected.json"
+        outside = self.root / "outside.json"
+        outside.write_text("{}\n", encoding="utf-8")
+        try:
+            redirected.symlink_to(outside)
+        except (OSError, NotImplementedError) as exc:
+            self.skipTest(f"symlinks are unavailable in this Windows test environment: {exc}")
+        result = self.cli_raw(
+            "migrate", "--repo", str(self.repo),
+            "--from-state-root", str(source_root), "--to-state-root", str(target_root),
+        )
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("symlink", json.loads(result.stdout)["conflicts"][0])
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]).exists())
+        self.assertFalse((self.repo / ".megin").exists())
+
+    def test_migrate_rechecks_source_before_publish(self) -> None:
+        source_root, target_root, state_path = self.prepare_legacy_run()
+        original_transform = ENGINE._migration_transform_tree
+        changed = False
+
+        def mutate_source_before_transform(root: Path, source: Path, target: Path) -> list[str]:
+            nonlocal changed
+            if not changed and source == source_root:
+                changed = True
+                state_path.write_text(state_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            return original_transform(root, source, target)
+
+        args = argparse.Namespace(
+            from_state_root=str(source_root), to_state_root=str(target_root), dry_run=False,
+        )
+        with mock.patch.object(ENGINE, "_migration_transform_tree", side_effect=mutate_source_before_transform):
+            with self.assertRaises(ENGINE.MeginError) as context:
+                ENGINE._run_migration(args, self.repo)
+        self.assertIn("changed during migration", str(context.exception))
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"] / "config.json").exists())
+        self.assertFalse((self.repo / ".megin").exists())
+        self.assertTrue(state_path.exists())
+
+    def test_migrate_recovers_after_publish_validation_failure(self) -> None:
+        source_root, target_root, _ = self.prepare_legacy_run()
+        args = argparse.Namespace(
+            from_state_root=str(source_root), to_state_root=str(target_root), dry_run=False,
+        )
+        with mock.patch.object(ENGINE, "load_config", side_effect=ENGINE.MeginError("injected target validation failure")):
+            with self.assertRaises(ENGINE.MeginError) as context:
+                ENGINE._run_migration(args, self.repo)
+        self.assertIn("injected target validation failure", str(context.exception))
+        self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"] / "config.json").exists())
+        self.assertFalse((self.repo / ".megin").exists())
+        self.assertTrue((source_root / ENGINE.repo_identity(self.repo) / "work-migrate.json").exists())
+        self.assertTrue(list(target_root.glob("*.megin-failed-*")))
+        self.assertTrue(list(self.repo.glob(".megin.failed-*")))
 
 
 if __name__ == "__main__":

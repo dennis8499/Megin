@@ -2,7 +2,7 @@
 
 # Human approval Gate review contract
 
-This file is the single source of truth for every SDLC Gate that asks a human
+This file is the single source of truth for every Megin Gate that asks a human
 for approval in Chat. It applies to Requirements, Plan, Knowledge/Apply,
 bootstrap and repair Candidates, the BUG assessment co-gate, and a bulk-edit
 occurrence map. Automatic validation, fresh review, test, performance,
