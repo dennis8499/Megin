@@ -1,0 +1,123 @@
+{
+  "bug": {
+    "bug_id": "bug-delivery-plan-revision-gap",
+    "follow_up": [],
+    "implementation_review_ref": "reviews/round-1/report.json",
+    "original_reproduction": {
+      "post_fix": {
+        "command_ref": "CMD-BUG-REPRO-001",
+        "evidence_refs": [
+          "commands/obligations/CMD-BUG-REPRO-001.stderr.txt"
+        ],
+        "status": "absent"
+      },
+      "pre_fix": {
+        "command_ref": "CMD-BUG-REPRO-001",
+        "evidence_refs": [
+          "evidence/oracle/pre-fix-red.stderr.txt"
+        ],
+        "status": "present"
+      }
+    },
+    "proxy": {
+      "bdd_refs": [],
+      "green_evidence_refs": [],
+      "red_evidence_refs": [],
+      "test_refs": []
+    },
+    "regression": {
+      "bdd_refs": [
+        "BDD-001"
+      ],
+      "green_evidence_refs": [
+        "evidence/bug/regression-green.txt"
+      ],
+      "red_evidence_refs": [
+        "evidence/bug/regression-red.txt"
+      ],
+      "test_refs": [
+        "TEST-001"
+      ]
+    },
+    "residual_risks": []
+  },
+  "bug_verification_ref": "docs/bugs/bug-delivery-plan-revision-gap/verifications/work-20260916-delivery-revision-gap.json",
+  "changes": [
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/_delivery_record.py",
+      "sha256": "5f021659c302b05d508ae6a8b2baf2b02d67cd6f9515602ce4a00f97d368b5c2",
+      "summary": "Derive revision allocation from recorded high-water and reject rollback/reuse."
+    },
+    {
+      "path": ".agents/skills/delivery-orchestrator/scripts/test_delivery_transitions.py",
+      "sha256": "b5f710b1664a1da617bd99525ef4b9ecf9a61c79ae5e84e1d8e91e9a2dad4933",
+      "summary": "Add cross-generation gap, collision, reuse, and atomicity regression coverage."
+    },
+    {
+      "path": ".agents/skills/technical-planning/scripts/test_validate_contracts.py",
+      "sha256": "f91080dc10d2ec51d2c7ad9da195c5ef5e9d013042f2b8e9c1461aeed7cddf3f",
+      "summary": "Keep schema-count contract aligned with the current six-schema execution bundle."
+    }
+  ],
+  "created_at": "2026-09-17T05:23:36.632286+00:00",
+  "implementation_run_id": "bd29e77a172515561a933ecf91528ba58cfc580b115410dba1bffce4717e7c2c",
+  "knowledge_decision": "change",
+  "known_deviations": [
+    "Hosted CI was not run under the approved local-only scope; it remains an optional release follow-up."
+  ],
+  "markdown": {
+    "path": "docs/work/work-20260916-delivery-revision-gap/implementation/outcome.md",
+    "sha256": "0a1335dfc44c0617bc4dd087779ddacafe14c0016560a1d37daece8da6aac4a2"
+  },
+  "result": "verified",
+  "review": {
+    "evidence_refs": [
+      "review:fresh-review:preliminary-r4"
+    ],
+    "report_ref": "reviews/round-1/report.json",
+    "report_sha256": "779064e4158330aa0e2224c7593a16d5ee4629ac71b71dd1ba7c11931b25d406",
+    "verdict": "APPROVED"
+  },
+  "revision": 1,
+  "schema": "implementation-outcome/v1",
+  "summary": "Original symptom is absent after the root-cause fix.",
+  "verification": [
+    {
+      "command_id": "CMD-BDD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-BDD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-RELATED-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-RELATED-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-BUILD-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-BUILD-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-TEST-FULL-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-TEST-FULL-001.txt"
+      ],
+      "outcome": "passed"
+    },
+    {
+      "command_id": "CMD-GOVERNANCE-001",
+      "evidence_refs": [
+        "reviews/round-1/outputs/CMD-GOVERNANCE-001.txt"
+      ],
+      "outcome": "passed"
+    }
+  ],
+  "work_id": "work-20260916-delivery-revision-gap",
+  "work_kind": "bug"
+}

@@ -1664,7 +1664,21 @@ def _assert_smallest_available_revision(
     recorded_paths: set[str],
 ) -> None:
     worktree = Path(record["generations"][-1]["canonical_worktree"])
-    for number in range(1, revision):
+    revision_parser = _requirements_revision if kind == "requirements" else _plan_revision
+    high_water = max(
+        (
+            parsed
+            for path in recorded_paths
+            if (parsed := revision_parser(path, record["artifact_root"])) is not None
+        ),
+        default=0,
+    )
+    if revision <= high_water:
+        raise DeliveryError(
+            f"{candidate_path} must be greater than recorded revision {high_water}",
+            code="INVALID_REVISION",
+        )
+    for number in range(high_water + 1, revision):
         relative = _revision_path(record["artifact_root"], kind, number)
         if relative in recorded_paths:
             continue

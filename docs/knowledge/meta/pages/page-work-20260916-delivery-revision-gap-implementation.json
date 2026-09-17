@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260916-delivery-revision-gap-implementation",
+      "content_anchor": "implementation-outcome",
+      "contradicts": [],
+      "evidence_class": "observed",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "6752ca9602183abc877b5e74b574be0a57c807a0e31316a6257d89c661d55605",
+          "locator": {
+            "end_line": 7,
+            "start_line": 7
+          },
+          "path": "docs/work/work-20260916-delivery-revision-gap/implementation/outcome.md",
+          "sha256": "0a1335dfc44c0617bc4dd087779ddacafe14c0016560a1d37daece8da6aac4a2"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260916-delivery-revision-gap-implementation.md",
+  "content_sha256": "d3eef76e394ae9a2b95e0857f33100230c3d9926ee35dfb4364169bd3f6afdbd",
+  "lifecycle": "current",
+  "page_id": "page-work-20260916-delivery-revision-gap-implementation",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "implementation"
+  ],
+  "title": "Implementation Outcome"
+}

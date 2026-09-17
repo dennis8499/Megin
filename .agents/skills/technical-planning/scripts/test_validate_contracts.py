@@ -99,9 +99,9 @@ class SchemaSubsetContractTests(unittest.TestCase):
         return validator.schema_keyword_errors(schema)
 
 
-    def test_all_five_repository_schemas_use_only_the_supported_subset(self) -> None:
+    def test_all_repository_schemas_use_only_the_supported_subset(self) -> None:
         paths = sorted(SKILLS_ROOT.glob("**/*schema.json"))
-        self.assertEqual(5, len(paths), [path.as_posix() for path in paths])
+        self.assertEqual(6, len(paths), [path.as_posix() for path in paths])
         for path in paths:
             with self.subTest(path=path):
                 schema = json.loads(path.read_text(encoding="utf-8"))

@@ -1041,6 +1041,222 @@ class DeliveryTransitionTests(DeliveryFixture):
         self.assert_error("COMPLETE_FROZEN", lambda: self.start(primary, "approval-work", generation=2))
 
 
+class RevisionAllocationRegressionTests(DeliveryFixture):
+    """Regression coverage for revision allocation across generations."""
+
+    def _revision_two_generation(self, work_id: str) -> tuple[Path, Path, str, str]:
+        primary = self.make_repo(f"{work_id}-primary")
+        delivery = Path(self.start(primary, work_id)["worktree"])
+        self.enter_requirements(delivery, work_id)
+
+        # These draft paths deliberately occupy revision 1 without recording an
+        # approval.  The first approved revision is therefore revision 2.
+        draft_requirements = delivery / "docs" / "work" / work_id / "requirements.md"
+        draft_requirements.parent.mkdir(parents=True, exist_ok=True)
+        draft_requirements.write_text("draft requirements\n", encoding="utf-8", newline="\n")
+        requirements_path, requirements_sha = self.approve_requirements(
+            delivery, work_id, revision=2
+        )
+
+        self.transition(delivery, work_id, "planning", "awaiting_user", "plan_2_candidate")
+        draft_plan = delivery / "docs" / "work" / work_id / "plan" / "draft.txt"
+        draft_plan.parent.mkdir(parents=True, exist_ok=True)
+        draft_plan.write_text("draft plan\n", encoding="utf-8", newline="\n")
+        handoff_path, payload_sha, approval = self.ready_handoff(
+            delivery,
+            work_id,
+            requirements_path,
+            requirements_sha,
+            revision=2,
+        )
+        self.transition(
+            delivery,
+            work_id,
+            "implementation",
+            "active",
+            "plan_2_approved",
+            handoff_path=handoff_path,
+            candidate_revision="candidate-2",
+            payload_sha256=payload_sha,
+            plan_approval_refs=[approval],
+        )
+
+        generation_two = workspace.start_workspace(
+            primary,
+            work_id,
+            REQUEST_SHA,
+            root=self.registry,
+            generation=2,
+        )
+        delivery = Path(generation_two["worktree"])
+        self.assertFalse(
+            (delivery / "docs" / "work" / work_id / "requirements.md").exists()
+        )
+        self.assertFalse(
+            (delivery / "docs" / "work" / work_id / "plan").exists()
+        )
+        self.assertTrue(
+            (delivery / Path(*requirements_path.split("/"))).is_file()
+        )
+        self.assertTrue((delivery / Path(*handoff_path.split("/"))).is_file())
+        return primary, delivery, requirements_path, requirements_sha
+
+    def _reopen_planning(self, delivery: Path, work_id: str) -> None:
+        self.transition(
+            delivery,
+            work_id,
+            "planning",
+            "active",
+            "implementation_reapproval",
+            implementation_run_id="f" * 64,
+            implementation_ledger_ref="implementation:run-f",
+            implementation_status="Awaiting upstream reapproval",
+        )
+
+    def test_plan_revision_after_generation_uses_high_water(self) -> None:
+        primary, delivery, requirements_path, requirements_sha = self._revision_two_generation(
+            "revision-high-water-work"
+        )
+        work_id = "revision-high-water-work"
+        self._reopen_planning(delivery, work_id)
+
+        # Requirements revision 3 must follow the recorded high-water mark;
+        # requirements.md is intentionally absent from generation 2.
+        self.transition(delivery, work_id, "requirements", "active", "requirements_3_reopen")
+        self.transition(
+            delivery, work_id, "requirements", "awaiting_user", "requirements_3_candidate"
+        )
+        requirements_3_path, requirements_3_sha = self.approve_requirements(
+            delivery, work_id, revision=3
+        )
+
+        # The same high-water rule applies to Plan revision 3.  plan/ is absent
+        # in generation 2 because only the currently approved plan-2 was copied.
+        self.transition(delivery, work_id, "planning", "awaiting_user", "plan_3_candidate")
+        handoff_3, payload_3, approval_3 = self.ready_handoff(
+            delivery,
+            work_id,
+            requirements_3_path,
+            requirements_3_sha,
+            revision=3,
+        )
+        result = self.transition(
+            delivery,
+            work_id,
+            "implementation",
+            "active",
+            "plan_3_approved",
+            handoff_path=handoff_3,
+            candidate_revision="candidate-3",
+            payload_sha256=payload_3,
+            plan_approval_refs=[approval_3],
+        )
+
+        record = self.record(delivery, work_id)
+        self.assertEqual("implementation", result["phase"])
+        self.assertEqual(handoff_3, record["plans"]["current_handoff_path"])
+        self.assertEqual(requirements_3_path, record["requirements"]["current_path"])
+        self.assertEqual(
+            ["docs/work/revision-high-water-work/requirements-2.md",
+             "docs/work/revision-high-water-work/requirements-3.md"],
+            [item["path"] for item in record["requirements"]["revisions"]],
+        )
+        self.assertEqual(
+            [
+                "docs/work/revision-high-water-work/plan-2/handoff.json",
+                "docs/work/revision-high-water-work/plan-3/handoff.json",
+            ],
+            [item["handoff_path"] for item in record["plans"]["revisions"]],
+        )
+        self.assertEqual([], workspace.validate_record(record))
+        self.assertTrue(primary.is_dir())
+
+    def test_gap_collision_reuse_and_atomicity(self) -> None:
+        primary, delivery, requirements_path, requirements_sha = self._revision_two_generation(
+            "revision-collision-work"
+        )
+        work_id = "revision-collision-work"
+        self._reopen_planning(delivery, work_id)
+        self.transition(delivery, work_id, "planning", "awaiting_user", "plan_4_candidate")
+
+        # plan-3 is a higher-than-high-water gap.  With no occupied directory,
+        # plan-4 must fail before changing the record or candidate bytes.
+        handoff_4, payload_4, approval_4 = self.ready_handoff(
+            delivery, work_id, requirements_path, requirements_sha, revision=4
+        )
+        record_before = self.record(delivery, work_id)
+        event_count_before = len(record_before["events"])
+        current_before = record_before["plans"]["current_handoff_path"]
+        candidate_before = (delivery / Path(*handoff_4.split("/"))).read_bytes()
+        self.assert_error(
+            "INVALID_REVISION",
+            lambda: self.transition(
+                delivery,
+                work_id,
+                "implementation",
+                "active",
+                "plan_4_missing_gap",
+                handoff_path=handoff_4,
+                candidate_revision="candidate-4",
+                payload_sha256=payload_4,
+                plan_approval_refs=[approval_4],
+            ),
+        )
+        record_after = self.record(delivery, work_id)
+        self.assertEqual(event_count_before, len(record_after["events"]))
+        self.assertEqual(current_before, record_after["plans"]["current_handoff_path"])
+        self.assertEqual(candidate_before, (delivery / Path(*handoff_4.split("/"))).read_bytes())
+
+        # Occupying the missing higher revision is allowed, and its bytes must
+        # survive the later plan-4 approval unchanged.
+        occupied = delivery / "docs" / "work" / work_id / "plan-3" / "sentinel.txt"
+        occupied.parent.mkdir(parents=True, exist_ok=True)
+        occupied.write_bytes(b"preserve this occupied path\n")
+        result = self.transition(
+            delivery,
+            work_id,
+            "implementation",
+            "active",
+            "plan_4_approved",
+            handoff_path=handoff_4,
+            candidate_revision="candidate-4",
+            payload_sha256=payload_4,
+            plan_approval_refs=[approval_4],
+        )
+        self.assertEqual("implementation", result["phase"])
+        self.assertEqual(b"preserve this occupied path\n", occupied.read_bytes())
+
+        # Reusing a previously approved path is rejected atomically after the
+        # successful append; no new event or current-ref mutation is allowed.
+        self._reopen_planning(delivery, work_id)
+        self.transition(delivery, work_id, "planning", "awaiting_user", "plan_2_reuse_candidate")
+        record_before_reuse = self.record(delivery, work_id)
+        reuse_event_count = len(record_before_reuse["events"])
+        reuse_current = record_before_reuse["plans"]["current_handoff_path"]
+        handoff_2 = "docs/work/revision-collision-work/plan-2/handoff.json"
+        handoff_2_path = delivery / Path(*handoff_2.split("/"))
+        handoff_2_payload = json.loads(handoff_2_path.read_text(encoding="utf-8"))
+        self.assert_error(
+            "ARTIFACT_ALREADY_APPROVED",
+            lambda: self.transition(
+                delivery,
+                work_id,
+                "implementation",
+                "active",
+                "plan_2_reuse",
+                handoff_path=handoff_2,
+                candidate_revision="candidate-2",
+                payload_sha256=handoff_2_payload["candidate"]["payload_sha256"],
+                plan_approval_refs=["conversation:plan-2"],
+            ),
+        )
+        record_after_reuse = self.record(delivery, work_id)
+        self.assertEqual(reuse_event_count, len(record_after_reuse["events"]))
+        self.assertEqual(reuse_current, record_after_reuse["plans"]["current_handoff_path"])
+        self.assertIsNone(record_after_reuse["plans"]["current_handoff_path"])
+        self.assertEqual([], workspace.validate_record(record_after_reuse))
+
+
 class DeliveryBugOverlayTests(DeliveryFixture):
     def start_bug(self, primary: Path, work_id: str = "bug-delivery-work") -> Path:
         started = workspace.start_workspace(

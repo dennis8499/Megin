@@ -6,6 +6,7 @@
 - [本地 AI SDLC 驗證與審查加速技術決策](docs/knowledge/decisions/work-20260907-workflow-speed-d0b3946d-planning.md) — `page-work-20260907-workflow-speed-d0b3946d-planning` — `current`
 - [tgrep full-test runner contract](docs/knowledge/decisions/work-20260908-tgrep-index-4f6a8a9c-planning.md) — `page-work-20260908-tgrep-index-4f6a8a9c-planning` — `current`
 - [BUG Closure Policy v2](docs/knowledge/decisions/work-20260912-bug-closure-policy-dbcbce13-planning.md) — `page-work-20260912-bug-closure-policy-dbcbce13-planning` — `current`
+- [本地完成邊界的跨世代 Delivery 修訂版配置](docs/knowledge/decisions/work-20260916-delivery-revision-gap-planning.md) — `page-work-20260916-delivery-revision-gap-planning` — `current`
 - [Implementation Outcome](docs/knowledge/topics/work-20260831-project-knowledge-system-19202d78-implementation.md) — `page-work-20260831-project-knowledge-system-19202d78-implementation` — `current`
 - [Implementation Outcome](docs/knowledge/topics/work-20260902-skill-script-performance-0ae7b62a-implementation.md) — `page-work-20260902-skill-script-performance-0ae7b62a-implementation` — `current`
 - [Implementation Outcome](docs/knowledge/topics/work-20260903-unified-skill-entry-198002a2-implementation.md) — `page-work-20260903-unified-skill-entry-198002a2-implementation` — `current`
@@ -18,3 +19,5 @@
 - [本地 AI SDLC 端到端速度改善需求](docs/knowledge/topics/work-20260907-workflow-speed-d0b3946d-requirements.md) — `page-work-20260907-workflow-speed-d0b3946d-requirements` — `current`
 - [Implementation Outcome](docs/knowledge/topics/work-20260908-tgrep-index-4f6a8a9c-implementation.md) — `page-work-20260908-tgrep-index-4f6a8a9c-implementation` — `current`
 - [將 tgrep.exe 整合至 Project Knowledge 搜尋流程](docs/knowledge/topics/work-20260908-tgrep-index-4f6a8a9c-requirements.md) — `page-work-20260908-tgrep-index-4f6a8a9c-requirements` — `current`
+- [Implementation Outcome](docs/knowledge/topics/work-20260916-delivery-revision-gap-implementation.md) — `page-work-20260916-delivery-revision-gap-implementation` — `current`
+- [跨世代 Delivery 修訂版配置的本地完成範圍](docs/knowledge/topics/work-20260916-delivery-revision-gap-requirements.md) — `page-work-20260916-delivery-revision-gap-requirements` — `current`

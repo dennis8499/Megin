@@ -1,0 +1,22 @@
+{
+  "approval": {
+    "actor": "user",
+    "evidence": "conversation:work-20260916-delivery-revision-gap:requirements:local-only-candidate-1"
+  },
+  "candidate_ref": "knowledge:candidates/promotion-requirements-bcb03cff1b205f56/candidate.json",
+  "decision": "change",
+  "formal_paths": [
+    "docs/bugs/bug-delivery-plan-revision-gap/assessment-2.json",
+    "docs/bugs/bug-delivery-plan-revision-gap/assessment-2.md",
+    "docs/work/work-20260916-delivery-revision-gap/requirements-2.md"
+  ],
+  "lint": {
+    "required_outcome": "passed"
+  },
+  "payload_sha256": "44856dca47a7814e4ecc157cb70dc01a269b93c6db52a88935c1ed5c628e49dc",
+  "promotion_id": "promotion-requirements-bcb03cff1b205f56",
+  "schema": "knowledge-promotion/v1",
+  "stage": "requirements",
+  "status": "Ready",
+  "work_id": "work-20260916-delivery-revision-gap"
+}

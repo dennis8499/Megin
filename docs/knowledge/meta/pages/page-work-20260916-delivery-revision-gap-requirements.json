@@ -1,0 +1,34 @@
+{
+  "aliases": [],
+  "backlinks": [],
+  "claims": [
+    {
+      "claim_id": "claim-work-20260916-delivery-revision-gap-requirements",
+      "content_anchor": "requirements-claim",
+      "contradicts": [],
+      "evidence_class": "required",
+      "lifecycle": "current",
+      "source_refs": [
+        {
+          "excerpt_sha256": "f67e3386b422a8069135a94b893a4a3f2100071e8048627f4a50b6546441307d",
+          "locator": {
+            "end_line": 91,
+            "start_line": 91
+          },
+          "path": "docs/work/work-20260916-delivery-revision-gap/requirements-2.md",
+          "sha256": "d85edbdfb5e736183158f99ebf66b655c8e9e847f692418c8d6eb4df4395af0b"
+        }
+      ],
+      "supersedes": []
+    }
+  ],
+  "content_path": "docs/knowledge/topics/work-20260916-delivery-revision-gap-requirements.md",
+  "content_sha256": "84bbf22881b86b50038ed891a39783bc464d3ccbc5bdfe85116fe5fc242386e6",
+  "lifecycle": "current",
+  "page_id": "page-work-20260916-delivery-revision-gap-requirements",
+  "schema": "knowledge-page/v1",
+  "tags": [
+    "requirements"
+  ],
+  "title": "跨世代 Delivery 修訂版配置的本地完成範圍"
+}
