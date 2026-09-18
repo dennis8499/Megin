@@ -1,8 +1,8 @@
 # Megin 操作手冊
 
-本手冊集中說明 portable v2 與 repository-local legacy v1 的開始、續跑、診斷、Blocked、Complete 與安全復原。規則細節仍以 [Delivery Orchestrator](.agents/skills/delivery-orchestrator/SKILL.md)、[v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)、[stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md)及各階段的 `delivery-protocol.md` 為準。
+新工作統一使用 portable `delivery-run/v3`。本手冊說明探索、單一計畫核准、BDD/TDD 派工、獨立 Review、自動驗證、人工驗測與本機 commit；舊 v1/v2 規則只作歷史 run 遷移參考，不能用舊核准續跑新工作。
 
-## Portable v2 快速操作
+## Portable v3 快速操作
 
 先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立功能 branch、worktree 或寫入產品：
 
@@ -10,7 +10,7 @@
 codex plugin install ./plugins/megin
 ```
 
-在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀 task classification；新工作預設在目前 checkout 建立功能 branch，只有明確指定時才用 worktree：
+在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀分類與候選建立；核准前不建立功能 branch：
 
 ```console
 megin init --repo <target-repo>
@@ -23,11 +23,11 @@ megin start --repo <target-repo> --request "<request>"
 | 類型 | 行為 |
 |---|---|
 | `read_only` | 只查證與回報，不建立 run、worktree 或 branch |
-| `small` | 短 design brief，一次 integrated approval，核准後才建立功能 branch（或明確指定的 worktree） |
-| `large` | Requirements 與 Planning 各一次 approval，第二次核准後自動進 Implementation |
+| `small` | 短 Design、必要 Gherkin，一次 plan approval |
+| `large` | 完整 Design、Gherkin、Task graph，一次 plan approval |
 | `bug` | 先唯讀 diagnosis，再依影響走 small 或 large path |
 
-核准範圍同時綁定驗收、allowed paths、測試命令、knowledge scope 與 finish destination。
+核准範圍同時綁定行為情境、驗收、allowed paths、測試命令、knowledge scope 與本機 commit 目標。
 同一 workspace 同一時間最多一名 authorized writer；implementation subagent 可以擔任 writer，
 但不得平行寫入或自行再委派。Implementation 完成後由不同 fresh、read-only Reviewer 審查；
 blocking finding 回交同一 writer，沿用 bounded fix loop。
@@ -36,43 +36,47 @@ blocking finding 回交同一 writer，沿用 bounded fix loop。
 
 ```console
 megin status --repo <target-repo> --work-id <work-id>
+megin approve --repo <target-repo> --work-id <work-id> --confirm
 megin resume --repo <target-repo> --work-id <work-id>
+megin verify --repo <target-repo> --work-id <work-id>
+megin accept --repo <target-repo> --work-id <work-id> --confirm
 megin finish --repo <target-repo> --work-id <work-id>
 ```
 
-小任務的核准、派工與審查可用下列最小循序操作表示；每個結果都會寫入外部 v2 state：
+小任務的核准、派工、審查與人工驗測可用下列最小循序操作表示；每個結果都會寫入外部 v3 state：
 
 ```console
-megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
+megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest"
+megin approve --repo <target-repo> --work-id <work-id> --response "確認計畫 <work-id> plan-1，依此開始開發。"
 megin resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
 megin resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+megin verify --repo <target-repo> --work-id <work-id>
+megin accept --repo <target-repo> --work-id <work-id> --response "驗測通過 <work-id> acceptance-1，同意更新知識並建立本機 commit。"
 megin finish --repo <target-repo> --work-id <work-id>
 ```
 
-大型變更在不同的 `resume` 呼叫分別帶入 `--approve requirements` 與 `--approve plan`；疑似
+大型變更仍在同一個 `approve` 關卡核准完整 bundle；疑似
 BUG 先以 `diagnose` 的唯讀命令與根因假設保存 assessment，再以 `--diagnosis-file` 綁定修復。來源 checkout 可用
 `python -X utf8 -B plugins/megin/scripts/validate.py` 驗證 manifest、技能、schema 與 state。
 
-`finish` 先檢查 approved scope、review snapshot 與 automatic knowledge review；預設保留未暫存修改，只有核准的 commit／draft-pr 模式才 stage／
-commit 核准 paths；只有已核准 remote／認證可用時才 push 並建立或重用該 branch 的 draft PR。缺少 remote、
-認證或網路時保存 `publication_pending`；這只適用於明確選用 commit／draft-pr 模式，設定並核准目的地後再由 `resume`／`finish` 只重試未完成步驟。Merge、
-deployment、cleanup 與刪除 worktree 永遠是獨立動作。runtime state、assignments、reports、
-raw outputs 與 publication state 存在 repository 外的持久化 state root；`doctor` 顯示實際路徑。
+`verify` 通過後會停在 `awaiting_user_acceptance`，不更新正式 knowledge、不 stage、不 commit。
+`accept` 記錄人工驗測版本；`finish` 才檢查 source-backed knowledge、限定 paths 並建立一筆本機 commit。
+Push、Merge、deployment、cleanup 與刪除 worktree 永遠是獨立動作。runtime state、assignments、reports、
+raw outputs、人工驗測與 publication state 存在 repository 外的持久化 state root；`doctor` 顯示實際路徑。
 
-v2 操作的詳細 writer／Reviewer／knowledge／finish 規則見 [v2 派工、審查與交付收尾契約](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md)。
+v3 的詳細規則見 [Megin v3 orchestrator](plugins/megin/skills/megin-orchestrator/SKILL.md)、[behavior-contract](plugins/megin/skills/behavior-contract/SKILL.md) 與 [human-acceptance](plugins/megin/skills/human-acceptance/SKILL.md)。
 
-## 從舊版設定遷移
+## 從舊版設定建立 v3 候選
 
-Megin 不提供舊 CLI 別名，也不會直接讀取 `.sdlc/config.json`。若 repository 仍使用舊設定，先以 dry-run 檢查來源、目的地、工作項目、檔案數與衝突，再執行遷移：
+Megin v3 不會直接讀取 `.sdlc/config.json`，也不會沿用 v1/v2 的核准。保留舊設定、run 與 evidence
+作為來源，重新執行探索並建立新的 Work ID：
 
 ```console
-megin migrate --repo <target-repo> --dry-run
-megin migrate --repo <target-repo>
-megin migrate --repo <target-repo> \
-  --from-state-root <old-state-root> --to-state-root <new-state-root>
+megin classify --request "<new request>"
+megin start --repo <target-repo> --request "<new request>" --source <historical-evidence>
 ```
 
-未指定 state root 時，舊來源預設為 Windows `%LOCALAPPDATA%/sdlc/state` 或 POSIX `$XDG_STATE_HOME/sdlc`，新目的地則對應 `megin`。遷移會先 staging 與驗證，再發布設定和 state；成功後保留可復原的 `.sdlc.migrated-<digest>` 與舊 state backup，不自動刪除。原始 request、command、event 與 raw evidence 不改寫；受路徑或 identity 影響的衍生 digest 會重算。重跑已完成的遷移會回報 `already_migrated`，任何目的地衝突、lock、損毀或 redirect 都會 fail closed。
+新候選必須重新取得當前基底 SHA、計畫版本與使用者核准；必要時在 `--source` 保留舊決策的來源連結。任何衝突都停在探索或規劃，不自動覆寫歷史內容。
 
 ## Repository-local v1 開始一筆工作（legacy）
 

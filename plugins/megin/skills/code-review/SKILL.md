@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Perform a fresh, read-only review of an approved Megin work snapshot in the current checkout or worktree for requirements fit, code quality, tests, knowledge integrity, scope safety, and unstaged-delivery readiness.
+description: Perform a fresh, read-only review of an approved Megin v3 task and integrated snapshot for behavior fit, code quality, tests, knowledge integrity, and scope safety.
 ---
 
 # Code Review

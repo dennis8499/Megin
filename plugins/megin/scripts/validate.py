@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small dependency-free validator for the portable plugin and v2 state records."""
+"""Small dependency-free validator for the portable plugin and v2/v3 state records."""
 
 from __future__ import annotations
 
@@ -13,6 +13,11 @@ try:
 except ImportError:  # pragma: no cover - supports `python -m plugins.megin.scripts.validate`
     from .megin import SCHEMA, PLUGIN_VERSION, compatible_plugin_version, approved_verification_commands, assignment_digest_payload, assignment_ticket_payload, allowed_path, candidate_payload, digest_bytes, digest_json, normalize_paths, read_json, state_root, validate_work_id, _candidate_summary, validate_candidate_bundles, validate_knowledge_record, verification_payload, validate_delivery_schema, load_diagnosis_assessment, load_routing_evidence, _report_commands_passed, _report_commands_cover, _review_evidence_item_valid
 
+try:
+    from megin_v3 import SCHEMA as V3_SCHEMA, PLUGIN_VERSION as V3_PLUGIN_VERSION, DELIVERY_SCHEMA_PATH as V3_SCHEMA_PATH, validate_state as validate_v3_state
+except ImportError:  # pragma: no cover
+    from .megin_v3 import SCHEMA as V3_SCHEMA, PLUGIN_VERSION as V3_PLUGIN_VERSION, DELIVERY_SCHEMA_PATH as V3_SCHEMA_PATH, validate_state as validate_v3_state
+
 
 def validate_plugin(root: Path) -> list[str]:
     errors: list[str] = []
@@ -25,13 +30,13 @@ def validate_plugin(root: Path) -> list[str]:
         errors.append("manifest name must be megin")
     if not manifest.get("version"):
         errors.append("manifest version is required")
-    elif manifest.get("version") != PLUGIN_VERSION:
-        errors.append(f"manifest version must match the engine version {PLUGIN_VERSION}")
+    elif manifest.get("version") not in (PLUGIN_VERSION, V3_PLUGIN_VERSION):
+        errors.append(f"manifest version must match an installed engine version ({PLUGIN_VERSION} or {V3_PLUGIN_VERSION})")
     skills_root = root / "skills"
     for name in (
         "megin-orchestrator", "requirements-discovery", "technical-planning", "bug-diagnosis",
         "project-knowledge", "implementation-execution", "test-driven-development", "code-review",
-        "verification-before-completion", "finishing-delivery",
+        "verification-before-completion", "finishing-delivery", "behavior-contract", "human-acceptance",
     ):
         skill = skills_root / name / "SKILL.md"
         if not skill.exists():
@@ -39,13 +44,22 @@ def validate_plugin(root: Path) -> list[str]:
     for entrypoint in (root / "bin" / "megin", root / "bin" / "megin.cmd"):
         if not entrypoint.exists():
             errors.append(f"missing executable wrapper: {entrypoint.relative_to(root)}")
-    schema = root / "schemas" / "delivery-run-v2.schema.json"
+    for schema, label in ((root / "schemas" / "delivery-run-v3.schema.json", "v3"), (root / "schemas" / "delivery-run-v2.schema.json", "v2-history")):
+        try:
+            schema_value = read_json(schema)
+            if schema_value.get("$id") is None:
+                errors.append(f"{label} schema must define $id")
+        except Exception as exc:  # pragma: no cover
+            errors.append(f"{label} schema: {exc}")
+    hooks = root / "hooks" / "hooks.json"
     try:
-        schema_value = read_json(schema)
-        if schema_value.get("$id") is None:
-            errors.append("v2 schema must define $id")
+        hook_value = read_json(hooks)
+        if not isinstance(hook_value.get("hooks"), dict):
+            errors.append("hooks.json must define a hooks object")
     except Exception as exc:  # pragma: no cover
-        errors.append(f"schema: {exc}")
+        errors.append(f"hooks: {exc}")
+    if not (root / "scripts" / "megin_v3.py").exists():
+        errors.append("missing v3 controller: scripts/megin_v3.py")
     for schema_name in (
         "knowledge-candidate-v2.schema.json", "bug-diagnosis-v1.schema.json",
         "megin-writer-report-v1.schema.json", "megin-review-report-v1.schema.json",
@@ -68,8 +82,15 @@ def validate_state(path: Path) -> list[str]:
         state = read_json(path)
     except Exception as exc:  # pragma: no cover
         return [str(exc)]
+    if state.get("schema") == V3_SCHEMA:
+        errors.extend(f"schema: {item}" for item in validate_delivery_schema(state, V3_SCHEMA_PATH))
+        try:
+            validate_v3_state(state)
+        except Exception as exc:
+            errors.append(str(exc))
+        return errors
     if state.get("schema") != SCHEMA:
-        errors.append("schema must be delivery-run/v2")
+        errors.append("schema must be delivery-run/v2 or delivery-run/v3")
     errors.extend(f"schema: {item}" for item in validate_delivery_schema(state))
     if state.get("version") != 2:
         errors.append("version must be 2")
@@ -373,7 +394,7 @@ def validate_state(path: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="validate portable megin plugin or v2 state")
+    parser = argparse.ArgumentParser(description="validate portable megin plugin or v2/v3 state")
     parser.add_argument("--plugin-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--state", type=Path)
     args = parser.parse_args(argv)

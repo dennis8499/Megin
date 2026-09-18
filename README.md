@@ -1,12 +1,8 @@
-# Megin Delivery System
+# Megin Delivery System — Workflow v3
 
-這個 repository 同時提供兩條相容路徑（portable plugin 目前目標版本為 **Megin 0.3.0**）：既有的 repository-local Skills 與 `delivery-run/v1`
-治理流程，以及可跨專案安裝的 `megin` plugin 與 `delivery-run/v2` workflow。兩者都把需求探索、
-技術規劃、實作、BUG 分診、Project Knowledge、核准與可追溯 evidence 串成一條可驗證的流程。
-v2 另依任務大小分流，支援受監督的單一 implementation writer、fresh review、automatic
-knowledge review 與 Git finish handoff。
+這個 repository 的新工作統一使用可跨專案安裝的 `megin` plugin 與 `delivery-run/v3`。v3 把需求探索、Codebase／Project Knowledge 證據、設計、可執行 Gherkin、BDD/TDD、獨立 Review、人工驗測與本機 commit 綁在同一筆可續跑狀態；舊 v1/v2 文件與 state 只保留作歷史查閱與遷移，不再作新工作的執行入口。
 
-系統的核心原則是：每筆變更都有穩定的 Work ID、明確的功能分支、版本化契約、階段授權與雜湊綁定。v2 預設使用目前工作目錄；需要隔離時才建立 Git worktree。README 提供入口與常用操作；各 owner contract 才是行為、資料格式與授權規則的唯一權威。
+系統的核心原則是：每筆變更都有穩定的 Work ID、版本化行為契約、Codebase 來源、單一計畫核准、獨立 writer/reviewer、驗證證據與人工驗測版本。v3 預設使用目前工作目錄；需要隔離時才建立 Git worktree。README 提供入口與常用操作；v3 schema 與 plugin Skills 是新工作的唯一執行權威。
 
 本文件主要服務：
 
@@ -14,13 +10,13 @@ knowledge review 與 Git finish handoff。
 - 依流程工作的 Contributor／AI Agent
 - 需要判讀測試、CI、metrics 與 evidence 的 CI Reviewer
 
-## Portable `megin` plugin（v2）
+## Portable `megin` plugin（v3）
 
-這個 v2 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)
+這個 v3 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)
 與 [brainstorming skill](https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md)：先探索、在有實質取捨時比較方案、再以可驗證工作包執行。
 Megin 另外保留本 repository 原有的 Work ID、來源追溯、核准綁定與 v1 相容性。
 
-要在其他 Git repository 使用 v2，先安裝本 repository 提供的 plugin；安裝不會替任何目標
+要在其他 Git repository 使用 v3，先安裝本 repository 提供的 plugin；安裝不會替任何目標
 repository 初始化設定或寫入程式碼：
 
 ~~~console
@@ -36,38 +32,41 @@ megin start --repo . --request "<request>"
 ~~~
 
 `start` 先判斷是否真的要求修改，再將請求分類為 `read_only`、`small`、`large` 或 `bug`。read-only 只回報 evidence；
-small 產生短 design brief 並只需一次 integrated approval；large 依序取得 Requirements 與
-Planning approvals；bug 先完成唯讀 diagnosis，再依影響進入 small 或 large。核准前不建立
-產品功能 branch；只有指定 `--workspace-mode worktree` 才建立隔離 worktree。
+變更請求會把 Codebase／Knowledge 來源、Chat Summary、File Details、穩定情境 ID、可執行 Gherkin、
+Task 與人工驗測投影到候選狀態。所有變更都只有一個 `approve` 計畫關卡；核准前不建立
+產品功能 branch。
 
-核准後可由 `status`／`resume` 續跑，完成 review 後使用 `finish`。新工作預設保留未暫存修改並提供建議 commit；需要 Git 收尾時才指定 `--finish-mode commit` 或 `--finish-mode draft-pr`：
+核准後由 `resume` 交接 writer 與 fresh Reviewer，接著用 `verify` 執行核准的命令與 Gherkin。
+自動驗證完成後狀態會停在 `awaiting_user_acceptance`；`accept` 收到 Work ID 與驗測版本後，
+`finish` 才能更新知識並建立一筆本機 commit：
 
 ~~~console
 megin status --repo . --work-id <work-id>
+megin approve --repo . --work-id <work-id> --confirm
 megin resume --repo . --work-id <work-id>
+megin verify --repo . --work-id <work-id>
+megin accept --repo . --work-id <work-id> --confirm
 megin finish --repo . --work-id <work-id>
-megin status --repo . --work-id <work-id> --human
 ~~~
 
-若目標 repository 尚留有舊版 `.sdlc/config.json` 或舊 state，可先預覽並執行一次性遷移：
+若目標 repository 尚留有舊版 `.sdlc/config.json`、v1 或 v2 state，v3 不會把舊核准當成新授權。
+請保留歷史 evidence，從目前 Codebase 與 Knowledge 重新建立 v3 候選：
 
 ~~~console
-megin migrate --repo <target-repo> --dry-run
-megin migrate --repo <target-repo>
-megin migrate --repo <target-repo> --from-state-root <old-state-root> --to-state-root <new-state-root>
+megin classify --request "<new request>"
+megin start --repo <target-repo> --request "<new request>" --source <historical-evidence>
 ~~~
 
-遷移會將設定、持久化 state、reports、capabilities 與診斷路徑轉成 Megin 格式，重算受路徑／identity 影響的衍生 digest，並保留 `.sdlc.migrated-<digest>` 與 state backup。`--dry-run` 不寫入檔案；一般 `megin` 命令不會讀取舊設定，遇到它只會提示執行 `megin migrate`。遷移成功後再次執行會回報 `already_migrated`。
+舊設定與 state 只作來源查證；不要覆寫或重用舊核准。新的 v3 state 會重新綁定 Work ID、基底 SHA、情境、scope、Task、review、verification 與人類驗測版本。
 
-v2 runtime state、dispatch assignment、review reports、測試 raw outputs 與 publication state
+v3 runtime state、Task assignment、review reports、測試 raw outputs、人工驗測與 publication state
 位於 plugin 管理的 repository 外部持久化 state root；`doctor` 會顯示實際 state path。目標
-repository 不需要這個 repository 的 `.agents/skills` tree。`finish` 只會在核准範圍內完成
-knowledge review；預設不 stage／commit，只有明確核准 commit／draft-pr 模式時才 push 並建立或重用 draft PR。
-只有在明確選擇 Git 發布模式但缺少核准目的地時才保留 `publication_pending`；設定並核准目的地後再續跑發布。
-Merge、deployment 與 worktree cleanup 必須另外執行。
+repository 不需要這個 repository 的 `.agents/skills` tree。`verify` 和 `accept` 前不會更新
+正式 knowledge、不會 stage，也不會建立本次 commit。`finish` 只 stage 核准範圍，且不會 push、merge、deployment 或 cleanup。
 
-完整的分類、核准、升級與相容規則見 [v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)；writer、Reviewer、knowledge 與 finish 見
-[v2 派工、審查與交付收尾契約](.agents/skills/implementation-execution/references/v2-dispatch-and-finish.md)。
+完整的新流程以 [delivery-run-v3.schema.json](plugins/megin/schemas/delivery-run-v3.schema.json)、
+[Megin v3 orchestrator](plugins/megin/skills/megin-orchestrator/SKILL.md) 與 plugin README 為準；v2
+契約只作歷史遷移參考。
 
 ## 快速開始
 
@@ -110,25 +109,30 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/run_quick_checks.py
 
 ## 交付流程總覽
 
-### Portable v2 一般變更
+### Portable v3 一般變更
 
 ~~~text
-request -> read-only classify
-  -> read_only: evidence / report
-  -> small: short design + one integrated approval
-  -> large: Requirements approval + Planning approval
-  -> approved Work ID current checkout feature branch (or explicit worktree)
-  -> single authorized writer (implementation subagent allowed)
-  -> focused + full verification
-  -> fresh read-only review
-  -> automatic knowledge review
-  -> finish: unstaged diff + commit suggestion (or explicit commit / draft PR)
+request -> read-only route and Codebase/Knowledge exploration
+  -> unresolved behavior questions: one question per turn
+  -> concise or complete Design + stable executable Gherkin scenarios
+  -> Chat Summary + File Details review gate
+  -> one plan approval for the exact Work ID and plan version
+  -> fetched base + feature branch/worktree + one fresh writer at a time
+  -> BDD/TDD evidence + independent Reviewer per Task
+  -> focused/related/full verification and integrated Review
+  -> awaiting_user_acceptance with no commit or formal knowledge update
+  -> human acceptance -> source-backed knowledge promotion -> one local commit
 ~~~
 
 同一 workspace 同一時間只能有一名 writer，不能平行寫入；Reviewer 使用另一個 fresh、唯讀
-session。小任務的 integrated approval、或大型變更的第二次 Planning approval，都會綁定
-驗收、allowed paths、tests、knowledge scope 與 finish destination。scope drift、review
-finding、knowledge conflict 或缺少能力時會停在可觀察的 awaiting／blocked state。
+session。計畫核准會綁定情境、驗收、allowed paths、tests、knowledge scope 與本機交付目標。
+scope drift、review finding、knowledge conflict、fetch 失敗或缺少能力時會停在可觀察的
+awaiting／blocked state；相同阻塞 finding 連續三次沒有進展就保存證據並回報。
+
+### 歷史相容流程（v1/v2，不作新工作入口）
+
+以下段落保留舊 repository-local/v2 執行契約、遷移與既有 run 的查閱說明。新工作請使用上方
+`delivery-run/v3`；舊核准不能直接續跑成 v3，必須以歷史內容建立新的候選。
 
 ### Repository-local v1 一般變更（legacy）
 
@@ -234,7 +238,7 @@ checkout、branch switch、Git index 或 binary 變更後，重新執行上述�
 
 下列命令不是一般查詢入口。它們必須由 Delivery Orchestrator 或對應 owner contract 路由，不能拿來繞過人工 gate、phase authorization 或 hash validation。
 
-### Portable v2 lifecycle
+### Portable v3 lifecycle
 
 以下是 plugin 的公開 CLI；它們使用目標 repository 的明確 `--repo`，不依賴目標專案的
 `.agents/skills`。`init` 只建立 project binding；`start` 先分類並保存候選 state；
@@ -337,7 +341,7 @@ python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py reco
 
 ## 驗證、測試與 CI
 
-### Portable v2 validation
+### Portable v3 validation
 
 Plugin release 前至少要在乾淨的 Git repository 驗證 manifest、CLI 與 state isolation；
 驗證範圍包含四種 task class、small／large gate policy、single-writer lock、fresh

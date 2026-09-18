@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.megin/delivery-run-v3.schema.json",
+  "title": "Portable Megin delivery run v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "version", "plugin", "plugin_version", "work_id", "revision",
+    "repo", "task", "exploration", "behavior_contract", "design", "approval",
+    "workspace", "phase", "status", "tasks", "assignments", "review",
+    "verification", "human_acceptance", "knowledge", "publication", "events",
+    "next_action", "created_at", "updated_at"
+  ],
+  "properties": {
+    "schema": {"const": "delivery-run/v3"},
+    "version": {"const": 3},
+    "plugin": {"const": "megin"},
+    "plugin_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "work_id": {"$ref": "#/$defs/workId"},
+    "revision": {"type": "integer", "minimum": 0},
+    "repo": {"$ref": "#/$defs/repo"},
+    "task": {"$ref": "#/$defs/task"},
+    "exploration": {"$ref": "#/$defs/exploration"},
+    "behavior_contract": {"$ref": "#/$defs/behaviorContract"},
+    "design": {"$ref": "#/$defs/design"},
+    "approval": {"$ref": "#/$defs/approval"},
+    "workspace": {"$ref": "#/$defs/workspace"},
+    "phase": {"enum": ["exploration", "planning", "implementation", "review", "verification", "acceptance", "knowledge", "delivery"]},
+    "status": {"enum": ["awaiting_clarification", "awaiting_approval", "active", "awaiting_review", "awaiting_verification", "awaiting_user_acceptance", "blocked", "complete"]},
+    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/taskUnit"}},
+    "assignments": {"type": "array", "items": {"$ref": "#/$defs/assignment"}},
+    "review": {"$ref": "#/$defs/review"},
+    "verification": {"$ref": "#/$defs/verification"},
+    "human_acceptance": {"$ref": "#/$defs/humanAcceptance"},
+    "knowledge": {"$ref": "#/$defs/knowledge"},
+    "publication": {"$ref": "#/$defs/publication"},
+    "events": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+    "next_action": {"type": "string", "minLength": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "workId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$", "minLength": 3, "maxLength": 64},
+    "repo": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repo_id", "path", "base_branch", "base_sha"],
+      "properties": {
+        "repo_id": {"$ref": "#/$defs/sha256"},
+        "path": {"type": "string", "minLength": 1},
+        "base_branch": {"type": "string", "minLength": 1},
+        "base_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "remote": {"type": ["string", "null"]}
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request", "request_sha256", "task_class", "classification"],
+      "properties": {
+        "request": {"type": "string", "minLength": 1},
+        "request_sha256": {"$ref": "#/$defs/sha256"},
+        "task_class": {"enum": ["small", "large", "bug"]},
+        "repair_class": {"enum": ["small", "large", null]},
+        "classification": {"type": "object", "additionalProperties": true},
+        "diagnosis": {"enum": ["confirmed", "likely", "not-a-bug", null]},
+        "diagnosis_assessment": {"anyOf": [{"type": "object", "additionalProperties": true}, {"type": "null"}]},
+        "source_refs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "exploration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sources", "questions", "answers", "unresolved", "completed_at"],
+      "properties": {
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "questions": {"type": "array", "items": {"type": "string"}},
+        "answers": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "unresolved": {"type": "array", "items": {"type": "string"}},
+        "completed_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "behaviorContract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "plan_version", "features", "scenarios", "manual_acceptance", "digest"],
+      "properties": {
+        "version": {"const": 1},
+        "plan_version": {"type": "string", "minLength": 1},
+        "features": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "scenarios": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/scenario"}},
+        "manual_acceptance": {"type": "array", "items": {"$ref": "#/$defs/manualStep"}},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "scenario": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "source", "steps", "automatic", "manual"],
+      "properties": {
+        "id": {"type": "string", "minLength": 2},
+        "title": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "gherkin": {"type": "string", "minLength": 1},
+        "steps": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "automatic": {"type": "boolean"},
+        "manual": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "manualStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scenario_id", "path", "environment", "operation", "expected"],
+      "properties": {
+        "scenario_id": {"type": "string"},
+        "path": {"type": "string"},
+        "environment": {"type": "string"},
+        "operation": {"type": "string"},
+        "expected": {"type": "string"}
+      }
+    },
+    "design": {
+      "type": "object", "additionalProperties": false,
+      "required": ["chat_summary", "file_details", "decisions", "interfaces", "failure_modes", "implementation_strategy", "verification", "plan_version", "digest"],
+      "properties": {
+        "chat_summary": {"type": "string", "minLength": 1},
+        "file_details": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "decisions": {"type": "array", "items": {"type": "string"}},
+        "interfaces": {"type": "array", "items": {"type": "string"}},
+        "failure_modes": {"type": "array", "items": {"type": "string"}},
+        "implementation_strategy": {"type": "string", "minLength": 1},
+        "verification": {"type": "array", "items": {"type": "string"}},
+        "plan_version": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "status", "candidate_revision", "plan_version", "approved_at", "approved_by", "response", "candidate_digest", "scope"],
+      "properties": {
+        "policy": {"const": "plan"},
+        "status": {"enum": ["pending", "approved", "superseded"]},
+        "candidate_revision": {"type": "string", "pattern": "^candidate-[0-9]+$"},
+        "plan_version": {"type": "string", "minLength": 1},
+        "approved_at": {"type": ["string", "null"], "format": "date-time"},
+        "approved_by": {"type": ["string", "null"]},
+        "response": {"type": ["string", "null"]},
+        "candidate_digest": {"$ref": "#/$defs/sha256"},
+        "refs": {"type": "array", "items": {"type": "string"}},
+        "scope": {"$ref": "#/$defs/scope"}
+      }
+    },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["allowed_paths", "test_commands", "knowledge_scope", "acceptance"],
+      "properties": {
+        "allowed_paths": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "test_commands": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "knowledge_scope": {"type": "array", "items": {"type": "string"}},
+        "acceptance": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "publication": {"type": "object", "additionalProperties": true}
+      }
+    },
+    "workspace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "worktree", "branch", "base_sha", "created_at"],
+      "properties": {
+        "mode": {"enum": ["current", "worktree"]},
+        "worktree": {"type": "string", "minLength": 1},
+        "branch": {"type": "string", "minLength": 1},
+        "base_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "taskUnit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "status", "depends_on", "allowed_paths", "acceptance", "scenario_ids", "test_commands"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "status": {"enum": ["pending", "active", "awaiting_review", "needs_revision", "reviewed", "blocked", "completed"]},
+        "depends_on": {"type": "array", "items": {"type": "string"}},
+        "allowed_paths": {"type": "array", "items": {"type": "string"}},
+        "acceptance": {"type": "array", "items": {"type": "string"}},
+        "scenario_ids": {"type": "array", "items": {"type": "string"}},
+        "test_commands": {"type": "array", "items": {"type": "string"}},
+        "writer": {"type": ["string", "null"]},
+        "writer_session": {"type": ["string", "null"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewer_session": {"type": ["string", "null"]},
+        "review_round": {"type": "integer", "minimum": 0},
+        "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "assignment": {
+      "type": "object", "additionalProperties": true,
+      "required": ["assignment_id", "task_id", "role", "identity", "ticket", "status"],
+      "properties": {
+        "assignment_id": {"type": "string"},
+        "task_id": {"type": "string"},
+        "role": {"enum": ["writer", "reviewer"]},
+        "identity": {"type": "string"},
+        "ticket": {"type": "string"},
+        "status": {"enum": ["active", "consumed", "completed", "returned"]}
+      }
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["overall", "per_task", "findings", "no_progress_count"],
+      "properties": {
+        "overall": {"enum": ["pending", "approved", "changes_required", "blocked"]},
+        "per_task": {"type": "object", "additionalProperties": true},
+        "findings": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "no_progress_count": {"type": "integer", "minimum": 0},
+        "snapshot": {"type": ["string", "null"]}
+      }
+    },
+    "verification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "commands", "scenario_results", "snapshot"],
+      "properties": {
+        "status": {"enum": ["not_run", "running", "passed", "failed", "stale"]},
+        "commands": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "scenario_results": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+        "snapshot": {"type": ["string", "null"]},
+        "record_sha256": {"type": ["string", "null"]}
+      }
+    },
+    "humanAcceptance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "version", "response", "checked_scenarios", "observed", "snapshot", "accepted_at"],
+      "properties": {
+        "status": {"enum": ["pending", "passed", "failed"]},
+        "version": {"type": "string", "minLength": 1},
+        "response": {"type": ["string", "null"]},
+        "checked_scenarios": {"type": "array", "items": {"type": "string"}},
+        "observed": {"type": "array", "items": {"type": "string"}},
+        "snapshot": {"type": ["string", "null"]},
+        "accepted_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "knowledge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scope", "status", "sources", "conflicts", "candidate_path", "promoted_at"],
+      "properties": {
+        "scope": {"type": "array", "items": {"type": "string"}},
+        "status": {"enum": ["not_needed", "pending", "reviewed", "promoted", "blocked"]},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "conflicts": {"type": "array", "items": {"type": "string"}},
+        "candidate_path": {"type": ["string", "null"]},
+        "promoted_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "publication": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "commit_sha", "changed_paths", "suggested_commit"],
+      "properties": {
+        "state": {"enum": ["not_ready", "uncommitted", "committed"]},
+        "commit_sha": {"type": ["string", "null"]},
+        "changed_paths": {"type": "array", "items": {"type": "string"}},
+        "suggested_commit": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

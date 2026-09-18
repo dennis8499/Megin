@@ -1,11 +1,11 @@
 ---
 name: verification-before-completion
-description: Prove that an approved Megin change is complete using fresh snapshot-bound tests, review evidence, knowledge checks, and the approved current-branch or worktree delivery mode before any completion claim.
+description: Prove that an approved Megin v3 change is complete using fresh snapshot-bound tests, executable Gherkin, review evidence, and human acceptance before delivery.
 ---
 
 # Verification Before Completion
 
-Use this skill immediately before reporting completion or invoking `finishing-delivery`. Verification is a claim backed by current evidence, not a description of what was intended to happen.
+Use this skill immediately before asking for human acceptance or invoking `finishing-delivery`. Verification is a claim backed by current evidence, not a description of what was intended to happen.
 
 ## Verify the current snapshot
 
@@ -18,13 +18,11 @@ Use this skill immediately before reporting completion or invoking `finishing-de
 
 ## Completion states
 
-Use explicit delivery states so local success is not confused with publication or an unstaged handoff:
+Use explicit v3 states so automated success is not confused with human acceptance or delivery:
 
-- `LOCAL_VERIFIED`: implementation, tests, review, and applicable knowledge checks pass locally.
-- `DELIVERED_UNSTAGED`: the approved feature branch contains the reviewed, verified unstaged diff; HEAD and the index were not changed, and a commit suggestion is recorded.
-- `READY_TO_PUBLISH`: local verification passes and the approved Git destination is available.
-- `DRAFT_PR_CREATED`: commit and push succeeded and the draft pull request identity is recorded.
-- `PUBLISH_PENDING`: local verification or commit succeeded, but remote, credentials, network, or PR tooling prevented publication; preserve the work and resume only the pending delivery action.
+- `awaiting_user_acceptance`: all automated commands and reviews pass; product, knowledge, staging, and commit state are unchanged.
+- `accepted`: the user named the Work ID and acceptance version and confirmed the approved manual scenarios.
+- `complete`: knowledge promotion and one local commit succeeded after acceptance.
 
 Never report `DRAFT_PR_CREATED` without a real PR identity, and never call a failed or skipped command evidence of completion. A failed obligation returns the work to the authorized writer for a focused fix and then a fresh review/verification cycle; it is not waived by a passing unrelated test.
 

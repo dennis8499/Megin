@@ -1,11 +1,11 @@
 ---
 name: finishing-delivery
-description: Finish a verified Megin v2 change in its approved mode: preserve an unstaged feature-branch diff with a suggested commit, create a local commit, or publish a draft pull request while preserving resumability.
+description: Finish a verified and human-accepted Megin v3 change by reviewing knowledge, staging approved paths, and creating one local commit.
 ---
 
 # Finishing Delivery
 
-Use this skill only after `verification-before-completion` passes for the exact work identity and approved publication target. In `unstaged` mode it must not run `git add`, commit, push, or PR commands; it records the current diff, branch, and a suggested commit message. In `commit` mode it creates only the approved local commit. In `draft-pr` mode it owns the authorized commit, push, and draft-PR actions; it does not change product behavior.
+Use this skill only after `verify` passes and the user records the exact human acceptance response. Before that gate it must not update knowledge, stage paths, or create a commit. v3 creates one local commit after checking source-backed knowledge; push, merge, and draft PR are outside this workflow.
 
 ## Preflight
 

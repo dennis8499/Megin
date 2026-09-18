@@ -1,6 +1,6 @@
 ---
 name: megin-orchestrator
-description: Guide natural-language repository work through evidence-first questions, small/large/bug routing, design approval, TDD implementation, fresh review, and safe resume. Use for requests that may change a repository; do not use for pure explanations or read-only evaluation.
+description: Route repository requests through Megin v3 exploration, one plan approval, BDD/TDD tasks, independent review, verification, human acceptance, and safe resume. Use for change requests; do not use for pure explanations or read-only evaluation.
 ---
 
 # Megin Orchestrator
@@ -41,15 +41,15 @@ Classification is based on impact and uncertainty, not line count. If a small ta
 
 Create a short, reviewable candidate before mutation. It must state the goal, in-scope and out-of-scope files or interfaces, acceptance criteria, implementation steps, test commands, knowledge-update scope, publication target, and the repository/work identity.
 
-- A small task has **one integrated approval** for its design, acceptance, implementation, verification, knowledge review, and the stated Git publication target.
-- A large change has **two approvals**: requirements first, then the technical plan. The second gate authorizes implementation of the exact approved plan.
+- Every mutating task has **one plan approval** for its behavior contract, design, acceptance, implementation boundary, verification, knowledge scope, and local delivery target. Small tasks use a concise design; large tasks include the complete design and dependency graph.
+- Requirements questions and technical planning are prepared before that one gate; they are not separate execution authorizations. A changed behavior, acceptance criterion, or scope creates a new plan version.
 - A bug repair keeps the diagnosis as evidence; requirements still own what to change and the plan owns how to change it.
 
 Approval is valid only for the exact candidate revision and work identity. A changed acceptance criterion, expanded file set, new publication destination, or changed knowledge claim requires a new approval. Never treat a prompt, skill name, or child-agent report as write authorization.
 
 ## 5. Coordinate implementation and review
 
-After approval, create or resume the approved workspace. New v2 work defaults to the current checkout:
+After approval, create or resume the approved workspace. New v3 work defaults to the current checkout:
 resolve the repository's main/master base, verify a clean starting tree, and create `feat/<work-id>`.
 Use `--workspace-mode worktree` only when the user or approved scope requests isolation. Keep product
 files, work records, and evidence tied to the same work identity. Route implementation to the
@@ -86,7 +86,7 @@ current: <active unit or blocker>
 next: <one concrete action or decision>
 ```
 
-Before declaring completion, invoke `verification-before-completion`. After a passing review and verification,
-invoke `finishing-delivery`. The default delivery target is an unstaged, verified diff on the feature
-branch plus a suggested commit message. Commit, push, and draft pull request require an explicitly
-approved `finish_mode`; merge, deployment, and worktree cleanup remain separate authorization.
+Before declaring completion, invoke `verification-before-completion` and stop at
+`awaiting_user_acceptance`. Human acceptance names the Work ID and acceptance version. `finish`
+then reviews/promotes source-backed knowledge and creates one local commit; push, merge,
+deployment, and worktree cleanup remain separate authorization.

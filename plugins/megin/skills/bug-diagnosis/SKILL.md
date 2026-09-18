@@ -1,6 +1,6 @@
 ---
 name: bug-diagnosis
-description: Diagnose a suspected defect in a Megin v2 repository workflow with reproducible, read-only evidence before any repair work is authorized.
+description: Diagnose a suspected defect with reproducible, read-only evidence before a Megin v3 repair plan is authorized.
 ---
 
 # Bug Diagnosis

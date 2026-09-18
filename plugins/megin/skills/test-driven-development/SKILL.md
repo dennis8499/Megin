@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Implement an approved Megin v2 change with an outside-in behavior red-green-refactor loop, focused evidence, and regression coverage for defects.
+description: Implement an approved Megin v3 change with an outside-in executable-behavior red-green-refactor loop, focused evidence, and regression coverage for defects.
 ---
 
 # Test-Driven Development

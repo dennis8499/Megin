@@ -1,7 +1,7 @@
 {
   "name": "megin",
-  "version": "0.3.0",
-  "description": "Portable, evidence-driven Megin workflow for classifying, implementing, reviewing, verifying, and delivering repository changes.",
+  "version": "0.4.0",
+  "description": "Portable Megin Workflow v3 for evidence-linked planning, executable behavior contracts, independent review, human acceptance, and local delivery.",
   "author": {
     "name": "Megin Contributors"
   },
@@ -11,13 +11,16 @@
     "workflow",
     "tdd",
     "code-review",
-    "delivery"
+    "delivery",
+    "bdd",
+    "human-acceptance"
   ],
   "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "Megin Delivery Workflow",
-    "shortDescription": "Classify, implement, review, verify, and deliver work safely.",
-    "longDescription": "A portable repository workflow that scales governance to the task, delegates implementation to one authorized writer, requires a fresh read-only review, and records verification before delivery.",
+    "shortDescription": "Align behavior, implementation, tests, review, and human acceptance.",
+    "longDescription": "Megin v3 asks evidence-based questions, binds executable Gherkin to one approved plan, dispatches independent writer and reviewer loops, waits for human acceptance, then updates knowledge and creates one local commit.",
     "developerName": "Megin Contributors",
     "category": "Developer Tools",
     "capabilities": [
@@ -25,9 +28,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Describe what you want to build and let Megin guide the design.",
-      "Implement this approved plan with TDD and a fresh review.",
-      "Verify the change and leave an unstaged feature branch with a suggested commit."
+      "Describe the behavior you need and let Megin explore the codebase before asking one decision at a time.",
+      "Approve the Chat Summary and File Details once, then let Megin dispatch BDD/TDD tasks and independent reviews.",
+      "Run the approved verification, perform human acceptance, and create one local commit only after acceptance."
     ]
   }
 }
