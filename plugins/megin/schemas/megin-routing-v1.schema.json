@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.megin/megin-routing-v1.schema.json",
+  "title": "Megin read-only routing evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "request_sha256", "repo_id", "head_sha", "intent", "sources", "risks", "open_questions"],
+  "properties": {
+    "schema": {"const": "megin-routing/v1"},
+    "request_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "repo_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "head_sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "intent": {"enum": ["read_only", "mutate", "ambiguous"]},
+    "task_class": {"enum": ["read_only", "small", "large", "bug", null]},
+    "sources": {"type": "array", "items": {"type": "string"}},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "open_questions": {"type": "array", "items": {"type": "string"}},
+    "generated_at": {"type": "string"}
+  }
+}

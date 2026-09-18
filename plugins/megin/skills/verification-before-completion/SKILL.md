@@ -1,6 +1,6 @@
 ---
 name: verification-before-completion
-description: Prove that an approved change is complete using fresh, snapshot-bound tests, review evidence, and knowledge checks before any delivery claim.
+description: Prove that an approved Megin change is complete using fresh snapshot-bound tests, review evidence, knowledge checks, and the approved current-branch or worktree delivery mode before any completion claim.
 ---
 
 # Verification Before Completion
@@ -10,7 +10,7 @@ Use this skill immediately before reporting completion or invoking `finishing-de
 ## Verify the current snapshot
 
 1. Load the exact approved scope, acceptance criteria, required validation commands, knowledge-update authorization, and the latest writer/reviewer reports.
-2. Inspect repository status and the worktree diff. Confirm the work identity, branch, allowed paths, and product/test/configuration snapshot are unchanged since the reviewed snapshot.
+2. Inspect repository status and the workspace diff. Confirm the work identity, branch, allowed paths, and product/test/configuration snapshot are unchanged since the reviewed snapshot.
 3. Execute every logical obligation in the approved validation plan: focused tests, related tests, full checks, static checks, and applicable build or contract checks. Capture the exact command, exit status, and raw output.
 4. Confirm that evidence is fresh for the current source, configuration, dependencies, test inputs, and generated artifacts. Any relevant change invalidates the affected evidence and requires a rerun.
 5. Confirm a fresh read-only review has an `APPROVED` verdict with no blocking finding and covers the current snapshot.
@@ -18,9 +18,10 @@ Use this skill immediately before reporting completion or invoking `finishing-de
 
 ## Completion states
 
-Use explicit delivery states so local success is not confused with publication:
+Use explicit delivery states so local success is not confused with publication or an unstaged handoff:
 
 - `LOCAL_VERIFIED`: implementation, tests, review, and applicable knowledge checks pass locally.
+- `DELIVERED_UNSTAGED`: the approved feature branch contains the reviewed, verified unstaged diff; HEAD and the index were not changed, and a commit suggestion is recorded.
 - `READY_TO_PUBLISH`: local verification passes and the approved Git destination is available.
 - `DRAFT_PR_CREATED`: commit and push succeeded and the draft pull request identity is recorded.
 - `PUBLISH_PENDING`: local verification or commit succeeded, but remote, credentials, network, or PR tooling prevented publication; preserve the work and resume only the pending delivery action.

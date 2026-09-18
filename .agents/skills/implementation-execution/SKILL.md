@@ -33,7 +33,7 @@ dispatch 與結果整合的 owner：
 | `test-driven-development` | outside-in BDD、inner TDD 與每個 slice 的 red／green evidence |
 | `code-review` | fresh、read-only Reviewer、scope／quality findings 與修正複查 |
 | `verification-before-completion` | focused／related／full commands、證據新鮮度、snapshot 與完成判定 |
-| `finishing-delivery` | approved scope 的 knowledge review、commit／push／draft PR handoff 與可續跑 publication state |
+| `finishing-delivery` | approved scope 的 knowledge review、unstaged／commit／push／draft PR handoff 與可續跑 publication state |
 
 方法只能被 current v2 assignment 或 v1 階段授權載入；方法本身不授予 writer、phase
 transition 或 Git finish 權限，也不能另開第二條 mutation path。
@@ -42,10 +42,10 @@ transition 或 Git finish 權限，也不能另開第二條 mutation path。
 
 - Ready bundle、sources、delivery requirements 與治理唯讀。
 - 寫入集合精確等於 plan 明列的產品、測試與 test-only 設定；秘密、無關檔案與未授權外部狀態不變。
-- v1 嚴禁 stage、commit、push、merge、deploy、建立 ticket、cleanup 或刪除 worktree；v2 的 Git stage／commit／push／draft PR 只可由 approved `finish` handoff 執行。
+- v1 嚴禁 stage、commit、push、merge、deploy、建立 ticket、cleanup 或刪除 worktree；v2 的 `unstaged` finish 也嚴禁這些 Git 發布動作，只有 approved `commit`／`draft-pr` handoff 才可 stage／commit／push／建立 draft PR。
 - Fresh Reviewer capability 不可用時為 Blocked；Reviewer 只核准固定 snapshot，Complete 後 run 凍結。
 - BUG assessment 只是診斷 evidence；Requirements 仍唯一擁有 WHAT，Ready plan 仍唯一擁有 HOW。不得在實作期改寫它們來合理化 patch。
-- v2 同一 worktree 同一時間最多一名 writer；subagent writer 不可平行執行、再委派或擴大 allowed paths。Controller 保存 assignment／result，Reviewer 必須是不同 fresh、read-only session。
+- v2 同一 workspace 同一時間最多一名 writer；subagent writer 不可平行執行、再委派或擴大 allowed paths。Controller 保存 assignment／result，Reviewer 必須是不同 fresh、read-only session。
 - v2 knowledge review 只處理 approval payload 明列的 knowledge scope；scope drift、lint／source／snapshot conflict 或 blocking finding 停止在 awaiting／blocked，不自動回寫。
 
 ## 0. 取得階段授權
@@ -82,7 +82,7 @@ Producer 缺口為 Awaiting upstream reapproval；workspace、能力、工具、
 
 ## 2. Executing
 
-完整讀取 [BDD／TDD 執行迴圈](references/bdd-tdd-loop.md)。依 WP DAG 穩定拓撲序執行 public-seam BDD red → inner test red → minimal green → refactor-with-green → BDD／related green。Greenfield red 前的 production shape 只來自已核准 BOOT contract。v2 由 current writer assignment 依相同順序執行；同一 worktree 不平行 dispatch。
+完整讀取 [BDD／TDD 執行迴圈](references/bdd-tdd-loop.md)。依 WP DAG 穩定拓撲序執行 public-seam BDD red → inner test red → minimal green → refactor-with-green → BDD／related green。Greenfield red 前的 production shape 只來自已核准 BOOT contract。v2 由 current writer assignment 依相同順序執行；同一 workspace 不平行 dispatch。
 
 完成條件：每個新行為都有時間順序正確的 red／green；一個 WP 的 scenarios、tests、commands、scope 與追溯全通過後才為 Verified；全部 WP Verified 才進 Verifying。
 
@@ -102,7 +102,7 @@ BUG run 同時產生獨立 `bug-verification/v1`。Reviewer 的 `APPROVED` 只�
 
 讀取 [品質契約](references/quality-contract.md)與 [交付協定](references/delivery-protocol.md)。前者只判 Pass／Fail；後者唯一擁有 state 與 terminal ordering。
 
-完成條件：implementation結果唯一為 Complete、Awaiting upstream reapproval 或 Blocked。Implementation Complete 發生在 raw response／outputs／report 保存及保存後 snapshots 重算成功之後；required delivery此時轉knowledge/awaiting_user而非宣稱delivery Complete，直到人工核准promotion與lint通過。Worktree 與未提交 diff 保留。v2 通過 implementation／knowledge review 後交給 `finish`；finish 才可在 approved scope 內 stage、commit、push 與建立 draft PR，並將缺 remote／認證／網路記為可續跑的 publication pending。
+完成條件：implementation結果唯一為 Complete、Awaiting upstream reapproval 或 Blocked。Implementation Complete 發生在 raw response／outputs／report 保存及保存後 snapshots 重算成功之後；required delivery此時轉knowledge/awaiting_user而非宣稱delivery Complete，直到人工核准promotion與lint通過。Workspace 與未提交 diff 保留。v2 通過 implementation／knowledge review 後交給 `finish`；預設 finish 交付未暫存 diff，只有核准 `commit`／`draft-pr` mode 才可在 approved scope 內 stage、commit、push 與建立 draft PR，並將缺 remote／認證／網路記為可續跑的 publication pending。
 
 ## 維護
 

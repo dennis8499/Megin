@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import errno
 import hashlib
 import json
 import os
@@ -37,7 +38,7 @@ if hasattr(sys.stderr, "reconfigure"):
 SCHEMA = "delivery-run/v2"
 CONFIG_SCHEMA = "megin-project/v1"
 MIGRATION_SCHEMA = "megin-migration/v1"
-PLUGIN_VERSION = "0.2.0"
+PLUGIN_VERSION = "0.3.0"
 # v2 records are bound to the contract major version.  A newer compatible
 # plugin may continue an older minor/patch record; it must never reinterpret a
 # v1 record or a future record it does not understand.
@@ -57,6 +58,8 @@ WORK_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 TASK_CLASSES = ("read_only", "small", "large", "bug")
 APPROVAL_STAGES = ("integrated", "requirements", "plan")
+WORKSPACE_MODES = ("current", "worktree")
+FINISH_MODES = ("unstaged", "commit", "draft-pr")
 DELIVERY_SCHEMA_PATH = Path(__file__).resolve().parents[1] / "schemas" / "delivery-run-v2.schema.json"
 
 
@@ -470,6 +473,174 @@ def current_branch(repo: Path) -> str:
     return value or "HEAD"
 
 
+def git_remotes(repo: Path) -> list[str]:
+    """Return configured remote names without contacting any remote."""
+
+    return [item.strip() for item in git(repo, "remote", check=False).splitlines() if item.strip()]
+
+
+def remote_default_branches(repo: Path) -> list[tuple[str, str]]:
+    """Return locally cached symbolic default branches for configured remotes."""
+
+    defaults: list[tuple[str, str]] = []
+    for remote in git_remotes(repo):
+        symbolic = git(
+            repo, "symbolic-ref", "--quiet", f"refs/remotes/{remote}/HEAD", check=False,
+        ).strip()
+        prefix = f"refs/remotes/{remote}/"
+        if not symbolic.startswith(prefix):
+            continue
+        candidate = symbolic[len(prefix):]
+        if candidate and git(
+            repo, "show-ref", "--verify", f"refs/remotes/{remote}/{candidate}", check=False,
+        ).strip():
+            defaults.append((remote, candidate))
+    return defaults
+
+
+def default_base_branch(repo: Path) -> str:
+    """Choose a stable project base branch without assuming the current checkout.
+
+    A repository may call its primary branch ``main`` or ``master``.  Prefer the
+    remote's symbolic default when it is available, then a local conventional
+    branch, and finally the current branch for repositories that use another
+    name.  This function is read-only and never fetches or changes branches.
+    """
+
+    remote_defaults = remote_default_branches(repo)
+    remote_branches = sorted({branch for _, branch in remote_defaults})
+    if len(remote_branches) > 1:
+        raise MeginError("base branch is ambiguous across remote defaults; specify --base-branch explicitly")
+    if remote_branches:
+        return remote_branches[0]
+    conventional = [
+        candidate for candidate in ("main", "master")
+        if git(repo, "show-ref", "--verify", f"refs/heads/{candidate}", check=False).strip()
+    ]
+    if len(conventional) > 1:
+        raise MeginError("base branch is ambiguous; specify --base-branch as main or master")
+    if conventional:
+        return conventional[0]
+    local_branches = [
+        item.strip() for item in git(repo, "for-each-ref", "refs/heads", "--format=%(refname:short)", check=False).splitlines()
+        if item.strip()
+    ]
+    if len(local_branches) == 1:
+        return local_branches[0]
+    if len(local_branches) > 1:
+        raise MeginError("base branch is ambiguous; specify --base-branch explicitly")
+    branch = current_branch(repo)
+    return branch if branch != "HEAD" else "main"
+
+
+def resolve_base_sha(repo: Path, branch: str, remote: str | None = None) -> str:
+    """Resolve the approved base ref without fetching or changing checkout state."""
+
+    refs = [f"refs/heads/{branch}"]
+    remote_names = [remote] if remote else []
+    remote_names.extend(item for item in git_remotes(repo) if item not in remote_names)
+    for remote_name in remote_names:
+        refs.append(f"refs/remotes/{remote_name}/{branch}")
+    refs.append(branch)
+    for ref in refs:
+        resolved = git(repo, "rev-parse", "--verify", ref, check=False).strip()
+        if re.fullmatch(r"[a-f0-9]{40}", resolved):
+            return resolved
+    raise MeginError(f"approved base branch does not exist: {branch}")
+
+
+def workspace_status(repo: Path) -> tuple[list[str], bool]:
+    """Return dirty paths and whether the index contains staged changes."""
+
+    paths, _ = status_paths(repo)
+    staged = bool(git(repo, "diff", "--cached", "--name-only", check=False).strip())
+    return paths, staged
+
+
+def ensure_megin_excluded(repo: Path) -> Path:
+    """Keep repository-local Megin runtime metadata out of product changes."""
+
+    try:
+        exclude_path = Path(git(repo, "rev-parse", "--git-path", "info/exclude").strip())
+        if not exclude_path.is_absolute():
+            exclude_path = (repo / exclude_path).resolve()
+        existing = exclude_path.read_text(encoding="utf-8") if exclude_path.exists() else ""
+        entries = {line.strip() for line in existing.splitlines() if line.strip() and not line.lstrip().startswith("#")}
+        if ".megin/" not in entries and ".megin" not in entries:
+            exclude_path.parent.mkdir(parents=True, exist_ok=True)
+            separator = "" if not existing or existing.endswith("\n") else "\n"
+            exclude_path.write_text(existing + separator + ".megin/\n", encoding="utf-8")
+        return exclude_path
+    except OSError as exc:
+        raise MeginError(f"cannot update local Git exclude for .megin metadata: {exc}") from exc
+
+
+def ensure_clean_start(repo: Path) -> None:
+    """Reject dirty source checkouts before any new workspace is acquired."""
+
+    paths, staged = workspace_status(repo)
+    unexpected = [item for item in paths if item != ".megin/config.json"]
+    if unexpected or staged:
+        detail = ", ".join(unexpected[:8]) or "staged changes"
+        raise MeginError(
+            "new work requires a clean starting checkout; preserve or resolve these changes first: "
+            + detail
+        )
+
+
+def create_current_branch(
+    repo: Path,
+    work_id: str,
+    base_sha: str,
+    base_branch: str,
+    branch_prefix: str = "feat",
+    remote: str | None = None,
+) -> tuple[Path, str]:
+    """Create the approved feature branch in the caller's current work directory.
+
+    Branch creation is deliberately conservative: the directory must be clean,
+    the base branch must be checked out, and its HEAD must still match the
+    approved digest.  We never stash, reset, merge, rebase, or discard user data.
+    """
+
+    ensure_clean_start(repo)
+    branch = f"{branch_prefix}/{work_id}"
+    if git(repo, "show-ref", "--verify", f"refs/heads/{branch}", check=False).strip():
+        raise MeginError(f"feature branch already exists: {branch}")
+    # Check the approved ref before switching the caller's checkout.  If the
+    # base advanced after approval, leave the user's original branch untouched
+    # and require a new candidate instead of switching and then failing.
+    resolved_base = resolve_base_sha(repo, base_branch, remote)
+    if resolved_base != base_sha:
+        raise MeginError("approved base branch changed since the candidate was created; refresh the candidate and approve again")
+    if current_branch(repo) != base_branch:
+        local_base = git(repo, "show-ref", "--verify", f"refs/heads/{base_branch}", check=False).strip()
+        if not local_base:
+            candidate_remotes = [remote] if remote else []
+            candidate_remotes.extend(item for item in git_remotes(repo) if item not in candidate_remotes)
+            remote_ref = next(
+                (
+                    f"{candidate}/{base_branch}"
+                    for candidate in candidate_remotes
+                    if git(repo, "show-ref", "--verify", f"refs/remotes/{candidate}/{base_branch}", check=False).strip()
+                ),
+                None,
+            )
+            if remote_ref is None:
+                raise MeginError(f"approved base branch does not exist locally: {base_branch}")
+            switched = run_process(("git", "switch", "-c", base_branch, "--track", remote_ref), repo, timeout=60, check=False)
+        else:
+            switched = run_process(("git", "switch", base_branch), repo, timeout=60, check=False)
+        if switched.returncode != 0:
+            raise MeginError(f"cannot switch to approved base branch {base_branch}: {redact((switched.stdout or '') + (switched.stderr or '')).strip()}")
+    if head_sha(repo) != base_sha:
+        raise MeginError("approved base branch changed since the candidate was created; refresh the candidate and approve again")
+    created = run_process(("git", "switch", "-c", branch), repo, timeout=60, check=False)
+    if created.returncode != 0:
+        raise MeginError(f"cannot create feature branch {branch}: {redact((created.stdout or '') + (created.stderr or '')).strip()}")
+    return repo.resolve(), branch
+
+
 def validate_branch_name(value: str) -> str:
     value = str(value).strip()
     if (
@@ -484,6 +655,19 @@ def validate_branch_name(value: str) -> str:
     ):
         raise MeginError(f"base branch contains unsupported characters: {value!r}")
     return value
+
+
+def validate_branch_prefix(value: str) -> str:
+    prefix = str(value).strip()
+    if len(prefix) > 40:
+        raise MeginError(f"branch prefix contains unsupported characters: {prefix!r}")
+    try:
+        validate_branch_name(prefix)
+    except MeginError as exc:
+        raise MeginError(f"branch prefix contains unsupported characters: {prefix!r}") from exc
+    if any(not part or part.startswith(".") or part.endswith(".") for part in prefix.split("/")):
+        raise MeginError(f"branch prefix contains unsupported characters: {prefix!r}")
+    return prefix
 
 
 def head_sha(repo: Path) -> str:
@@ -1680,6 +1864,12 @@ def state_path(repo: Path, work_id: str) -> Path:
     return state_directory(repo) / f"{work_id}.json"
 
 
+def workspace_binding_path(repo: Path) -> Path:
+    """Return the repository-level lock used to serialize current workspaces."""
+
+    return state_directory(repo) / ".workspace-binding"
+
+
 def diagnosis_directory(repo: Path) -> Path:
     return state_root(repo_identity(repo), repo) / repo_identity(repo) / "diagnoses"
 
@@ -2126,54 +2316,204 @@ def explore_repository(repo: Path) -> dict[str, Any]:
     }
 
 
-def classify(request: str, repo: Path | None = None) -> dict[str, Any]:
+def load_routing_evidence(
+    path_value: str,
+    request: str | None,
+    repo: Path | None,
+    *,
+    request_sha256: str | None = None,
+    verify_head: bool = True,
+) -> dict[str, Any]:
+    """Read and validate a read-only routing record produced during exploration."""
+
+    path = Path(path_value).expanduser().resolve()
+    if not path.is_file():
+        raise MeginError(f"routing evidence file does not exist: {path}")
+    try:
+        payload = read_json(path)
+    except Exception as exc:
+        raise MeginError(f"routing evidence is not valid JSON: {path}") from exc
+    if payload.get("schema") != "megin-routing/v1":
+        raise MeginError("routing evidence must use schema megin-routing/v1")
+    required_keys = {"schema", "request_sha256", "repo_id", "head_sha", "intent", "sources", "risks", "open_questions"}
+    missing_keys = sorted(required_keys - set(payload))
+    if missing_keys:
+        raise MeginError("routing evidence is missing required fields: " + ", ".join(missing_keys))
+    allowed_keys = required_keys | {"task_class", "generated_at"}
+    unknown_keys = sorted(set(payload) - allowed_keys)
+    if unknown_keys:
+        raise MeginError("routing evidence contains unsupported fields: " + ", ".join(unknown_keys))
+    if not SHA256_RE.fullmatch(str(payload.get("request_sha256", ""))):
+        raise MeginError("routing evidence request_sha256 is invalid")
+    if not SHA256_RE.fullmatch(str(payload.get("repo_id", ""))):
+        raise MeginError("routing evidence repo_id is invalid")
+    if not re.fullmatch(r"[a-f0-9]{40}", str(payload.get("head_sha", ""))):
+        raise MeginError("routing evidence head_sha is invalid")
+    expected_request_sha256 = request_sha256 or digest_text(request or "")
+    if payload.get("request_sha256") != expected_request_sha256:
+        raise MeginError("routing evidence request digest does not match the current request")
+    if repo is not None:
+        if payload.get("repo_id") != repo_identity(repo):
+            raise MeginError("routing evidence repository identity does not match the target repository")
+        if verify_head and payload.get("head_sha") != head_sha(repo):
+            raise MeginError("routing evidence is stale for the current repository HEAD")
+    intent = payload.get("intent")
+    if intent not in ("read_only", "mutate", "ambiguous"):
+        raise MeginError("routing evidence intent must be read_only, mutate, or ambiguous")
+    suggested = payload.get("task_class")
+    if suggested is not None and suggested not in TASK_CLASSES:
+        raise MeginError(f"routing evidence task_class is unsupported: {suggested}")
+    if "generated_at" in payload and not isinstance(payload.get("generated_at"), str):
+        raise MeginError("routing evidence generated_at must be a string when present")
+    if not isinstance(payload.get("sources"), list) or not isinstance(payload.get("risks"), list) or not isinstance(payload.get("open_questions"), list):
+        raise MeginError("routing evidence sources, risks, and open_questions must be arrays")
+    if any(not isinstance(item, str) for key in ("sources", "risks", "open_questions") for item in payload.get(key, [])):
+        raise MeginError("routing evidence source, risk, and question entries must be strings")
+    return {
+        "schema": payload["schema"],
+        "path": str(path),
+        "sha256": digest_bytes(path.read_bytes()),
+        "request_sha256": payload["request_sha256"],
+        "repo_id": payload.get("repo_id"),
+        "head_sha": payload.get("head_sha"),
+        "intent": intent,
+        "task_class": suggested,
+        "sources": [redact(str(item)) for item in payload.get("sources", [])],
+        "risks": [redact(str(item)) for item in payload.get("risks", [])],
+        "open_questions": [redact(str(item)) for item in payload.get("open_questions", [])],
+    }
+
+
+def _classification_term_present(text: str, term: str) -> bool:
+    """Match English routing terms as words while keeping CJK phrases intact."""
+
+    if re.fullmatch(r"[a-z0-9]+(?:[ -][a-z0-9]+)*", term):
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", text))
+    return term in text
+
+
+def classify(request: str, repo: Path | None = None, routing_file: str | None = None) -> dict[str, Any]:
+    """Classify intent before impact, keeping explanation words from implying a bug.
+
+    This remains a conservative heuristic.  A routing evidence file can add
+    repository-bound evidence, but it cannot authorize a write by itself.
+    """
+
     text = request.strip()
     lowered = text.casefold()
+    routing = load_routing_evidence(routing_file, request, repo) if routing_file else None
     if not text:
-        result = {"task_class": "large", "reason": "empty request has material uncertainty", "confidence": "low"}
-        if repo is not None:
-            result["exploration"] = explore_repository(repo)
-        return result
-    read_terms = (
-        "explain", "evaluate", "assessment", "review", "audit", "diagnos", "inspect", "status",
-        "解說", "評估", "診斷", "審查", "檢視", "檢查", "唯讀", "報告",
-    )
-    mutating_terms = ("fix", "implement", "change", "add", "update", "modify", "edit", "更新", "修改", "改", "修", "新增", "實作", "建立", "轉型")
-    bug_terms = ("bug", "defect", "regression", "broken", "failure", "error", "錯誤", "故障", "異常", "問題", "失敗")
-    large_terms = (
-        "architecture", "architectural", "subsystem", "migration", "schema", "contract", "api", "dependency",
-        "permission", "security", "cross-module", "platform", "framework", "new system", "database",
-        "架構", "子系統", "遷移", "契約", "介面", "依賴", "權限", "跨模組", "資料庫", "平台", "完整轉型",
-    )
-    small_terms = ("typo", "wording", "format", "readme", "docs", "documentation", "isolated", "single file", "文字", "格式", "文件")
-    if any(term in lowered for term in read_terms) and not any(term in lowered for term in mutating_terms):
-        result = {"task_class": "read_only", "reason": "request asks for explanation, assessment, diagnosis, or review", "confidence": "high"}
-        if repo is not None:
-            result["exploration"] = explore_repository(repo)
-        return result
-    if any(term in lowered for term in bug_terms):
-        result = {"task_class": "bug", "reason": "request describes an existing failure or suspected defect; diagnose before repair", "confidence": "medium", "requires_diagnosis": True}
-        if repo is not None:
-            result["exploration"] = explore_repository(repo)
-        return result
-    if any(term in lowered for term in large_terms):
-        result = {"task_class": "large", "reason": "request may change architecture, contracts, data, permissions, dependencies, or multiple modules", "confidence": "high"}
-        if repo is not None:
-            result["exploration"] = explore_repository(repo)
-        return result
-    if any(term in lowered for term in small_terms) and not any(term in lowered for term in large_terms):
-        result = {"task_class": "small", "reason": "request appears isolated with a clear, bounded result", "confidence": "medium"}
-        if repo is not None:
-            result["exploration"] = explore_repository(repo)
-        return result
-    result = {"task_class": "large", "reason": "scope or impact is not sufficiently bounded to prove a small task", "confidence": "low"}
+        result = {"task_class": "large", "reason": "empty request has material uncertainty", "confidence": "low", "needs_clarification": True}
+    else:
+        explicit_read = any(_classification_term_present(lowered, term) for term in (
+            "explain", "evaluate", "assessment", "review", "audit", "inspect", "check", "status", "plan", "advice",
+            "recommend", "recommendation", "suggest", "compare", "provide advice", "read-only", "without changing", "說明", "如何", "怎麼",
+            "不要修改", "不修改", "不需修改", "不必修改", "只分析", "只檢查", "僅檢視", "提供建議", "計畫書",
+            "解說", "說明", "分析", "評估", "審查", "檢視", "檢查", "唯讀", "報告",
+        ))
+        hard_change_terms = (
+            "fix", "repair", "resolve", "correct", "debug", "troubleshoot", "implement", "change", "add", "update", "modify", "edit", "refactor", "build", "create",
+            "remove", "delete", "upgrade", "integrate", "修復", "修正", "實作", "新增", "更新", "修改",
+            "建立", "改寫", "重構", "轉型", "加入", "移除", "刪除", "升級", "整合", "排除", "除錯",
+        )
+        soft_change_terms = ("improve", "enhance", "support", "enable", "改善", "優化", "調整", "支援", "啟用")
+        soft_change = any(_classification_term_present(lowered, term) for term in soft_change_terms)
+        explicit_no_change = bool(
+            re.search(
+                r"(?:do not|don't|without|no changes?|不要|不(?:要|需|必)|無需|不必).{0,20}(?:change|modify|edit|fix|write|修改|變更|改|修|寫)",
+                lowered,
+            )
+            or re.search(r"\bno changes?\b|不要修改|不修改|不需修改|不必修改|無需修改", lowered)
+        )
+        # Do not let the word "修改" in "不要修改" turn a read-only request
+        # into a mutation.  Keep a positive verb elsewhere in the sentence so
+        # genuinely contradictory requests still stop for clarification.
+        change_context = lowered
+        if explicit_no_change:
+            change_context = re.sub(
+                r"(?:do not|don't|without|no changes?|不要|不(?:要|需|必|修改|變更|改|修|寫)|無需|不必)[^.!?;，。！？]{0,24}",
+                " ",
+                lowered,
+            )
+        hard_change = any(_classification_term_present(change_context, term) for term in hard_change_terms)
+        has_change = hard_change or soft_change
+        plan_or_advice = any(_classification_term_present(lowered, term) for term in (
+            "plan only", "provide a plan", "recommend", "suggest", "provide advice", "plan", "explain", "how to", "計畫", "規劃", "建議", "方案", "如何", "怎麼",
+        ))
+        direct_action = bool(re.search(
+            r"^(?:please\s+|i\s+want\s+to\s+|we\s+need\s+to\s+)?(?:fix|repair|resolve|correct|debug|troubleshoot|implement|change|add|update|modify|edit|refactor|build|create|remove|delete|upgrade|integrate)\b",
+            lowered,
+        )) or bool(re.search(r"^(?:請|需要|希望)?\s*(?:修復|修正|實作|新增|更新|修改|建立|改寫|重構|轉型|加入|移除|刪除|升級|整合)", text))
+        # Planning/advice language describes a possible change but does not
+        # authorize it.  A direct imperative still wins, while a soft term
+        # such as "improve" is enough to route a plainly mutating request.
+        modification_requested = has_change and not explicit_no_change and not (explicit_read and plan_or_advice and not direct_action)
+        contradictory_intent = bool(explicit_no_change and hard_change)
+        mixed_intent = bool(
+            explicit_read
+            and hard_change
+            and not explicit_no_change
+            and not direct_action
+            and any(term in lowered for term in (" and ", " then ", " after ", "並", "然後", "接著", "再"))
+        )
+        # An explanation that happens to mention error/API/bug terminology is
+        # still read-only unless the user asks to repair the behavior.
+        bug_request = (
+            any(_classification_term_present(lowered, term) for term in ("bug", "defect", "regression", "broken", "failure", "error"))
+            or any(_classification_term_present(lowered, term) for term in ("錯誤", "故障", "問題", "失敗", "修復錯誤", "修正錯誤", "修復故障", "修正問題", "修復異常", "修復 bug"))
+        ) and modification_requested
+        docs_only = any(_classification_term_present(lowered, term) for term in ("readme", "documentation", "docs", "文件", "文檔")) and not any(
+            _classification_term_present(lowered, term) for term in ("runtime", "behavior", "行為", "程式", "功能", "schema", "contract", "契約", "介面契約", "資料庫", "migration", "遷移")
+        )
+        large_terms = (
+            "architecture", "architectural", "subsystem", "migration", "schema", "contract", "api", "dependency",
+            "permission", "security", "cross-module", "platform", "framework", "new system", "database",
+            "架構", "子系統", "遷移", "契約", "介面", "依賴", "權限", "跨模組", "資料庫", "平台", "完整轉型",
+        )
+        has_large_impact = any(_classification_term_present(lowered, term) for term in large_terms)
+        if routing and routing["intent"] == "read_only":
+            result = {"task_class": "read_only", "reason": "routing evidence marks the request as read-only", "confidence": "high"}
+        elif routing and routing["intent"] == "ambiguous":
+            result = {"task_class": "large", "reason": "routing evidence contains unresolved intent or scope questions", "confidence": "low", "needs_clarification": True}
+        elif contradictory_intent or mixed_intent:
+            result = {"task_class": "large", "reason": "request mixes read-only exploration with a mutation; clarify the intended next action", "confidence": "low", "needs_clarification": True}
+        elif not modification_requested and (explicit_read or not has_change):
+            result = {"task_class": "read_only", "reason": "request asks for explanation, assessment, planning, or review without a product mutation", "confidence": "high" if explicit_read else "medium"}
+        elif routing and routing["intent"] == "mutate" and routing.get("task_class") in ("small", "large", "bug"):
+            suggested = routing["task_class"]
+            result = {
+                "task_class": suggested,
+                "reason": "repository-bound routing evidence supplies the requested mutation class",
+                "confidence": "high",
+            }
+            if routing.get("open_questions"):
+                result["needs_clarification"] = True
+                result["reason"] = "routing evidence still contains open questions; clarify them before mutation"
+            if suggested == "bug":
+                result["requires_diagnosis"] = True
+        elif bug_request:
+            result = {"task_class": "bug", "reason": "request asks to repair an existing failure; diagnose before repair", "confidence": "medium", "requires_diagnosis": True}
+        elif has_large_impact and not docs_only:
+            result = {"task_class": "large", "reason": "request may change architecture, contracts, data, permissions, dependencies, or multiple modules", "confidence": "high"}
+        elif docs_only or any(_classification_term_present(lowered, term) for term in ("typo", "wording", "format", "文字", "格式", "單一檔案", "single file")):
+            result = {"task_class": "small", "reason": "request appears isolated with a clear, bounded result", "confidence": "medium"}
+        else:
+            result = {"task_class": "large", "reason": "scope or impact is not sufficiently bounded to prove a small task", "confidence": "low", "needs_clarification": True}
+        result["modification_requested"] = modification_requested
+    if routing:
+        result["routing_evidence"] = routing
+        result["routing_evidence_sha256"] = routing["sha256"]
+        if routing.get("risks"):
+            result["routing_risks"] = routing["risks"]
+        if routing.get("open_questions"):
+            result["open_questions"] = routing["open_questions"]
     if repo is not None:
         result["exploration"] = explore_repository(repo)
     return result
 
 
-def explicit_class(request: str, requested: str | None, repo: Path | None = None) -> dict[str, Any]:
-    result = classify(request, repo)
+def explicit_class(request: str, requested: str | None, repo: Path | None = None, routing_file: str | None = None) -> dict[str, Any]:
+    result = classify(request, repo, routing_file)
     if not requested:
         return result
     if requested not in TASK_CLASSES:
@@ -2186,6 +2526,8 @@ def explicit_class(request: str, requested: str | None, repo: Path | None = None
         raise MeginError("cannot downgrade an uncertain or architectural request to small; narrow and re-approve it")
     if requested == "read_only" and result["task_class"] in ("small", "large", "bug"):
         raise MeginError("a mutating request cannot be forced into read_only")
+    if result.get("needs_clarification") and requested in ("small", "large", "bug"):
+        raise MeginError("routing evidence or request intent is unresolved; clarify the request before selecting a mutating class")
     result["task_class"] = requested
     result["reason"] = f"explicitly selected {requested}; original exploration: {result['reason']}"
     return result
@@ -2208,6 +2550,15 @@ def load_config(repo: Path, *, required: bool = True) -> dict[str, Any] | None:
     if config.get("repo_id") != repo_identity(repo):
         raise MeginError(f"project configuration repository identity drifted: {path}")
     validate_remote_name(config.get("remote"))
+    if config.get("workspace_mode") is not None and config.get("workspace_mode") not in WORKSPACE_MODES:
+        raise MeginError(f"project configuration workspace_mode is unsupported: {config.get('workspace_mode')}")
+    if config.get("finish_mode") is not None and config.get("finish_mode") not in FINISH_MODES:
+        raise MeginError(f"project configuration finish_mode is unsupported: {config.get('finish_mode')}")
+    if config.get("branch_prefix") is not None:
+        try:
+            validate_branch_prefix(config.get("branch_prefix"))
+        except MeginError as exc:
+            raise MeginError(f"project configuration branch_prefix is unsupported: {config.get('branch_prefix')!r}") from exc
     return config
 
 
@@ -2287,11 +2638,37 @@ def build_scope(args: argparse.Namespace, config: dict[str, Any] | None) -> dict
         base_branch = args.base_branch
     elif config and config.get("base_branch"):
         base_branch = config["base_branch"]
-    elif config and config.get("repo_path"):
-        base_branch = current_branch(Path(config["repo_path"]))
     else:
-        base_branch = current_branch(Path.cwd())
+        base_branch = default_base_branch(repo_for_scope(config))
     base_branch = validate_branch_name(base_branch)
+    workspace_mode = getattr(args, "workspace_mode", None)
+    if workspace_mode is None and config:
+        workspace_mode = config.get("workspace_mode")
+    # Explicit task-class invocations are the legacy automation spelling. Keep
+    # the historical worktree/commit path only when neither new destination
+    # flag is present; selecting either mode opts into the v0.3 defaults for
+    # the other field as well. Natural-language starts always use current /
+    # unstaged unless project configuration says otherwise.
+    legacy_invocation = bool(
+        getattr(args, "task_class", None)
+        and getattr(args, "workspace_mode", None) is None
+        and getattr(args, "finish_mode", None) is None
+        and not (config or {}).get("workspace_mode")
+        and not (config or {}).get("finish_mode")
+    )
+    if workspace_mode is None:
+        workspace_mode = "worktree" if legacy_invocation else "current"
+    if workspace_mode not in WORKSPACE_MODES:
+        raise MeginError(f"workspace mode must be one of {', '.join(WORKSPACE_MODES)}")
+    finish_mode = getattr(args, "finish_mode", None)
+    if finish_mode is None and config:
+        finish_mode = config.get("finish_mode")
+    if finish_mode is None:
+        finish_mode = "commit" if legacy_invocation else "unstaged"
+    if finish_mode not in FINISH_MODES:
+        raise MeginError(f"finish mode must be one of {', '.join(FINISH_MODES)}")
+    branch_prefix = validate_branch_prefix(getattr(args, "branch_prefix", None) or (config or {}).get("branch_prefix") or "feat")
+    base_sha = resolve_base_sha(repo_for_scope(config), base_branch, remote)
     title = getattr(args, "title", None) or getattr(args, "request", None) or "Megin delivery"
     acceptance = [redact(value) for value in (getattr(args, "acceptance", None) or [title])]
     return {
@@ -2299,7 +2676,16 @@ def build_scope(args: argparse.Namespace, config: dict[str, Any] | None) -> dict
         "allowed_paths": allowed,
         "test_commands": commands,
         "knowledge_scope": knowledge,
-        "publication": {"remote": remote, "remote_url_sha256": remote_url_digest(repo_for_scope(config), remote), "base_branch": base_branch, "title": redact(title)[:200]},
+        "publication": {
+            "remote": remote,
+            "remote_url_sha256": remote_url_digest(repo_for_scope(config), remote),
+            "base_branch": base_branch,
+            "base_sha": base_sha,
+            "title": redact(title)[:200],
+            "workspace_mode": workspace_mode,
+            "finish_mode": finish_mode,
+            "branch_prefix": branch_prefix,
+        },
     }
 
 
@@ -2401,6 +2787,19 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
         )
     if state.get("work_id") != work_id or state.get("repo", {}).get("repo_id") != repo_identity(repo):
         raise MeginError(f"state identity mismatch: {path}")
+    routing_record = (state.get("task", {}).get("classification") or {}).get("routing_evidence")
+    if routing_record:
+        checked_routing = load_routing_evidence(
+            routing_record.get("path", ""),
+            state.get("task", {}).get("request", ""),
+            repo,
+            request_sha256=state.get("task", {}).get("request_sha256"),
+            verify_head=False,
+        )
+        if checked_routing.get("sha256") != routing_record.get("sha256"):
+            raise MeginError(f"routing evidence binding drifted; re-run read-only exploration: {path}")
+        if routing_record.get("head_sha") and checked_routing.get("head_sha") != routing_record.get("head_sha"):
+            raise MeginError(f"routing evidence source changed; re-run read-only exploration: {path}")
     task_record = state.get("task", {})
     if task_record.get("task_class") == "bug":
         assessment = task_record.get("diagnosis_assessment")
@@ -2445,6 +2844,16 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
         raise MeginError(f"approved base branch is invalid: {path}") from exc
     if state.get("repo", {}).get("base_branch") != configured_base or state.get("publication", {}).get("base_branch") != configured_base:
         raise MeginError(f"base branch binding drifted: {path}")
+    approved_base_sha = scope.get("publication", {}).get("base_sha")
+    if approved_base_sha is not None and not re.fullmatch(r"[a-f0-9]{40}", str(approved_base_sha)):
+        raise MeginError(f"approved base SHA is invalid: {path}")
+    if approved_base_sha is not None and state.get("publication", {}).get("base_sha") not in (None, approved_base_sha):
+        raise MeginError(f"base SHA binding drifted: {path}")
+    finish_mode = state.get("publication", {}).get("finish_mode") or scope.get("publication", {}).get("finish_mode")
+    if finish_mode == "unstaged" and state.get("publication", {}).get("commit_sha"):
+        raise MeginError(f"unstaged publication cannot contain a commit SHA: {path}")
+    if state.get("publication", {}).get("state") == "delivered_unstaged" and finish_mode != "unstaged":
+        raise MeginError(f"delivered_unstaged state requires finish_mode=unstaged: {path}")
     if any(not allowed_path(item, scope.get("allowed_paths", [])) for item in scope.get("knowledge_scope", [])):
         raise MeginError(f"knowledge scope is outside the approved write scope: {path}")
     task_ids = [task.get("id") for task in state.get("tasks", [])]
@@ -2485,8 +2894,12 @@ def load_state(repo: Path, work_id: str) -> tuple[dict[str, Any], Path]:
         actual_top = Path(git(worktree, "rev-parse", "--show-toplevel").strip()).resolve()
         if actual_top != worktree:
             raise MeginError(f"delivery worktree identity drifted: {worktree}")
+        if workspace.get("mode") == "current" and worktree != repo.resolve():
+            raise MeginError(f"current workspace path drifted: {worktree}")
         if workspace.get("branch") and current_branch(worktree) != workspace["branch"]:
             raise MeginError(f"delivery branch identity drifted: {worktree}")
+        if approved_base_sha and workspace.get("base_sha") not in (None, approved_base_sha):
+            raise MeginError(f"workspace base SHA binding drifted: {worktree}")
     assignments = state.get("assignments", [])
     for assignment in assignments:
         if assignment.get("task_id") not in task_id_set:
@@ -2811,6 +3224,9 @@ def materialize_candidate_bundles(state: dict[str, Any], repo: Path, args: argpa
     root = state_root(state["repo"]["repo_id"], state_target_repo(state, repo)) / state["repo"]["repo_id"] / state["work_id"] / "candidates"
     scope = state["approval"]["scope"]
     request = redact(state["task"].get("request", ""))
+    classification = state.get("task", {}).get("classification") or {}
+    routing_risks = list(classification.get("routing_risks", []))
+    open_questions = list(classification.get("open_questions", []))
     package_text = _work_package_markdown(state.get("tasks", []))
     test_text = "\n".join(f"- {item}" for item in scope.get("test_commands", [])) or "- none configured"
 
@@ -2824,6 +3240,12 @@ def materialize_candidate_bundles(state: dict[str, Any], repo: Path, args: argpa
             "## Acceptance\n" + "\n".join(f"- {item}" for item in scope.get("acceptance", [])) + "\n\n"
             "## In scope\n" + "\n".join(f"- {item}" for item in scope.get("allowed_paths", [])) + "\n\n"
             "## Out of scope\n- Any path outside the approved scope\n- New dependencies, migrations, permissions, or contracts unless explicitly approved\n\n"
+            "## Risks and open questions\n"
+            + "\n".join(f"- Risk: {item}" for item in routing_risks)
+            + ("\n" if routing_risks else "")
+            + "\n".join(f"- Question: {item}" for item in open_questions)
+            + ("- none\n" if not routing_risks and not open_questions else "")
+            + "\n"
             "## Work packages\n" + package_text + "\n\n"
             "## Test commands\n" + test_text + "\n\n"
             "## Steps\n- Implement the smallest approved change.\n- Run focused and related tests for each work package.\n- Obtain an independent review and full verification before delivery.\n\n"
@@ -2831,6 +3253,10 @@ def materialize_candidate_bundles(state: dict[str, Any], repo: Path, args: argpa
             f"- Knowledge scope: {', '.join(scope.get('knowledge_scope', [])) or 'none'}\n"
             f"- Publication remote: {scope.get('publication', {}).get('remote') or 'none'}\n"
             f"- Base branch: {scope.get('publication', {}).get('base_branch')}\n"
+            f"- Base SHA: {scope.get('publication', {}).get('base_sha')}\n"
+            f"- Workspace mode: {scope.get('publication', {}).get('workspace_mode')}\n"
+            f"- Finish mode: {scope.get('publication', {}).get('finish_mode')}\n"
+            f"- Feature branch: {scope.get('publication', {}).get('branch_prefix')}/<work-id>\n"
             f"- Draft PR title: {scope.get('publication', {}).get('title')}\n"
         )
         design_text, source_sha, source_ref = _candidate_source(repo, getattr(args, "design_file", None), generated)
@@ -2861,10 +3287,16 @@ def materialize_candidate_bundles(state: dict[str, Any], repo: Path, args: argpa
         + "\n\n## In scope\n"
         + "\n".join(f"- {item}" for item in scope.get("allowed_paths", []))
         + "\n\n## Out of scope\n- Any path outside the approved scope\n- Unapproved dependency, data, permission, or contract changes\n\n"
+        + "## Risks and open questions\n"
+        + "\n".join(f"- Risk: {item}" for item in routing_risks)
+        + ("\n" if routing_risks else "")
+        + "\n".join(f"- Question: {item}" for item in open_questions)
+        + ("- none\n" if not routing_risks and not open_questions else "")
+        + "\n"
         + "## Knowledge scope\n"
         + "\n".join(f"- {item}" for item in scope.get("knowledge_scope", []))
         + "\n\n## Publication target\n"
-        + f"- Remote: {scope.get('publication', {}).get('remote') or 'none'}\n- Base branch: {scope.get('publication', {}).get('base_branch')}\n- Draft PR title: {scope.get('publication', {}).get('title')}\n"
+        + f"- Remote: {scope.get('publication', {}).get('remote') or 'none'}\n- Base branch: {scope.get('publication', {}).get('base_branch')}\n- Base SHA: {scope.get('publication', {}).get('base_sha')}\n- Workspace mode: {scope.get('publication', {}).get('workspace_mode')}\n- Finish mode: {scope.get('publication', {}).get('finish_mode')}\n- Feature branch: {scope.get('publication', {}).get('branch_prefix')}/<work-id>\n- Draft PR title: {scope.get('publication', {}).get('title')}\n"
         + "\n## Work packages and test obligations\n"
         + package_text
         + "\n"
@@ -2891,6 +3323,10 @@ def materialize_candidate_bundles(state: dict[str, Any], repo: Path, args: argpa
         + f"- Knowledge scope: {', '.join(scope.get('knowledge_scope', [])) or 'none'}\n"
         + f"- Remote: {scope.get('publication', {}).get('remote') or 'none'}\n"
         + f"- Base branch: {scope.get('publication', {}).get('base_branch')}\n"
+        + f"- Base SHA: {scope.get('publication', {}).get('base_sha')}\n"
+        + f"- Workspace mode: {scope.get('publication', {}).get('workspace_mode')}\n"
+        + f"- Finish mode: {scope.get('publication', {}).get('finish_mode')}\n"
+        + f"- Feature branch: {scope.get('publication', {}).get('branch_prefix')}/<work-id>\n"
         + f"- Draft PR title: {scope.get('publication', {}).get('title')}\n"
     )
     plan_text, plan_source_sha, plan_ref = _candidate_source(repo, getattr(args, "plan_file", None), generated_plan)
@@ -3009,11 +3445,14 @@ def state_summary(state: dict[str, Any], path: Path) -> dict[str, Any]:
         "repair_class": state.get("task", {}).get("repair_class"),
         "diagnosis": state.get("task", {}).get("diagnosis"),
         "diagnosis_assessment": (state.get("task", {}).get("diagnosis_assessment") or {}).get("path"),
+        "routing_risks": (state.get("task", {}).get("classification") or {}).get("routing_risks", []),
+        "open_questions": (state.get("task", {}).get("classification") or {}).get("open_questions", []),
         "phase": state.get("phase"),
         "status": state.get("status"),
         "approval": state.get("approval", {}).get("status"),
         "approval_policy": state.get("approval", {}).get("policy"),
         "approval_stages": state.get("approval", {}).get("approved_stages", []),
+        "approval_digest": state.get("approval", {}).get("payload_sha256"),
         "candidate_revision": state.get("approval", {}).get("candidate_revision"),
         # Status is the operator-facing projection, so include direct links to
         # the immutable candidate files while keeping approval digests limited
@@ -3033,6 +3472,13 @@ def state_summary(state: dict[str, Any], path: Path) -> dict[str, Any]:
         "knowledge_conflicts": state.get("knowledge", {}).get("conflicts", []),
         "publication": state.get("publication", {}).get("state"),
         "publication_reason": state.get("publication", {}).get("reason"),
+        "workspace_mode": state.get("workspace", {}).get("mode") or state.get("publication", {}).get("workspace_mode"),
+        "finish_mode": state.get("publication", {}).get("finish_mode"),
+        "base_branch": state.get("workspace", {}).get("base_branch") or state.get("publication", {}).get("base_branch"),
+        "base_sha": state.get("workspace", {}).get("base_sha") or state.get("publication", {}).get("base_sha"),
+        "suggested_commit": state.get("publication", {}).get("suggested_commit"),
+        "delivered_snapshot": state.get("publication", {}).get("delivered_snapshot"),
+        "changed_paths": state.get("publication", {}).get("changed_paths", []),
         "next_action": state.get("next_action"),
         "worktree": state.get("workspace", {}).get("worktree"),
         "branch": state.get("workspace", {}).get("branch"),
@@ -3043,6 +3489,9 @@ def state_summary(state: dict[str, Any], path: Path) -> dict[str, Any]:
 
 
 def emit(value: Any, args: argparse.Namespace | None = None) -> None:
+    if args is not None and getattr(args, "human", False):
+        print(human_summary(value))
+        return
     if args is not None and getattr(args, "text", False):
         if isinstance(value, dict):
             for key, item in value.items():
@@ -3053,6 +3502,93 @@ def emit(value: Any, args: argparse.Namespace | None = None) -> None:
             print(value)
         return
     print(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2))
+
+
+def human_summary(value: Any) -> str:
+    """Render a concise operator-facing report without nested state JSON."""
+
+    if not isinstance(value, dict):
+        return str(value)
+    lines: list[str] = []
+    labels = {"read_only": "唯讀", "small": "小任務", "large": "大型變更", "bug": "疑似 BUG"}
+    if value.get("task_class"):
+        lines.append(f"分類：{labels.get(value['task_class'], value['task_class'])}")
+        if value.get("reason"):
+            lines.append(f"判定：{value['reason']}")
+    if value.get("confidence"):
+        lines.append(f"信心：{value['confidence']}")
+    if "run_created" in value:
+        lines.append(f"建立 run：{'是' if value['run_created'] else '否'}")
+    if value.get("needs_clarification"):
+        lines.append("需要釐清：是")
+    if value.get("work_id"):
+        lines.append(f"Work ID：{value['work_id']}")
+    if value.get("status"):
+        lines.append(f"狀態：{value['status']}")
+    if value.get("phase"):
+        lines.append(f"階段：{value['phase']}")
+    if value.get("approval"):
+        lines.append(f"核准：{value['approval']}")
+    if value.get("workspace_mode"):
+        lines.append(f"工作目錄模式：{value['workspace_mode']}")
+    if value.get("finish_mode"):
+        lines.append(f"交付模式：{value['finish_mode']}")
+    if value.get("branch"):
+        lines.append(f"分支：{value['branch']}")
+    if value.get("worktree"):
+        lines.append(f"工作路徑：{value['worktree']}")
+    if value.get("base_branch"):
+        lines.append(f"基底分支：{value['base_branch']}")
+    if value.get("base_sha"):
+        lines.append(f"基底 SHA：{value['base_sha']}")
+    if value.get("routing_risks"):
+        lines.append(f"風險：{'; '.join(str(item) for item in value['routing_risks'])}")
+    if value.get("open_questions"):
+        lines.append(f"待決問題：{'; '.join(str(item) for item in value['open_questions'])}")
+    tasks = value.get("tasks")
+    if isinstance(tasks, list):
+        paths = sorted({path for task in tasks if isinstance(task, dict) for path in task.get("allowed_paths", [])})
+        if paths:
+            lines.append(f"主要變更：{', '.join(paths)}")
+    current = value.get("current")
+    if isinstance(current, dict):
+        task_id = current.get("task_id") or current.get("assignment_id")
+        writer = current.get("writer_id") or current.get("writer")
+        if task_id or writer:
+            lines.append(f"目前工作：{task_id or 'unknown'}；writer：{writer or 'unknown'}")
+    if value.get("completed"):
+        lines.append(f"已完成：{', '.join(str(item) for item in value['completed'])}")
+    if value.get("review"):
+        lines.append(f"審查：{value['review']}")
+    if value.get("verification"):
+        lines.append(f"驗證：{value['verification']}")
+    if value.get("publication"):
+        lines.append(f"交付：{value['publication']}")
+    if value.get("knowledge"):
+        lines.append(f"知識：{value['knowledge']}")
+    if value.get("knowledge_conflicts"):
+        lines.append(f"知識待決：{'; '.join(str(item) for item in value['knowledge_conflicts'])}")
+    if value.get("commit"):
+        lines.append(f"Commit：{value['commit']}")
+    candidates = value.get("candidates")
+    if isinstance(candidates, dict):
+        for name, candidate in candidates.items():
+            if isinstance(candidate, dict) and candidate.get("path"):
+                lines.append(f"候選文件（{name}）：{candidate['path']}")
+    if value.get("changed_paths"):
+        lines.append(f"交付檔案：{', '.join(str(item) for item in value['changed_paths'])}")
+    if value.get("suggested_commit"):
+        lines.append("建議 commit：")
+        lines.append(str(value["suggested_commit"]))
+    if value.get("next_action"):
+        lines.append(f"下一步：{value['next_action']}")
+    if value.get("state_path"):
+        lines.append(f"狀態檔：{value['state_path']}")
+    if not lines:
+        for key in ("initialized", "already_initialized", "ok", "next_action"):
+            if key in value:
+                lines.append(f"{key}：{value[key]}")
+    return "\n".join(lines)
 
 
 def create_worktree(repo: Path, work_id: str, base_sha: str) -> tuple[Path, str]:
@@ -3069,6 +3605,43 @@ def create_worktree(repo: Path, work_id: str, base_sha: str) -> tuple[Path, str]
         detail = redact((result.stdout or "") + (result.stderr or "")).strip()
         raise MeginError(f"cannot create delivery worktree ({result.returncode}): {detail}")
     return worktree.resolve(), branch
+
+
+def assert_current_workspace_available(repo: Path, work_id: str) -> None:
+    """Prevent two active v2 runs from writing the same checkout."""
+
+    try:
+        directory = state_directory(repo)
+    except MeginError:
+        return
+    if not directory.exists():
+        return
+    target = repo.resolve()
+    for path in directory.glob("*.json"):
+        if path.stem == work_id:
+            continue
+        try:
+            candidate = read_json(path)
+        except Exception:
+            continue
+        workspace = candidate.get("workspace") or {}
+        workspace_path = workspace.get("repo") or workspace.get("worktree")
+        if workspace.get("mode") != "current" or not workspace_path:
+            continue
+        try:
+            same_repo = Path(workspace_path).resolve() == target
+        except OSError:
+            same_repo = False
+        # A pending candidate has not acquired a writer workspace yet and may
+        # coexist with another discussion.  Once a workspace exists, active
+        # and blocked runs retain the single-writer reservation until they are
+        # explicitly completed or abandoned.
+        bound = bool(workspace.get("worktree"))
+        if same_repo and (candidate.get("status") in ("active", "blocked") or (bound and candidate.get("status") == "awaiting_approval")):
+            raise MeginError(
+                f"current workspace is already bound to active Work ID {path.stem}; "
+                "resume or complete that run before starting another writer"
+            )
 
 
 def task_for_id(state: dict[str, Any], task_id: str | None) -> dict[str, Any] | None:
@@ -3199,6 +3772,63 @@ def refresh_assignment_digest(assignment: dict[str, Any]) -> None:
     assignment["assignment_sha256"] = digest_json(assignment_digest_payload(assignment))
 
 
+def rebind_assignment_authorizations(state: dict[str, Any], repo: Path) -> None:
+    """Reissue writer handoffs after a publication-only candidate rebind.
+
+    Changing finish mode changes the approval digest, so the old assignment
+    ticket cannot remain valid.  The implementation result itself is retained;
+    only its controller-owned ticket binding is refreshed.
+    """
+
+    evidence_root = state_root(state["repo"]["repo_id"], repo) / state["repo"]["repo_id"] / state["work_id"] / "evidence"
+    for assignment in state.get("assignments", []):
+        writer_id = assignment.get("writer_id") or assignment.get("writer")
+        session_id = assignment.get("session_id") or assignment.get("session")
+        capability_path, capability_sha = register_capability(
+            state,
+            repo,
+            kind="writer",
+            identity=writer_id,
+            session_id=session_id,
+            assignment_id=assignment.get("assignment_id"),
+            read_only=False,
+        )
+        assignment["capability_path"] = capability_path
+        assignment["capability_sha256"] = capability_sha
+        assignment["ticket_sha256"] = digest_json(assignment_ticket_payload(state, assignment))
+        writer_result = assignment.get("writer_result")
+        if isinstance(writer_result, dict):
+            writer_result["ticket_sha256"] = assignment["ticket_sha256"]
+            result_path = Path(str(writer_result.get("evidence_path", ""))).expanduser().resolve()
+            try:
+                result_path.relative_to(evidence_root.resolve())
+            except ValueError as exc:
+                raise MeginError(f"writer result evidence is outside the persistent work state: {assignment.get('assignment_id')}") from exc
+            report_path = Path(str(writer_result.get("report_path", ""))).expanduser().resolve()
+            try:
+                report_path.relative_to(evidence_root.resolve())
+            except ValueError as exc:
+                raise MeginError(f"writer report is outside the persistent work state: {assignment.get('assignment_id')}") from exc
+            if report_path.exists():
+                report = read_json(report_path)
+                if report.get("schema") != WRITER_REPORT_SCHEMA:
+                    raise MeginError(f"writer report schema is not compatible with the current state: {assignment.get('assignment_id')}")
+                if "ticket_sha256" in report:
+                    report["ticket_sha256"] = assignment["ticket_sha256"]
+                    write_json_atomic(report_path, report)
+                    writer_result["report_sha256"] = digest_bytes(report_path.read_bytes())
+            write_json_atomic(result_path, writer_result)
+            assignment["writer_result_sha256"] = digest_json(writer_result)
+        refresh_assignment_digest(assignment)
+
+
+def assignment_authorizations_current(state: dict[str, Any]) -> bool:
+    return all(
+        digest_json(assignment_ticket_payload(state, assignment)) == assignment.get("ticket_sha256")
+        for assignment in state.get("assignments", [])
+    )
+
+
 def _new_assignment(
     state: dict[str, Any],
     args: argparse.Namespace,
@@ -3295,22 +3925,19 @@ def append_assignment(state: dict[str, Any], args: argparse.Namespace, repo: Pat
 def base_sha_for_state(repo: Path, state: dict[str, Any]) -> str:
     """Resolve the approved configured base branch before creating a worktree."""
 
+    approved_sha = state.get("approval", {}).get("scope", {}).get("publication", {}).get("base_sha")
+    if approved_sha:
+        if not re.fullmatch(r"[a-f0-9]{40}", str(approved_sha)):
+            raise MeginError("approved base SHA is invalid")
+        return str(approved_sha)
     configured = (
         state.get("approval", {}).get("scope", {}).get("publication", {}).get("base_branch")
         or state.get("repo", {}).get("base_branch")
         or current_branch(repo)
     )
     branch = validate_branch_name(configured)
-    candidates = [f"refs/heads/{branch}"]
     remote = state.get("approval", {}).get("scope", {}).get("publication", {}).get("remote")
-    if remote:
-        candidates.append(f"refs/remotes/{remote}/{branch}")
-    candidates.append(branch)
-    for ref in candidates:
-        resolved = git(repo, "rev-parse", "--verify", ref, check=False).strip()
-        if resolved:
-            return resolved
-    raise MeginError(f"approved base branch does not exist: {branch}")
+    return resolve_base_sha(repo, branch, remote)
 
 
 def activate_if_approved(state: dict[str, Any], repo: Path, args: argparse.Namespace) -> None:
@@ -3333,20 +3960,70 @@ def activate_if_approved(state: dict[str, Any], repo: Path, args: argparse.Names
     if effective == "large":
         validate_candidate_bundles(state)
     if state.get("workspace", {}).get("worktree"):
+        bound_workspace = Path(state["workspace"]["worktree"]).resolve()
+        if not bound_workspace.exists():
+            raise MeginError(f"approved delivery workspace is missing: {bound_workspace}")
+        bound_branch = state.get("workspace", {}).get("branch")
+        if bound_branch and current_branch(bound_workspace) != bound_branch:
+            raise MeginError("approved workspace branch changed; stop before dispatching another writer")
+        expected_head = state.get("publication", {}).get("commit_sha") or state.get("workspace", {}).get("base_sha")
+        if expected_head and head_sha(bound_workspace) != expected_head:
+            raise MeginError(
+                "approved workspace HEAD changed; stop before dispatching another writer and inspect the snapshot"
+            )
+        if not state.get("assignments") and not all_tasks_completed(state):
+            dirty_paths, _ = status_paths(bound_workspace)
+            if dirty_paths:
+                raise MeginError(
+                    "approved workspace changed before the first writer dispatch; inspect the external changes before writing"
+                )
+        previous_approval_digest = state["approval"].get("payload_sha256")
         state["approval"]["status"] = "approved"
         if not state.get("publication", {}).get("commit_sha"):
             state["status"] = "active"
+            state["phase"] = "implementation"
         else:
             state["status"] = "complete" if state.get("publication", {}).get("state") == "draft_pr_created" else "active"
             state["phase"] = "delivery"
         refresh_approval_digests(state)
+        if state.get("assignments") and previous_approval_digest != state["approval"].get("payload_sha256"):
+            rebind_assignment_authorizations(state, repo)
         if not state.get("assignments") and not all_tasks_completed(state):
             state["phase"] = "implementation"
             ensure_assignment(state, args, repo)
+        elif not state.get("publication", {}).get("commit_sha") and all_tasks_completed(state):
+            state["next_action"] = "obtain a fresh independent review"
         return
     base = base_sha_for_state(repo, state)
-    worktree, branch = create_worktree(repo, state["work_id"], base)
-    state["workspace"] = {"worktree": str(worktree), "branch": branch, "base_sha": base, "repo": str(repo), "created_at": now()}
+    publication = state["approval"].get("scope", {}).get("publication", {})
+    workspace_mode = publication.get("workspace_mode") or state.get("workspace", {}).get("mode")
+    if workspace_mode is None:
+        # Pre-0.3 v2 records did not carry a workspace mode.  Preserve their
+        # historical isolated-worktree contract when a newer engine resumes
+        # them; only a new candidate gets the current-directory default.
+        workspace_mode = "worktree"
+    base_branch = publication.get("base_branch") or state.get("repo", {}).get("base_branch") or default_base_branch(repo)
+    branch_prefix = publication.get("branch_prefix") or "feat"
+    approved_remote = publication.get("remote")
+    if resolve_base_sha(repo, base_branch, approved_remote) != base:
+        raise MeginError("approved base branch changed since the candidate was created; refresh the candidate and approve again")
+    if workspace_mode == "current":
+        ensure_clean_start(repo)
+        assert_current_workspace_available(repo, state["work_id"])
+        worktree, branch = create_current_branch(
+            repo, state["work_id"], base, base_branch, branch_prefix, approved_remote,
+        )
+    else:
+        worktree, branch = create_worktree(repo, state["work_id"], base)
+    state["workspace"] = {
+        "mode": workspace_mode,
+        "worktree": str(worktree),
+        "branch": branch,
+        "base_branch": base_branch,
+        "base_sha": base,
+        "repo": str(repo),
+        "created_at": now(),
+    }
     state["approval"]["status"] = "approved"
     state["phase"] = "implementation"
     state["status"] = "active"
@@ -3354,7 +4031,12 @@ def activate_if_approved(state: dict[str, Any], repo: Path, args: argparse.Names
     refresh_verification_digest(state)
     refresh_approval_digests(state)
     ensure_assignment(state, args, repo)
-    append_event(state, "worktree_created", phase="implementation", status="active")
+    append_event(
+        state,
+        "workspace_created" if workspace_mode == "current" else "worktree_created",
+        phase="implementation",
+        status="active",
+    )
 
 
 def make_state(repo: Path, work_id: str, request: str, classification: dict[str, Any], args: argparse.Namespace, config: dict[str, Any] | None) -> dict[str, Any]:
@@ -3424,7 +4106,15 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
             "stage_digests": {},
             "created_at": now(),
         },
-        "workspace": {"worktree": None, "branch": None, "base_sha": None, "repo": str(repo), "created_at": None},
+        "workspace": {
+            "mode": scope["publication"].get("workspace_mode", "current"),
+            "worktree": None,
+            "branch": None,
+            "base_branch": scope["publication"].get("base_branch"),
+            "base_sha": None,
+            "repo": str(repo),
+            "created_at": None,
+        },
         "phase": "requirements" if policy == "requirements_and_plan" else "implementation",
         "status": "awaiting_approval",
         "tasks": build_work_packages(args, scope, repo),
@@ -3433,7 +4123,26 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
         "verification": {"status": "not_run", "commands": [], "snapshot": None, "record_sha256": None},
         "knowledge": {"scope": scope["knowledge_scope"], "status": "not_needed" if not scope["knowledge_scope"] else "pending", "candidate_path": None, "candidate_sha256": None, "sources": [], "certainty": None, "snapshot_before": None, "snapshot_after": None, "lint": None, "conflicts": [], "reviewer_id": None, "reviewer_session": None, "report_path": None, "report_sha256": None, "promotion": None},
         "candidates": {"design": None, "requirements": None, "plan": None},
-        "publication": {"remote": scope["publication"]["remote"], "remote_url_sha256": scope["publication"].get("remote_url_sha256"), "base_branch": scope["publication"]["base_branch"], "title": scope["publication"]["title"], "state": "not_ready", "commit_sha": None, "push_commit_sha": None, "post_commit_snapshot": None, "post_commit_product_snapshot": None, "pr": None, "reason": None},
+        "publication": {
+            "remote": scope["publication"]["remote"],
+            "remote_url_sha256": scope["publication"].get("remote_url_sha256"),
+            "base_branch": scope["publication"]["base_branch"],
+            "base_sha": scope["publication"].get("base_sha"),
+            "title": scope["publication"]["title"],
+            "workspace_mode": scope["publication"].get("workspace_mode", "current"),
+            "finish_mode": scope["publication"].get("finish_mode", "unstaged"),
+            "branch_prefix": scope["publication"].get("branch_prefix", "feat"),
+            "state": "not_ready",
+            "commit_sha": None,
+            "push_commit_sha": None,
+            "post_commit_snapshot": None,
+            "post_commit_product_snapshot": None,
+            "delivered_snapshot": None,
+            "changed_paths": [],
+            "suggested_commit": None,
+            "pr": None,
+            "reason": None,
+        },
         "events": [],
         "next_action": "obtain integrated approval" if policy == "integrated" else "obtain requirements approval",
         "created_at": now(),
@@ -3446,12 +4155,33 @@ def make_state(repo: Path, work_id: str, request: str, classification: dict[str,
 
 
 def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> None:
+    finish_mode_rebind = False
     if getattr(args, "work_package", None) or getattr(args, "work_package_file", None):
         raise MeginError("dispatch packages are fixed when the Work ID is started; create a new Work ID to change them")
+    if getattr(args, "routing_file", None):
+        checked = load_routing_evidence(
+            args.routing_file,
+            state.get("task", {}).get("request", ""),
+            Path(state["repo"]["path"]),
+            request_sha256=state.get("task", {}).get("request_sha256"),
+            verify_head=False,
+        )
+        bound = (state.get("task", {}).get("classification") or {}).get("routing_evidence") or {}
+        if checked.get("sha256") != bound.get("sha256"):
+            raise MeginError("routing evidence differs from the approved Work ID candidate; create a new Work ID")
     if state["approval"]["status"] == "approved":
-        if any(getattr(args, name, None) for name in ("allowed_path", "test_command", "knowledge_path", "acceptance", "design_file", "requirements_file", "plan_file", "remote", "base_branch", "title")):
+        scope_inputs = ("allowed_path", "test_command", "knowledge_path", "acceptance", "design_file", "requirements_file", "plan_file", "remote", "base_branch", "workspace_mode", "finish_mode", "branch_prefix", "title")
+        only_finish_rebind = (
+            bool(getattr(args, "finish_mode", None))
+            and state.get("publication", {}).get("state") == "delivered_unstaged"
+            and getattr(args, "finish_mode", None) != state.get("publication", {}).get("finish_mode")
+            and not any(getattr(args, name, None) for name in scope_inputs if name != "finish_mode")
+        )
+        finish_mode_rebind = only_finish_rebind
+        if any(getattr(args, name, None) for name in scope_inputs) and not only_finish_rebind:
             raise MeginError("approved scope is immutable; create a new revision instead of changing it")
-        return
+        if not only_finish_rebind:
+            return
     stages = approval_args(args)
     existing_stages = set(state["approval"].get("approved_stages", []))
     permitted_stages = {"integrated"} if state["approval"].get("policy") == "integrated" else {"requirements", "plan"}
@@ -3487,6 +4217,9 @@ def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> No
         or bool(getattr(args, "plan_file", None))
         or (getattr(args, "remote", None) is not None and validate_remote_name(args.remote) != scope.get("publication", {}).get("remote"))
         or (getattr(args, "base_branch", None) is not None and args.base_branch != scope.get("publication", {}).get("base_branch"))
+        or (getattr(args, "workspace_mode", None) is not None and args.workspace_mode != scope.get("publication", {}).get("workspace_mode"))
+        or (getattr(args, "finish_mode", None) is not None and args.finish_mode != scope.get("publication", {}).get("finish_mode"))
+        or (getattr(args, "branch_prefix", None) is not None and args.branch_prefix != scope.get("publication", {}).get("branch_prefix"))
         or (getattr(args, "title", None) is not None and redact(args.title)[:200] != scope.get("publication", {}).get("title"))
     )
     if scope_changed:
@@ -3509,12 +4242,52 @@ def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> No
             scope["publication"]["remote_url_sha256"] = remote_url_digest(Path(state["repo"]["path"]), scope["publication"]["remote"])
         if getattr(args, "base_branch", None) is not None:
             scope["publication"]["base_branch"] = validate_branch_name(args.base_branch)
+        if getattr(args, "remote", None) is not None or getattr(args, "base_branch", None) is not None:
+            scope["publication"]["base_sha"] = resolve_base_sha(
+                Path(state["repo"]["path"]),
+                scope["publication"]["base_branch"],
+                scope["publication"].get("remote"),
+            )
+        if getattr(args, "workspace_mode", None) is not None:
+            if args.workspace_mode not in WORKSPACE_MODES:
+                raise MeginError(f"workspace mode must be one of {', '.join(WORKSPACE_MODES)}")
+            scope["publication"]["workspace_mode"] = args.workspace_mode
+        if getattr(args, "finish_mode", None) is not None:
+            if args.finish_mode not in FINISH_MODES:
+                raise MeginError(f"finish mode must be one of {', '.join(FINISH_MODES)}")
+            scope["publication"]["finish_mode"] = args.finish_mode
+        if getattr(args, "branch_prefix", None) is not None:
+            scope["publication"]["branch_prefix"] = validate_branch_prefix(args.branch_prefix)
         if getattr(args, "title", None) is not None:
             scope["publication"]["title"] = redact(args.title)[:200]
         state["publication"]["remote"] = scope["publication"].get("remote")
         state["publication"]["remote_url_sha256"] = scope["publication"].get("remote_url_sha256")
         state["publication"]["base_branch"] = scope["publication"].get("base_branch")
+        state["publication"]["base_sha"] = scope["publication"].get("base_sha")
+        # Do not fill new mode fields into an old v2 candidate just because a
+        # path or command was edited.  Missing fields carry the historical
+        # worktree/commit semantics until the caller explicitly selects a new
+        # destination.
+        for key in ("workspace_mode", "finish_mode", "branch_prefix"):
+            if key in scope["publication"]:
+                state["publication"][key] = scope["publication"][key]
         state["publication"]["title"] = scope["publication"].get("title")
+        if finish_mode_rebind:
+            state["publication"]["state"] = "not_ready"
+            state["publication"]["commit_sha"] = None
+            state["publication"]["push_commit_sha"] = None
+            state["publication"]["post_commit_snapshot"] = None
+            state["publication"]["post_commit_product_snapshot"] = None
+            state["publication"]["delivered_snapshot"] = None
+            state["publication"]["suggested_commit"] = None
+            state["publication"]["changed_paths"] = []
+            state["publication"]["pr"] = None
+            state["publication"]["reason"] = None
+            invalidate_verification(state)
+            state["phase"] = "implementation"
+            state["status"] = "active"
+            state["next_action"] = "obtain a fresh independent review after re-approving the delivery mode"
+            append_event(state, "finish_mode_rebound", phase="implementation", status="active")
         # Any scope edit creates a new candidate revision and invalidates approvals
         # collected for the previous candidate.  The caller must approve again.
         bump_candidate_revision(state)
@@ -3523,21 +4296,25 @@ def apply_approval_inputs(state: dict[str, Any], args: argparse.Namespace) -> No
         state["approval"]["status"] = "pending"
         state["review"] = {"verdict": None, "reviewer_id": None, "reviewer_session": None, "reviewer_capability_path": None, "reviewer_capability_sha256": None, "assignment_id": None, "assignment_sha256": None, "round": 0, "review_ticket_sha256": None, "snapshot": None, "product_snapshot": None, "paths": [], "findings": [], "no_progress_count": 0, "report_path": None, "report_sha256": None, "requirements_verdict": None, "quality_verdict": None, "test_evidence": []}
     refresh_approval_digests(state)
+    if finish_mode_rebind:
+        rebind_assignment_authorizations(state, Path(state["repo"]["path"]))
     state["approval"]["status"] = "pending"
     refresh_approval_digests(state)
 
 
 def cmd_classify(args: argparse.Namespace) -> int:
     repo = require_git_repo(args.repo) if getattr(args, "repo", None) else None
-    result = explicit_class(args.request, args.task_class, repo)
+    result = explicit_class(args.request, args.task_class, repo, getattr(args, "routing_file", None))
     result["request_sha256"] = digest_text(args.request)
     result["run_created"] = False
+    if result.get("needs_clarification"):
+        result["next_action"] = "clarify the request intent, scope, or unresolved routing questions; no delivery run is created"
     emit(result, args)
     return 0
 
 
 def cmd_diagnose(args: argparse.Namespace) -> int:
-    """Run a read-only bug oracle without creating a delivery worktree/run."""
+    """Run a read-only bug oracle without creating a delivery workspace/run."""
 
     repo = require_git_repo(args.repo)
     payload, path = record_diagnosis(repo, args)
@@ -3564,18 +4341,26 @@ def cmd_diagnose(args: argparse.Namespace) -> int:
 def cmd_init(args: argparse.Namespace) -> int:
     repo = require_git_repo(args.repo)
     path = repo / ".megin" / "config.json"
+    ensure_megin_excluded(repo)
     existing = path.exists()
     if existing and not args.force:
         config = load_config(repo, required=True)
         emit({"initialized": False, "already_initialized": True, "config_path": str(path), "config": config}, args)
         return 0
-    base_branch = validate_branch_name(args.base_branch or current_branch(repo))
+    base_branch = validate_branch_name(args.base_branch or default_base_branch(repo))
     commands = list(args.test_command or [])
     for command in commands:
         validate_command_text(command)
     if not commands:
         commands = ["python -m unittest discover"]
     remote = validate_remote_name(args.remote) if args.remote is not None else ("origin" if git_remote(repo, "origin") else None)
+    workspace_mode = args.workspace_mode or "current"
+    finish_mode = args.finish_mode or "unstaged"
+    if workspace_mode not in WORKSPACE_MODES:
+        raise MeginError(f"workspace mode must be one of {', '.join(WORKSPACE_MODES)}")
+    if finish_mode not in FINISH_MODES:
+        raise MeginError(f"finish mode must be one of {', '.join(FINISH_MODES)}")
+    branch_prefix = validate_branch_prefix(args.branch_prefix or "feat")
     config = {
         "schema": CONFIG_SCHEMA,
         "plugin": "megin",
@@ -3583,11 +4368,16 @@ def cmd_init(args: argparse.Namespace) -> int:
         "repo_id": repo_identity(repo),
         "repo_path": str(repo),
         "base_branch": base_branch,
+        "branch_prefix": branch_prefix,
         "test_commands": commands,
         "remote": remote,
         "state_root_policy": "user-state-outside-repository",
         "created_at": now(),
     }
+    if args.workspace_mode is not None:
+        config["workspace_mode"] = workspace_mode
+    if args.finish_mode is not None:
+        config["finish_mode"] = finish_mode
     write_json_atomic(path, config)
     emit({"initialized": True, "config_path": str(path), "config": config, "state_root": str(state_root(config["repo_id"], repo))}, args)
     return 0
@@ -3595,8 +4385,10 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_start(args: argparse.Namespace) -> int:
     repo = require_git_repo(args.repo)
-    config = load_config(repo, required=True)
-    classification = explicit_class(args.request, args.task_class, repo)
+    classification = explicit_class(args.request, args.task_class, repo, getattr(args, "routing_file", None))
+    if classification.get("needs_clarification"):
+        emit({**classification, "request_sha256": digest_text(args.request), "run_created": False, "next_action": "clarify the request intent, scope, or unresolved routing questions"}, args)
+        return 0
     if classification["task_class"] == "read_only":
         emit({**classification, "request_sha256": digest_text(args.request), "run_created": False, "next_action": "report evidence; no delivery run is created"}, args)
         return 0
@@ -3611,23 +4403,44 @@ def cmd_start(args: argparse.Namespace) -> int:
         if assessment.get("disposition") not in ("confirmed", "likely"):
             emit({**classification, "run_created": False, "diagnosis": assessment.get("disposition"), "assessment_path": str(assessment_path), "next_action": "resolve the blocked or partial diagnosis before starting repair"}, args)
             return 0
+    config = load_config(repo, required=True)
+    ensure_megin_excluded(repo)
     work_id = validate_work_id(args.work_id) if args.work_id else make_work_id(args.request)
     path = state_path(repo, work_id)
     state = make_state(repo, work_id, args.request, classification, args, config)
     reserve_state_file(path)
+    binding_lock: Path | None = None
     try:
         materialize_candidate_bundles(state, repo, args)
         refresh_approval_digests(state)
         save_state(state, path)
+        workspace_mode = state.get("approval", {}).get("scope", {}).get("publication", {}).get("workspace_mode")
+        if workspace_mode == "current":
+            workspace_binding_path(repo).parent.mkdir(parents=True, exist_ok=True)
+            binding_lock = acquire_state_lock(workspace_binding_path(repo))
         activate_if_approved(state, repo, args)
         save_state(state, path)
     except Exception:
-        try:
-            path.unlink()
-        except OSError:
-            pass
+        # Activation may have created a branch/worktree before the second
+        # state write.  Preserve that evidence so a later resume can prove and
+        # recover the same Work ID; only remove an unactivated reservation.
+        if state.get("workspace", {}).get("worktree"):
+            try:
+                save_state(state, path)
+            except Exception:
+                pass
+        else:
+            try:
+                path.unlink()
+            except OSError:
+                pass
         raise
-    emit(state_summary(state, path), args)
+    finally:
+        if binding_lock is not None:
+            release_state_lock(binding_lock)
+    result = state_summary(state, path)
+    result["run_created"] = True
+    emit(result, args)
     return 0
 
 
@@ -4227,29 +5040,109 @@ def apply_escalation(state: dict[str, Any], args: argparse.Namespace) -> None:
     append_event(state, "scope_escalated", phase="requirements", status="awaiting_approval")
 
 
+def _process_liveness(pid: int) -> str:
+    """Return alive, dead, or unknown without assuming ownership of a process."""
+
+    if os.name == "nt":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if result.returncode == 0:
+                return "alive" if re.search(rf"(?<!\d){pid}(?!\d)", result.stdout or "") else "dead"
+        except (OSError, subprocess.SubprocessError):
+            return "unknown"
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return "dead"
+    except PermissionError:
+        return "unknown"
+    except OSError as exc:
+        return "dead" if exc.errno == errno.ESRCH else "unknown"
+    return "alive"
+
+
+def inspect_state_lock(lock: Path) -> dict[str, Any]:
+    """Describe a lock without mutating it; used by acquisition and doctor."""
+
+    result: dict[str, Any] = {"path": str(lock), "state": "missing", "pid": None, "created_at": None}
+    if not lock.exists():
+        return result
+    result["state"] = "unknown"
+    try:
+        raw = lock.read_bytes()
+    except OSError as exc:
+        result["detail"] = f"cannot read lock: {exc}"
+        return result
+    result["raw"] = raw
+    payload: dict[str, Any] | None = None
+    try:
+        decoded = json.loads(raw.decode("utf-8"))
+        if isinstance(decoded, dict):
+            payload = decoded
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        payload = None
+    if payload is not None:
+        pid = payload.get("pid")
+        result["created_at"] = payload.get("created_at")
+    else:
+        legacy = raw.decode("ascii", errors="ignore").strip()
+        pid = int(legacy) if legacy.isdigit() else None
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
+        result["detail"] = "lock owner is missing or malformed"
+        return result
+    result["pid"] = pid
+    liveness = _process_liveness(pid)
+    result["state"] = "active" if liveness == "alive" else "stale" if liveness == "dead" else "unknown"
+    if liveness == "unknown":
+        result["detail"] = "lock owner could not be verified"
+    return result
+
+
 def acquire_state_lock(path: Path) -> Path:
-    """Acquire a short-lived cross-process lock for a state mutation."""
+    """Acquire a short-lived cross-process lock, recovering only dead owners."""
 
     lock = Path(str(path) + ".lock")
-    descriptor = -1
-    try:
-        descriptor = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(descriptor, str(os.getpid()).encode("ascii", errors="ignore"))
-        os.close(descriptor)
-    except FileExistsError as exc:
-        raise MeginError(f"state mutation is already in progress: {path.stem}") from exc
-    except Exception:
-        if descriptor >= 0:
-            try:
-                os.close(descriptor)
-            except Exception:
-                pass
+    for _ in range(2):
+        descriptor = -1
         try:
-            os.unlink(lock)
-        except OSError:
-            pass
-        raise
-    return lock
+            descriptor = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            payload = json_bytes({"pid": os.getpid(), "created_at": now()})
+            os.write(descriptor, payload)
+            os.close(descriptor)
+            return lock
+        except FileExistsError as exc:
+            info = inspect_state_lock(lock)
+            if info.get("state") == "stale":
+                try:
+                    if lock.read_bytes() == info.get("raw"):
+                        lock.unlink()
+                        continue
+                except FileNotFoundError:
+                    continue
+                except OSError:
+                    pass
+            raise MeginError(
+                f"state mutation is already in progress: {path.stem} ({info.get('state', 'unknown')} lock)"
+            ) from exc
+        except Exception:
+            if descriptor >= 0:
+                try:
+                    os.close(descriptor)
+                except Exception:
+                    pass
+            try:
+                os.unlink(lock)
+            except OSError:
+                pass
+            raise
+    raise MeginError(f"state mutation is already in progress: {path.stem} (lock race)")
 
 
 def release_state_lock(lock: Path) -> None:
@@ -4268,8 +5161,29 @@ def _cmd_resume_locked(args: argparse.Namespace, repo: Path) -> int:
     apply_approval_inputs(state, args)
     materialize_candidate_bundles(state, repo, args)
     refresh_approval_digests(state)
-    activate_if_approved(state, repo, args)
+    if state.get("assignments") and not assignment_authorizations_current(state):
+        rebind_assignment_authorizations(state, repo)
+    workspace_mode = (
+        state.get("workspace", {}).get("mode")
+        or state.get("approval", {}).get("scope", {}).get("publication", {}).get("workspace_mode")
+    )
+    binding_lock: Path | None = None
+    try:
+        if workspace_mode == "current":
+            workspace_binding_path(repo).parent.mkdir(parents=True, exist_ok=True)
+            binding_lock = acquire_state_lock(workspace_binding_path(repo))
+        activate_if_approved(state, repo, args)
+    finally:
+        if binding_lock is not None:
+            release_state_lock(binding_lock)
     progress_repo = Path(state["workspace"]["worktree"]) if state.get("workspace", {}).get("worktree") else repo
+    if (
+        state.get("workspace", {}).get("mode") == "current"
+        and state.get("workspace", {}).get("base_sha")
+        and not state.get("publication", {}).get("commit_sha")
+        and head_sha(progress_repo) != state["workspace"].get("base_sha")
+    ):
+        raise MeginError("current workspace HEAD changed after approval; stop and inspect the snapshot before writing")
     try:
         apply_progress_flags(state, progress_repo, args)
     except MeginError:
@@ -4406,6 +5320,17 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks.append({"name": "git", "ok": shutil.which("git") is not None})
     checks.append({"name": "gh", "ok": shutil.which("gh") is not None, "optional": True})
     checks.append({"name": "portable_contract", "ok": DELIVERY_SCHEMA_PATH.exists(), "path": str(DELIVERY_SCHEMA_PATH)})
+    binding_lock = Path(str(workspace_binding_path(repo)) + ".lock")
+    binding_info = inspect_state_lock(binding_lock)
+    checks.append({
+        "name": "workspace_binding_lock",
+        "ok": binding_info.get("state") == "missing",
+        "state": binding_info.get("state"),
+        "path": str(binding_lock),
+        "pid": binding_info.get("pid"),
+        "created_at": binding_info.get("created_at"),
+        "detail": binding_info.get("detail"),
+    })
     runs = []
     invalid_runs = []
     try:
@@ -4424,7 +5349,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             state, path = load_state(repo, args.work_id)
             runs = [state_summary(state, path)]
             checks.append({"name": "writer_assignment", "ok": (not state.get("assignments")) or bool(state["assignments"][-1].get("ticket_sha256")), "detail": "one ticketed writer assignment is present"})
-            checks.append({"name": "state_mutation_lock", "ok": not Path(str(path) + ".lock").exists(), "detail": "no stale state mutation lock is present"})
+            lock_info = inspect_state_lock(Path(str(path) + ".lock"))
+            checks.append({
+                "name": "state_mutation_lock",
+                "ok": lock_info.get("state") == "missing",
+                "state": lock_info.get("state"),
+                "path": lock_info.get("path"),
+                "pid": lock_info.get("pid"),
+                "created_at": lock_info.get("created_at"),
+                "detail": lock_info.get("detail") or "no state mutation lock is present",
+            })
             scope = state.get("approval", {}).get("scope", {})
             assignments = state.get("assignments", [])
             approved_paths = scope.get("allowed_paths", [])
@@ -4486,6 +5420,28 @@ def verify_scope(repo: Path, allowed: Sequence[str]) -> list[str]:
     return paths
 
 
+def suggested_commit_message(state: dict[str, Any], repo: Path, paths: Sequence[str]) -> str:
+    """Derive a reviewable commit suggestion from the approved request and diff."""
+
+    title = str(
+        state.get("approval", {}).get("scope", {}).get("publication", {}).get("title")
+        or state.get("task", {}).get("request")
+        or "update project"
+    ).strip().replace("\n", " ")
+    title = re.sub(r"\s+", " ", title)[:100]
+    task_class = state.get("task", {}).get("task_class")
+    prefix = "fix" if task_class == "bug" else "feat"
+    body = [
+        f"{prefix}(megin): {title}",
+        "",
+        f"Work ID: {state.get('work_id')}",
+        f"Changed paths: {', '.join(paths) if paths else 'none'}",
+        "",
+        "Validated by Megin review and the approved verification commands.",
+    ]
+    return "\n".join(body)
+
+
 def recover_commit(state: dict[str, Any], repo: Path) -> bool:
     """Recover a commit made immediately before a process crash.
 
@@ -4532,6 +5488,8 @@ def recover_commit(state: dict[str, Any], repo: Path) -> bool:
 
 
 def finish_publication(state: dict[str, Any], repo: Path, args: argparse.Namespace) -> None:
+    if not getattr(args, "publish", False):
+        return
     publication = state["publication"]
     if publication.get("commit_sha") and head_sha(repo) != publication.get("commit_sha"):
         raise MeginError("saved commit SHA no longer matches the delivery branch; publication is blocked")
@@ -4551,13 +5509,6 @@ def finish_publication(state: dict[str, Any], repo: Path, args: argparse.Namespa
             publication["reason"] = "approved Git remote URL is missing or has changed"
             state["next_action"] = "restore the approved remote destination, then rerun finish --publish"
             return
-    # A configured approved remote is the normal automatic publication target.  The
-    # explicit flag remains useful for retrying a previously pending handoff.
-    if not args.publish and not remote:
-        publication["state"] = "publication_pending"
-        publication["reason"] = "no Git remote is configured"
-        state["next_action"] = "configure an approved remote, then rerun finish --publish"
-        return
     if not remote:
         publication["state"] = "publication_pending"
         publication["reason"] = "no Git remote is configured"
@@ -4648,11 +5599,40 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
     requested_remote = validate_remote_name(getattr(args, "remote", None))
     if requested_remote and requested_remote != state.get("publication", {}).get("remote"):
         raise MeginError("finish remote differs from the approved publication destination; re-approve the scope")
-    if not state.get("workspace", {}).get("worktree"):
-        raise MeginError("finish requires an approved run with a delivery worktree")
-    worktree = Path(state["workspace"]["worktree"]).resolve()
+    workspace = state.get("workspace", {})
+    if not workspace.get("worktree"):
+        raise MeginError("finish requires an approved run with a delivery workspace")
+    worktree = Path(workspace["worktree"]).resolve()
     if not worktree.exists():
-        raise MeginError(f"delivery worktree is missing: {worktree}")
+        raise MeginError(f"delivery workspace is missing: {worktree}")
+    stored_finish_mode = state.get("publication", {}).get("finish_mode")
+    # States created before v0.3 retain their historical commit semantics.  A
+    # new flag must not silently reinterpret an old worktree as an unstaged
+    # delivery; start a new v0.3 run when the destination needs to change.
+    if stored_finish_mode is None:
+        requested_finish_mode = getattr(args, "finish_mode", None)
+        if requested_finish_mode and requested_finish_mode != "commit":
+            raise MeginError("legacy v2 state is bound to commit delivery; start a new run to select another finish mode")
+        finish_mode = "commit"
+    else:
+        finish_mode = stored_finish_mode
+    if getattr(args, "finish_mode", None) and stored_finish_mode and args.finish_mode != stored_finish_mode:
+        raise MeginError("finish mode differs from the approved delivery destination; start a new approved run")
+    if finish_mode not in FINISH_MODES:
+        raise MeginError(f"unsupported finish mode: {finish_mode}")
+    workspace_mode = workspace.get("mode") or ("current" if worktree == repo.resolve() else "worktree")
+    if workspace_mode == "current":
+        if current_branch(worktree) != workspace.get("branch"):
+            raise MeginError("current workspace branch changed after approval; return to the approved feature branch before finishing")
+        if workspace.get("base_sha") and head_sha(worktree) != workspace.get("base_sha") and not state.get("publication", {}).get("commit_sha"):
+            if finish_mode in ("commit", "draft-pr") and recover_commit(state, worktree):
+                publication = state["publication"]
+            else:
+                raise MeginError("current workspace HEAD changed after approval; create a new Work ID or restore the approved snapshot")
+    if finish_mode == "unstaged" and getattr(args, "publish", False):
+        raise MeginError("unstaged finish mode cannot publish; choose commit or draft-pr and approve that delivery mode")
+    if finish_mode == "draft-pr":
+        args.publish = True
     # These flags represent evidence returned by independent sessions.  They never grant
     # write access; they only record the externally obtained verdict before preflight.
     if args.review_approved or args.review_verdict or args.verified or args.knowledge_reviewed or args.knowledge_promoted:
@@ -4736,6 +5716,51 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
             raise MeginError("working tree changed after review outside an approved knowledge handoff")
         knowledge_conflict_pending = True
     publication = state["publication"]
+    if finish_mode == "unstaged" and publication.get("state") == "delivered_unstaged":
+        staged = git(worktree, "diff", "--cached", "--name-only", check=False).strip()
+        if staged:
+            raise MeginError("unstaged delivery changed because the index now contains staged paths")
+        approved_base = state.get("workspace", {}).get("base_sha") or publication.get("base_sha")
+        if approved_base and head_sha(worktree) != approved_base:
+            raise MeginError("unstaged delivery found a HEAD change after delivery; Megin will not rewrite or reset it")
+        current_snapshot = working_tree_snapshot(worktree)
+        if publication.get("delivered_snapshot") != current_snapshot:
+            raise MeginError("working tree changed after unstaged delivery; obtain a fresh review and verification")
+        emit(state_summary(state, path), args)
+        return 0
+    if finish_mode == "unstaged":
+        staged = git(worktree, "diff", "--cached", "--name-only", check=False).strip()
+        if staged:
+            state["status"] = "blocked"
+            state["phase"] = "delivery"
+            state["next_action"] = "unstage the approved changes or choose an explicitly approved commit finish mode"
+            save_state(state, path)
+            raise MeginError("unstaged finish mode found staged changes; Megin will not alter the index")
+        if publication.get("commit_sha"):
+            raise MeginError("unstaged finish mode cannot continue after a commit was created")
+        approved_base = state.get("workspace", {}).get("base_sha") or publication.get("base_sha")
+        if approved_base and head_sha(worktree) != approved_base:
+            state["status"] = "blocked"
+            state["phase"] = "delivery"
+            state["next_action"] = "inspect the external commit and start a new approved delivery or restore the approved base"
+            save_state(state, path)
+            raise MeginError("unstaged delivery found a HEAD change after approval; Megin will not rewrite or reset it")
+        changed_paths = verify_scope(worktree, state["approval"]["scope"].get("allowed_paths", []))
+        if not changed_paths:
+            raise MeginError("finish found no approved changes to deliver")
+        current_snapshot = working_tree_snapshot(worktree)
+        publication["state"] = "delivered_unstaged"
+        publication["changed_paths"] = changed_paths
+        publication["delivered_snapshot"] = current_snapshot
+        publication["suggested_commit"] = suggested_commit_message(state, worktree, changed_paths)
+        publication["reason"] = None
+        state["phase"] = "delivery"
+        state["status"] = "complete"
+        state["next_action"] = "review the unstaged diff and use the suggested commit message when you are ready"
+        append_event(state, "delivered_unstaged", phase="delivery", status="complete", paths=changed_paths)
+        save_state(state, path)
+        emit(state_summary(state, path), args)
+        return 0
     if publication.get("commit_sha"):
         expected = publication.get("post_commit_snapshot")
         if expected and expected != current_snapshot:
@@ -4789,9 +5814,14 @@ def _cmd_finish_locked(args: argparse.Namespace, repo: Path) -> int:
             else None
         )
         append_event(state, "committed", phase="delivery", status="complete")
-    finish_publication(state, worktree, args)
+    if getattr(args, "publish", False):
+        finish_publication(state, worktree, args)
+    else:
+        publication["state"] = "committed"
+        publication["reason"] = None
+        state["next_action"] = "local commit created; use an explicitly authorized --publish retry if publication is required"
     state["phase"] = "delivery"
-    state["status"] = "complete" if state.get("publication", {}).get("state") == "draft_pr_created" else "active"
+    state["status"] = "active" if knowledge_conflict_pending or state.get("publication", {}).get("state") == "publication_pending" else "complete"
     if knowledge_conflict_pending:
         state["next_action"] = "resolve the pending knowledge conflict and rerun the knowledge review"
     save_state(state, path)
@@ -4811,6 +5841,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
 
 def add_output(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--text", action="store_true", help="print a compact key/value report instead of JSON")
+    parser.add_argument("--human", action="store_true", help="print a concise operator-facing summary")
 
 
 def add_repo(parser: argparse.ArgumentParser) -> None:
@@ -4828,6 +5859,10 @@ def add_approval_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--knowledge-path", action="append")
     parser.add_argument("--remote")
     parser.add_argument("--base-branch")
+    parser.add_argument("--workspace-mode", choices=WORKSPACE_MODES, help="use the current checkout or an isolated worktree")
+    parser.add_argument("--finish-mode", choices=FINISH_MODES, help="leave changes unstaged, create a local commit, or publish a draft PR")
+    parser.add_argument("--branch-prefix", help="feature branch prefix for current-directory mode")
+    parser.add_argument("--routing-file", help="validated megin-routing/v1 evidence from read-only exploration")
     parser.add_argument("--writer")
     parser.add_argument("--writer-id")
     parser.add_argument("--writer-ticket")
@@ -4846,6 +5881,7 @@ def build_parser() -> argparse.ArgumentParser:
     classify_parser.add_argument("--request", required=True)
     classify_parser.add_argument("--repo", help="optional target Git repository for read-only exploration")
     classify_parser.add_argument("--task-class", choices=TASK_CLASSES)
+    classify_parser.add_argument("--routing-file")
     add_output(classify_parser)
 
     diagnose_parser = sub.add_parser("diagnose", help="run a read-only bug oracle and save an assessment")
@@ -4867,6 +5903,9 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = sub.add_parser("init", help="opt a target repository into the portable workflow")
     add_repo(init_parser)
     init_parser.add_argument("--base-branch")
+    init_parser.add_argument("--workspace-mode", choices=WORKSPACE_MODES)
+    init_parser.add_argument("--finish-mode", choices=FINISH_MODES)
+    init_parser.add_argument("--branch-prefix")
     init_parser.add_argument("--test-command", action="append")
     init_parser.add_argument("--remote")
     init_parser.add_argument("--force", action="store_true")
@@ -4916,11 +5955,12 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--work-id")
     add_output(doctor_parser)
 
-    finish_parser = sub.add_parser("finish", help="verify, commit, and optionally publish an approved run")
+    finish_parser = sub.add_parser("finish", help="verify and deliver an approved run")
     add_repo(finish_parser)
     finish_parser.add_argument("--work-id")
-    finish_parser.add_argument("--publish", action="store_true", help="push and create or reuse a draft PR")
+    finish_parser.add_argument("--publish", action="store_true", help="explicitly push and create or reuse a draft PR")
     finish_parser.add_argument("--remote")
+    finish_parser.add_argument("--finish-mode", choices=FINISH_MODES)
     finish_parser.add_argument("--review-approved", action="store_true")
     finish_parser.add_argument("--review-verdict", choices=("APPROVED", "CHANGES_REQUIRED", "BLOCKED"))
     finish_parser.add_argument("--finding", action="append")

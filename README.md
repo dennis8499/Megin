@@ -1,12 +1,12 @@
 # Megin Delivery System
 
-這個 repository 同時提供兩條相容路徑：既有的 repository-local Skills 與 `delivery-run/v1`
+這個 repository 同時提供兩條相容路徑（portable plugin 目前目標版本為 **Megin 0.3.0**）：既有的 repository-local Skills 與 `delivery-run/v1`
 治理流程，以及可跨專案安裝的 `megin` plugin 與 `delivery-run/v2` workflow。兩者都把需求探索、
 技術規劃、實作、BUG 分診、Project Knowledge、核准與可追溯 evidence 串成一條可驗證的流程。
 v2 另依任務大小分流，支援受監督的單一 implementation writer、fresh review、automatic
 knowledge review 與 Git finish handoff。
 
-系統的核心原則是：每筆變更都有穩定的 Work ID、隔離的 Git worktree、版本化契約、階段授權與雜湊綁定。README 提供入口與常用操作；各 owner contract 才是行為、資料格式與授權規則的唯一權威。
+系統的核心原則是：每筆變更都有穩定的 Work ID、明確的功能分支、版本化契約、階段授權與雜湊綁定。v2 預設使用目前工作目錄；需要隔離時才建立 Git worktree。README 提供入口與常用操作；各 owner contract 才是行為、資料格式與授權規則的唯一權威。
 
 本文件主要服務：
 
@@ -16,8 +16,9 @@ knowledge review 與 Git finish handoff。
 
 ## Portable `megin` plugin（v2）
 
-這個 v2 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)，
-保留本 repository 原有的 Work ID、來源追溯、核准綁定與 v1 相容性。
+這個 v2 workflow 參考 [obra/superpowers 的基本流程](https://github.com/obra/superpowers#the-basic-workflow)
+與 [brainstorming skill](https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md)：先探索、在有實質取捨時比較方案、再以可驗證工作包執行。
+Megin 另外保留本 repository 原有的 Work ID、來源追溯、核准綁定與 v1 相容性。
 
 要在其他 Git repository 使用 v2，先安裝本 repository 提供的 plugin；安裝不會替任何目標
 repository 初始化設定或寫入程式碼：
@@ -34,17 +35,18 @@ megin doctor --repo .
 megin start --repo . --request "<request>"
 ~~~
 
-`start` 會將請求分類為 `read_only`、`small`、`large` 或 `bug`。read-only 只回報 evidence；
+`start` 先判斷是否真的要求修改，再將請求分類為 `read_only`、`small`、`large` 或 `bug`。read-only 只回報 evidence；
 small 產生短 design brief 並只需一次 integrated approval；large 依序取得 Requirements 與
 Planning approvals；bug 先完成唯讀 diagnosis，再依影響進入 small 或 large。核准前不建立
-產品 worktree／branch。
+產品功能 branch；只有指定 `--workspace-mode worktree` 才建立隔離 worktree。
 
-核准後可由 `status`／`resume` 續跑，完成 review 後使用 `finish`：
+核准後可由 `status`／`resume` 續跑，完成 review 後使用 `finish`。新工作預設保留未暫存修改並提供建議 commit；需要 Git 收尾時才指定 `--finish-mode commit` 或 `--finish-mode draft-pr`：
 
 ~~~console
 megin status --repo . --work-id <work-id>
 megin resume --repo . --work-id <work-id>
 megin finish --repo . --work-id <work-id>
+megin status --repo . --work-id <work-id> --human
 ~~~
 
 若目標 repository 尚留有舊版 `.sdlc/config.json` 或舊 state，可先預覽並執行一次性遷移：
@@ -60,8 +62,8 @@ megin migrate --repo <target-repo> --from-state-root <old-state-root> --to-state
 v2 runtime state、dispatch assignment、review reports、測試 raw outputs 與 publication state
 位於 plugin 管理的 repository 外部持久化 state root；`doctor` 會顯示實際 state path。目標
 repository 不需要這個 repository 的 `.agents/skills` tree。`finish` 只會在核准範圍內完成
-knowledge review、stage／commit；只有已核准 remote 且具備權限時才 push 並建立或重用 draft PR。
-沒有核准目的地時保留 `publication_pending`，設定並核准目的地後再續跑發布。
+knowledge review；預設不 stage／commit，只有明確核准 commit／draft-pr 模式時才 push 並建立或重用 draft PR。
+只有在明確選擇 Git 發布模式但缺少核准目的地時才保留 `publication_pending`；設定並核准目的地後再續跑發布。
 Merge、deployment 與 worktree cleanup 必須另外執行。
 
 完整的分類、核准、升級與相容規則見 [v2 任務分級與核准契約](.agents/skills/delivery-orchestrator/references/v2-task-routing.md)；writer、Reviewer、knowledge 與 finish 見
@@ -115,15 +117,15 @@ request -> read-only classify
   -> read_only: evidence / report
   -> small: short design + one integrated approval
   -> large: Requirements approval + Planning approval
-  -> approved Work ID worktree / branch
+  -> approved Work ID current checkout feature branch (or explicit worktree)
   -> single authorized writer (implementation subagent allowed)
   -> focused + full verification
   -> fresh read-only review
   -> automatic knowledge review
-  -> finish: commit -> optional push -> draft PR
+  -> finish: unstaged diff + commit suggestion (or explicit commit / draft PR)
 ~~~
 
-同一 worktree 同一時間只能有一名 writer，不能平行寫入；Reviewer 使用另一個 fresh、唯讀
+同一 workspace 同一時間只能有一名 writer，不能平行寫入；Reviewer 使用另一個 fresh、唯讀
 session。小任務的 integrated approval、或大型變更的第二次 Planning approval，都會綁定
 驗收、allowed paths、tests、knowledge scope 與 finish destination。scope drift、review
 finding、knowledge conflict 或缺少能力時會停在可觀察的 awaiting／blocked state。
@@ -148,7 +150,7 @@ request
 
 ### BUG 變更
 
-疑似 BUG 在建立 worktree 前先走唯讀 bug-diagnosis。只有 schema-valid 且 verdict 為 confirmed 或 likely 的 assessment，才能進入 bug delivery；診斷本身不會修改 repository、測試、設定或外部狀態。
+疑似 BUG 在建立 workspace 前先走唯讀 bug-diagnosis。只有 schema-valid 且 verdict 為 confirmed 或 likely 的 assessment，才能進入 bug delivery；診斷本身不會修改 repository、測試、設定或外部狀態。
 
 預期行為改變不是 BUG 修復，應回到 Requirements；尚無足夠證據時，保留下一個可否證的 probe，不以猜測開始實作。
 
@@ -166,14 +168,14 @@ request
 work-YYYYMMDD-<topic>-<request-sha256-prefix>
 ~~~
 
-每筆工作都綁定 repository identity、base HEAD、worktree、branch、generation 與 append-only delivery record。不要手動改名、複製或重用另一筆工作的核准資料。
+每筆工作都綁定 repository identity、base HEAD、workspace、branch、generation 與 append-only delivery record。不要手動改名、複製或重用另一筆工作的核准資料。
 
 ### 固定位置
 
 | 資源 | 位置／規則 |
 |---|---|
-| Delivery worktree | primary-parent / repo-name.worktrees / work_id |
-| Branch | delivery/<work_id> |
+| Workspace | 預設為目標 repository 目前目錄；明確選用 `worktree` 時才使用 primary-parent / repo-name.worktrees / work_id |
+| Branch | `feat/<work_id>`（目前目錄模式）；既有 worktree 模式沿用 `delivery/<work_id>` |
 | Requirements | docs/work/<work_id>/requirements.md |
 | Plan bundle | docs/work/<work_id>/plan/ |
 | Implementation evidence | host-temp registry 的 run evidence，並由 repository Outcome 綁定 |
@@ -181,7 +183,7 @@ work-YYYYMMDD-<topic>-<request-sha256-prefix>
 | Disposable test fixture | .knowledge-test-tmp/ |
 | Portable v2 runtime state | plugin 管理的 repository 外部 state root（由 `doctor` 顯示） |
 
-Repository-local v1 Delivery helper 只負責建立／定位 worktree、驗證 identity、授權階段與追加狀態事件；不會替操作者 stage、commit、push、merge、deploy 或 cleanup。Portable v2 的 `finish` 是獨立 Git handoff，只有在 approved scope、fresh review 與 automatic knowledge review 通過後才可 stage／commit，並依 publication state 選擇 push／draft PR。
+Repository-local v1 Delivery helper 只負責建立／定位 worktree、驗證 identity、授權階段與追加狀態事件；不會替操作者 stage、commit、push、merge、deploy 或 cleanup。Portable v2 的 `finish` 是獨立 handoff；預設保留未暫存 diff，只有在 approved scope、fresh review 與 automatic knowledge review 通過且明確選擇 Git 模式後才 stage／commit，並依 publication state 選擇 push／draft PR。
 
 ## 常用唯讀命令
 
@@ -246,6 +248,7 @@ megin start --repo <target-repo> --request "<request>"
 megin status --repo <target-repo> --work-id <work-id>
 megin resume --repo <target-repo> --work-id <work-id>
 megin finish --repo <target-repo> --work-id <work-id>
+megin status --repo <target-repo> --work-id <work-id> --human
 ~~~
 
 Approval and execution results are recorded explicitly. For a small task, bind the allowed
@@ -264,12 +267,13 @@ repair first runs `megin diagnose` with a read-only oracle and falsifiable hypot
 Writer／Reviewer／knowledge completion reports are external, snapshot-bound JSON evidence. The dependency-free self-check is
 `python -X utf8 -B <plugin-root>/scripts/validate.py`.
 
-v2 的 `start` 只在對應 approval 完成後建立 worktree／branch；同一 worktree 同一時間
+v2 的 `start` 只在對應 approval 完成後建立功能 branch（預設在目前 checkout；明示
+`--workspace-mode worktree` 才建立隔離 worktree）；同一 workspace 同一時間
 最多一名 authorized writer，implementation subagent 可以擔任 writer。Fresh Reviewer
 以不同 session 唯讀審查完整 diff 與 evidence。`finish` 通過 approved path、knowledge
-scope 與 snapshot preflight 後建立 commit；有 remote／認證時 push 並建立或重用 draft PR，
-否則保存 `publication_pending`，待目的地核准後供 `resume`／`finish` 重試。merge、deployment、cleanup
-與刪除 worktree 不由 v2 自動執行。
+scope 與 snapshot preflight 後，預設保留未暫存 diff 並提供建議 commit；明確選擇 commit／draft-pr
+模式後才建立 commit、push 並建立或重用 draft PR。merge、deployment、cleanup 與刪除 worktree
+不由 v2 自動執行。
 
 ### Repository-local v1 建立或續接 workspace
 
@@ -281,7 +285,7 @@ python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspac
 python -X utf8 -B .agents/skills/delivery-orchestrator/scripts/delivery_workspace.py start --repo <primary-repo> --work-id <work-id> --request-sha256 <request-sha256> --work-kind bug --bug-id <bug-id>
 ~~~
 
-start 會建立 Git worktree／branch 與 host-temp registry binding。建立前必須通過 strict-clean、base HEAD、destination collision、Git trust 與 repository identity 檢查；失敗時不應自行 reset、clean 或刪除現場。
+start 會建立 Git workspace／branch 與 host-temp registry binding。建立前必須通過 strict-clean、base HEAD、destination collision、Git trust 與 repository identity 檢查；失敗時不應自行 reset、clean 或刪除現場。
 
 ### v1 Phase transition
 
@@ -472,4 +476,4 @@ README 只負責導覽與使用方法。若本文件與 owner contract、schema�
 
 修改 Skills、contracts、schemas、docs 或根目錄指南前，先以對應 stage 執行 Project Knowledge query，並重新讀取引用的 raw source。文件變更至少應通過 quick gate；涉及交付、Schema、Knowledge、跨平台或 workspace 行為時，再執行完整 suite。
 
-Repository-local v1 不提供自動備份還原、跨機遷移、核准流程重設、歷史 record 批次修補或自動發布流程。Portable v2 plugin 提供 scoped `finish` handoff，可自動 commit，並在 remote／credentials 可用時 push 與建立 draft PR；merge、deployment、cleanup 與歷史 record migration 仍不自動執行。
+Repository-local v1 不提供自動備份還原、跨機遷移、核准流程重設、歷史 record 批次修補或自動發布流程。Portable v2 plugin 的 `finish` 預設交付未暫存 diff 與建議 commit；只有明確核准 `commit`／`draft-pr` 模式時才會 commit，並在 remote／credentials 可用時 push 與建立 draft PR。merge、deployment、cleanup 與歷史 record migration 仍不自動執行。

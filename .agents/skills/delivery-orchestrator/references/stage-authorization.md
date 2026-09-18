@@ -27,16 +27,16 @@ Requirements 與 Plan 的人工 Gate、Implementation 的 fresh review，以及 
 
 ## v2 dispatch authorization
 
-v2 在建立產品 worktree 前先完成唯讀 task classification 與核准 payload binding。
+v2 在建立產品 workspace／branch 前先完成唯讀 task classification 與核准 payload binding。
 `read_only` 永遠沒有 writer authorization；`small` 必須有一次 integrated approval；
 `large` 與 bug 修復必須具備對應 Requirements／Planning approval（bug 另需 diagnosis）。
 核准 payload 的 digest 綁定 task class、驗收、allowed paths、commands、knowledge scope
-與 finish destination。
+與 workspace／finish destination。
 
 Implementation dispatch 會產生只能使用一次的 writer assignment。Assignment 必須包含
-`work_id`、state revision、canonical worktree／branch、approved scope、test commands
+`work_id`、state revision、canonical workspace／branch、approved scope、test commands
 與 evidence destination；只有目前 assignment 的 implementation writer 可以寫入產品或
-測試。Writer 可以是受監督 subagent，但同一 worktree 同一時間不得有平行 writers。
+測試。Writer 可以是受監督 subagent，但同一 workspace 同一時間不得有平行 writers。
 Assignment 完成或失敗後，Orchestrator 先保存 create-only result，再重新授權下一步；
 子代理名稱、prompt、branch 或路徑都不能取代 authorization。
 

@@ -27,7 +27,7 @@
 v2 不會把 Ready plan 或 caller prompt 當成寫入權。Controller 先驗證 `delivery-run/v2`
 state 的 repository identity、Work ID、task class、approval digest、allowed paths、
 commands、knowledge scope 與 finish destination，再建立 single-writer assignment。
-Implementation subagent 只有在 assignment current 且同一 worktree 沒有另一個 writer
+Implementation subagent 只有在 assignment current 且同一 workspace 沒有另一個 writer
 時才能寫入；assignments 依 work package DAG 循序完成，不能平行寫入或自行再委派。
 
 小任務使用一次 integrated gate；大型變更在 Requirements 與 Planning 兩個 gate 都通過
@@ -38,9 +38,10 @@ Implementation subagent 只有在 assignment current 且同一 worktree 沒有�
 
 Reviewer 通過後，Controller 依核准 knowledge scope 執行 automatic knowledge review：
 候選、source／lint、pre／post snapshots、review digest 與操作都必須保存；任何衝突或
-scope drift 停在 awaiting／blocked，不自動寫 canonical knowledge。v2 `finish` 再以
-同一 approved scope 完成 stage、commit、可選 push 與 draft PR，保存各 publication
-state；merge、deployment、cleanup 與刪除 worktree 不屬於 finish。
+scope drift 停在 awaiting／blocked，不自動寫 canonical knowledge。v2 `finish` 預設保留
+未暫存 diff 並保存 snapshot／建議 commit；只有核准 `commit`／`draft-pr` mode 才以同一
+approved scope 完成 stage、commit、可選 push 與 draft PR，保存各 publication state；
+merge、deployment、cleanup 與刪除 worktree 不屬於 finish。
 
 v1 的完整 Orchestrated Delivery Gate、host-temp Ledger、兩次人工核准與 terminal
 knowledge promotion gate 仍保持原義；缺少 v2 discriminator 的 record 不套用本節。

@@ -13,20 +13,20 @@ writer 執行；writer 可以是受監督的 implementation subagent，也可以
 
 Dispatch package 必須綁定以下內容：
 
-- `work_id`、state revision、task class 與 exact worktree／branch identity；
+- `work_id`、state revision、task class 與 exact current checkout／worktree／branch identity；
 - 已核准的 design／requirements／plan digest、驗收與來源；
 - 這個 work package 的允許修改路徑、不得修改的路徑與必要 interfaces；
 - focused、related、full verification commands 及報告位置；
 - knowledge scope、finish destination 與回報格式。
 
-Writer 只能在 dispatch package 宣告的範圍內寫入。每個 worktree 同一時間最多
-一名 writer；不得平行啟動兩個會修改相同 repository、worktree 或 state 的 writer。
+Writer 只能在 dispatch package 宣告的範圍內寫入。每個 workspace 同一時間最多
+一名 writer；不得平行啟動兩個會修改相同 repository、workspace 或 state 的 writer。
 新的 writer 必須等待前一份結果以 create-only assignment／result 回寫並由
 Controller 重新授權；writer 不自行再委派工作，也不能以 prompt、branch 名稱、
 檔案路徑或子代理名稱取得寫入權。循序多工作包會保存上一份 assignment 的 baseline
 dirty paths 與每個 baseline path 的內容／mode digest；後續 writer 只能保留這些精確
 bytes，若改動先前 work package 的檔案就會被阻擋。最後的 review 仍涵蓋整個未提交
-worktree。
+workspace。
 
 Writer 回報 `completed`、`needs_revision`、`blocked` 或 `awaiting_upstream`，
 並附 changed paths、測試輸出、疑慮與下一步。Controller 只把符合 dispatch package
@@ -77,15 +77,22 @@ Knowledge promotion gate；v2 不會將舊 Candidate 或 v1 approval 自動升�
 ## 4. Git finish handoff
 
 Finish 只在 implementation review、knowledge review（若有 scope）與完整驗證通過
-後執行。它是 v2 `finish` command 的唯一 Git 出口，且每一步都以 state identity、
-approved path set 與 current snapshot 做 preflight：
+後執行。它是 v2 `finish` command 的唯一交付出口，且每一步都以 state identity、
+approved path set 與 current snapshot 做 preflight。
+
+新工作預設 `finish_mode=unstaged`。此模式完成 preflight、驗證與 knowledge review 後，
+保留目前 feature branch 的修改，不執行 `git add`、commit、push 或 PR；保存 changed
+paths、snapshot 與根據 approved request 產生的建議 commit message。若 index 已有 staged
+內容，或 HEAD 已經改變，finish fail closed，不自動復原使用者操作。
+
+`finish_mode=commit` 或 `finish_mode=draft-pr` 才執行以下 Git handoff：
 
 1. 只 stage approved product、test、文件與已通過 review 的 knowledge paths；
 2. 建立一個可重算的 commit，保存 commit SHA、changed paths 與驗證 evidence；
 3. 若 state 指定 remote 且認證／網路可用，push 目前 delivery branch；
 4. 推送成功後建立或重用該 branch 的 draft pull request，保存 PR identity 與 URL；
-5. 結果分別記為 `local_verified`、`committed`、`pushed`、`draft_pr_created` 或
-   `publication_pending`，不得把較早的狀態誤報為完成。
+5. 結果分別記為 `local_verified`、`delivered_unstaged`、`committed`、`pushed`、
+   `draft_pr_created` 或 `publication_pending`，不得把較早的狀態誤報為完成。
 
 缺少 remote、認證或網路時保留本地 commit 與 state，讓 `resume`／`finish` 只重試
 未完成的發布步驟；若 branch 已有相同 head 的 draft PR，重用它，不建立重複 PR。

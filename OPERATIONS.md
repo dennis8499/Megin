@@ -4,13 +4,13 @@
 
 ## Portable v2 快速操作
 
-先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立 worktree 或寫入產品：
+先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立功能 branch、worktree 或寫入產品：
 
 ```console
 codex plugin install ./plugins/megin
 ```
 
-在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀 task classification：
+在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀 task classification；新工作預設在目前 checkout 建立功能 branch，只有明確指定時才用 worktree：
 
 ```console
 megin init --repo <target-repo>
@@ -23,12 +23,12 @@ megin start --repo <target-repo> --request "<request>"
 | 類型 | 行為 |
 |---|---|
 | `read_only` | 只查證與回報，不建立 run、worktree 或 branch |
-| `small` | 短 design brief，一次 integrated approval，核准後才建立 worktree |
+| `small` | 短 design brief，一次 integrated approval，核准後才建立功能 branch（或明確指定的 worktree） |
 | `large` | Requirements 與 Planning 各一次 approval，第二次核准後自動進 Implementation |
 | `bug` | 先唯讀 diagnosis，再依影響走 small 或 large path |
 
 核准範圍同時綁定驗收、allowed paths、測試命令、knowledge scope 與 finish destination。
-同一 worktree 同一時間最多一名 authorized writer；implementation subagent 可以擔任 writer，
+同一 workspace 同一時間最多一名 authorized writer；implementation subagent 可以擔任 writer，
 但不得平行寫入或自行再委派。Implementation 完成後由不同 fresh、read-only Reviewer 審查；
 blocking finding 回交同一 writer，沿用 bounded fix loop。
 
@@ -53,9 +53,9 @@ megin finish --repo <target-repo> --work-id <work-id>
 BUG 先以 `diagnose` 的唯讀命令與根因假設保存 assessment，再以 `--diagnosis-file` 綁定修復。來源 checkout 可用
 `python -X utf8 -B plugins/megin/scripts/validate.py` 驗證 manifest、技能、schema 與 state。
 
-`finish` 先檢查 approved scope、review snapshot 與 automatic knowledge review，再只 stage／
+`finish` 先檢查 approved scope、review snapshot 與 automatic knowledge review；預設保留未暫存修改，只有核准的 commit／draft-pr 模式才 stage／
 commit 核准 paths；只有已核准 remote／認證可用時才 push 並建立或重用該 branch 的 draft PR。缺少 remote、
-認證或網路時保存 `publication_pending`，設定並核准目的地後再由 `resume`／`finish` 只重試未完成步驟。Merge、
+認證或網路時保存 `publication_pending`；這只適用於明確選用 commit／draft-pr 模式，設定並核准目的地後再由 `resume`／`finish` 只重試未完成步驟。Merge、
 deployment、cleanup 與刪除 worktree 永遠是獨立動作。runtime state、assignments、reports、
 raw outputs 與 publication state 存在 repository 外的持久化 state root；`doctor` 顯示實際路徑。
 

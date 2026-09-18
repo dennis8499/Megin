@@ -218,10 +218,70 @@ class PortableCliTests(unittest.TestCase):
     def test_classification_and_read_only_do_not_create_run(self) -> None:
         output = self.cli("classify", "--request", "請檢視目前流程並提供評估")
         self.assertEqual(output["task_class"], "read_only")
+        output = self.cli("start", "--repo", str(self.repo), "--request", "請檢視目前流程")
+        self.assertFalse(output["run_created"])
         self.cli("init", "--repo", str(self.repo))
         output = self.cli("start", "--repo", str(self.repo), "--request", "請檢視目前流程")
         self.assertFalse(output["run_created"])
+
+    def test_natural_language_routing_separates_explanations_from_repairs(self) -> None:
+        self.assertEqual(ENGINE.classify("請解釋 error handling 的設計")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("請檢查 API 文件，不要修改")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("請檢查 API 文件，不修改")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("請提供改善建議與計畫書")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("check API docs with no change")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("review unchanged API docs")["task_class"], "read_only")
+        self.assertEqual(ENGINE.classify("provide an improvement plan")["task_class"], "read_only")
+        self.assertTrue(ENGINE.classify("請檢查並修改 README")["needs_clarification"])
+        self.assertTrue(ENGINE.classify("check and modify README")["needs_clarification"])
+        self.assertEqual(ENGINE.classify("修復 login failure")["task_class"], "bug")
+        self.assertEqual(ENGINE.classify("fix the error in login")["task_class"], "bug")
+        self.assertEqual(ENGINE.classify("修改 README 的 API 說明")["task_class"], "small")
         self.assertEqual(list((self.root / "state").rglob("*.json")), [])
+
+    def test_routing_evidence_is_bound_to_request_repository_and_head(self) -> None:
+        request = "修改 README 文字"
+        evidence = self.root / "routing.json"
+        evidence.write_text(json.dumps({
+            "schema": "megin-routing/v1",
+            "request_sha256": ENGINE.digest_text(request),
+            "repo_id": ENGINE.repo_identity(self.repo),
+            "head_sha": ENGINE.head_sha(self.repo),
+            "intent": "mutate",
+            "task_class": "small",
+            "sources": ["README.md"],
+            "risks": [],
+            "open_questions": [],
+        }, ensure_ascii=False), encoding="utf-8")
+        result = ENGINE.classify(request, self.repo, str(evidence))
+        self.assertEqual(result["task_class"], "small")
+        self.assertEqual(result["routing_evidence"]["head_sha"], ENGINE.head_sha(self.repo))
+        evidence.write_text(evidence.read_text(encoding="utf-8").replace(ENGINE.head_sha(self.repo), "0" * 40), encoding="utf-8")
+        with self.assertRaises(ENGINE.MeginError):
+            ENGINE.classify(request, self.repo, str(evidence))
+
+    def test_routing_reload_uses_the_raw_request_digest(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        request = "修改 README，password=secret"
+        evidence = self.root / "routing-secret.json"
+        evidence.write_text(json.dumps({
+            "schema": "megin-routing/v1",
+            "request_sha256": ENGINE.digest_text(request),
+            "repo_id": ENGINE.repo_identity(self.repo),
+            "head_sha": ENGINE.head_sha(self.repo),
+            "intent": "mutate",
+            "task_class": "small",
+            "sources": ["README.md"],
+            "risks": [],
+            "open_questions": [],
+        }, ensure_ascii=False), encoding="utf-8")
+        started = self.cli(
+            "start", "--repo", str(self.repo), "--request", request,
+            "--work-id", "work-routing-secret", "--allowed-path", "README.md",
+            "--routing-file", str(evidence), "--approve",
+        )
+        self.assertEqual(started["status"], "active")
+        self.assertEqual(self.cli("status", "--repo", str(self.repo), "--work-id", "work-routing-secret")["work_id"], "work-routing-secret")
 
     def test_small_task_requires_one_approval_then_creates_worktree(self) -> None:
         self.cli("init", "--repo", str(self.repo), "--test-command", "python -c 'print(1)'")
@@ -233,6 +293,91 @@ class PortableCliTests(unittest.TestCase):
         self.assertTrue(Path(active["worktree"]).exists())
         self.assertEqual(active["current"]["writer"], "implementation-writer")
 
+    def test_natural_language_start_defaults_to_current_unstaged_workspace(self) -> None:
+        self.cli("init", "--repo", str(self.repo), "--test-command", "python -c 'print(1)'")
+        active = self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字", "--work-id", "work-current",
+            "--allowed-path", "README.md", "--approve",
+        )
+        self.assertEqual(active["workspace_mode"], "current")
+        self.assertEqual(active["finish_mode"], "unstaged")
+        self.assertEqual(Path(active["worktree"]).resolve(), self.repo.resolve())
+        self.assertEqual(active["branch"], "feat/work-current")
+        state = json.loads(Path(active["state_path"]).read_text(encoding="utf-8"))
+        approved_base = self.git("rev-parse", "main").strip()
+        self.assertEqual(state["approval"]["scope"]["publication"]["base_sha"], approved_base)
+        self.assertIn(f"Base SHA: {approved_base}", Path(state["candidates"]["design"]["path"]).read_text(encoding="utf-8"))
+
+    def test_unstaged_finish_preserves_head_and_index(self) -> None:
+        self.cli("init", "--repo", str(self.repo), "--test-command", "python -c 'print(1)'")
+        self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字", "--work-id", "work-unstaged",
+            "--allowed-path", "README.md", "--approve",
+        )
+        (self.repo / "README.md").write_text("changed\n", encoding="utf-8")
+        self.writer_complete("work-unstaged")
+        self.review("work-unstaged", reviewer="fresh-unstaged")
+        delivered = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-unstaged")
+        self.assertEqual(delivered["publication"], "delivered_unstaged")
+        self.assertEqual(delivered["finish_mode"], "unstaged")
+        self.assertIsNone(delivered["commit"])
+        self.assertEqual(self.git("rev-list", "--count", "HEAD").strip(), "1")
+        self.assertEqual(self.git("diff", "--cached", "--name-only").strip(), "")
+        self.assertIn("README.md", self.git("status", "--short"))
+
+    def test_current_workspace_refuses_dirty_start_without_switching_branch(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        (self.repo / "keep.txt").write_text("keep\n", encoding="utf-8")
+        result = self.cli_raw(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字", "--work-id", "work-dirty",
+            "--allowed-path", "README.md", "--approve",
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("clean", result.stderr)
+        self.assertEqual(self.git("branch", "--show-current").strip(), "main")
+        self.assertFalse((self.root / "state").joinpath(ENGINE.repo_identity(self.repo), "work-dirty.json").exists())
+
+    def test_isolated_worktree_allows_unrelated_source_changes(self) -> None:
+        self.cli("init", "--repo", str(self.repo), "--workspace-mode", "worktree")
+        (self.repo / "keep.txt").write_text("source work in progress\n", encoding="utf-8")
+        active = self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字",
+            "--work-id", "work-dirty-worktree", "--allowed-path", "README.md", "--approve",
+        )
+        self.assertEqual(active["workspace_mode"], "worktree")
+        self.assertNotEqual(Path(active["worktree"]).resolve(), self.repo.resolve())
+        self.assertEqual((self.repo / "keep.txt").read_text(encoding="utf-8"), "source work in progress\n")
+
+    def test_existing_init_repairs_the_local_megin_exclude(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        exclude_path = Path(self.git("rev-parse", "--git-path", "info/exclude").strip())
+        if not exclude_path.is_absolute():
+            exclude_path = self.repo / exclude_path
+        exclude_path.write_text(
+            "\n".join(line for line in exclude_path.read_text(encoding="utf-8").splitlines() if line.strip() not in (".megin", ".megin/")) + "\n",
+            encoding="utf-8",
+        )
+        self.assertIn(".megin", self.git("status", "--short"))
+        self.cli("init", "--repo", str(self.repo))
+        self.assertIn(".megin/", exclude_path.read_text(encoding="utf-8"))
+        self.assertNotIn(".megin", self.git("status", "--short"))
+
+    def test_current_workspace_allows_only_one_active_writer(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        active = self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字", "--work-id", "work-one",
+            "--allowed-path", "README.md", "--approve",
+        )
+        self.assertEqual(active["workspace_mode"], "current")
+        competing = self.cli_raw(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字", "--work-id", "work-two",
+            "--allowed-path", "README.md", "--approve",
+        )
+        self.assertEqual(competing.returncode, 2)
+        self.assertIn("already bound", competing.stderr)
+        self.assertEqual(self.git("branch", "--show-current").strip(), "feat/work-one")
+        self.assertFalse((self.root / "state").joinpath(ENGINE.repo_identity(self.repo), "work-two.json").exists())
+
     def test_finish_only_commits_approved_paths_and_is_resumable(self) -> None:
         self.cli("init", "--repo", str(self.repo), "--test-command", "python -c 'print(1)'")
         self.cli("start", "--repo", str(self.repo), "--request", "修正 README 文字", "--work-id", "work-finish", "--task-class", "small", "--approve", "--allowed-path", "README.md")
@@ -242,8 +387,8 @@ class PortableCliTests(unittest.TestCase):
         self.writer_complete("work-finish")
         self.review("work-finish", reviewer="fresh-1")
         result = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-finish")
-        self.assertEqual(result["publication"], "publication_pending")
-        self.assertEqual(result["status"], "active")
+        self.assertEqual(result["publication"], "committed")
+        self.assertEqual(result["status"], "complete")
         validation = subprocess.run([sys.executable, str(SCRIPT.parent / "validate.py"), "--state", result["state_path"]], env=self.env, text=True, encoding="utf-8", capture_output=True)
         self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
         commit_count = self.git("rev-list", "--count", "HEAD", cwd=worktree).strip()
@@ -251,6 +396,66 @@ class PortableCliTests(unittest.TestCase):
         again = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-finish")
         self.assertEqual(again["commit"], result["commit"])
         self.assertEqual(self.git("rev-list", "--count", "HEAD", cwd=worktree).strip(), "2")
+
+    def test_commit_mode_never_pushes_without_explicit_publish(self) -> None:
+        remote = self.root / "remote.git"
+        self.git("init", "--bare", str(remote), cwd=self.root)
+        self.git("remote", "add", "origin", str(remote))
+        self.cli("init", "--repo", str(self.repo), "--finish-mode", "commit", "--test-command", "python -c 'print(1)'")
+        self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字",
+            "--work-id", "work-commit-local", "--allowed-path", "README.md", "--approve",
+        )
+        worktree = Path(self.cli("status", "--repo", str(self.repo), "--work-id", "work-commit-local")["worktree"])
+        (worktree / "README.md").write_text("local commit only\n", encoding="utf-8")
+        self.writer_complete("work-commit-local")
+        self.review("work-commit-local", reviewer="commit-reviewer")
+        result = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-commit-local")
+        self.assertEqual(result["publication"], "committed")
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(self.git("ls-remote", str(remote), "refs/heads/feat/work-commit-local", cwd=self.root).strip(), "")
+
+    def test_draft_pr_without_remote_preserves_publication_pending(self) -> None:
+        self.cli("init", "--repo", str(self.repo), "--finish-mode", "draft-pr", "--test-command", "python -c 'print(1)'")
+        self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字",
+            "--work-id", "work-draft-pending", "--allowed-path", "README.md", "--approve",
+        )
+        worktree = Path(self.cli("status", "--repo", str(self.repo), "--work-id", "work-draft-pending")["worktree"])
+        (worktree / "README.md").write_text("draft pending\n", encoding="utf-8")
+        self.writer_complete("work-draft-pending")
+        self.review("work-draft-pending", reviewer="draft-reviewer")
+        result = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-draft-pending")
+        self.assertEqual(result["publication"], "publication_pending")
+        self.assertEqual(result["status"], "active")
+        self.assertTrue(result["commit"])
+
+    def test_unstaged_delivery_can_rebind_to_local_commit(self) -> None:
+        self.cli("init", "--repo", str(self.repo), "--finish-mode", "unstaged", "--test-command", "python -c 'print(1)'")
+        self.cli(
+            "start", "--repo", str(self.repo), "--request", "修改 README 文字",
+            "--work-id", "work-rebind", "--allowed-path", "README.md", "--approve",
+        )
+        (self.repo / "README.md").write_text("rebound delivery\n", encoding="utf-8")
+        self.writer_complete("work-rebind")
+        self.review("work-rebind", reviewer="unstaged-reviewer")
+        delivered = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-rebind")
+        self.assertEqual(delivered["publication"], "delivered_unstaged")
+
+        rebound = self.cli("resume", "--repo", str(self.repo), "--work-id", "work-rebind", "--finish-mode", "commit")
+        self.assertEqual(rebound["publication"], "not_ready")
+        self.assertIsNone(rebound["review"])
+        self.assertEqual(rebound["status"], "awaiting_approval")
+        approved = self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", "work-rebind",
+            "--finish-mode", "commit", "--approve", "--approval-ref", "user:rebind",
+        )
+        self.assertEqual(approved["phase"], "implementation")
+        self.assertEqual(approved["next_action"], "obtain a fresh independent review")
+        self.review("work-rebind", reviewer="rebound-reviewer")
+        finished = self.cli("finish", "--repo", str(self.repo), "--work-id", "work-rebind")
+        self.assertEqual(finished["publication"], "committed")
+        self.assertEqual(finished["status"], "complete")
 
     def test_large_requires_requirements_and_plan(self) -> None:
         self.cli("init", "--repo", str(self.repo))
@@ -715,7 +920,7 @@ class PortableCliTests(unittest.TestCase):
         self.assertIn("README.md", json.loads(Path(finished["state_path"]).read_text(encoding="utf-8"))["knowledge"]["conflicts"][0])
         resumed = self.cli("status", "--repo", str(self.repo), "--work-id", "work-knowledge-conflict")
         self.assertEqual(resumed["status"], "active")
-        self.assertEqual(resumed["publication"], "publication_pending")
+        self.assertEqual(resumed["publication"], "committed")
 
     def test_migrate_dry_run_is_non_mutating_and_reports_manifest(self) -> None:
         self.cli("init", "--repo", str(self.repo))
@@ -760,7 +965,7 @@ class PortableCliTests(unittest.TestCase):
         migrated_path = Path(migrated["state_path"])
         state = json.loads(migrated_path.read_text(encoding="utf-8"))
         self.assertEqual(state["plugin"], "megin")
-        self.assertEqual(state["plugin_version"], "0.2.0")
+        self.assertEqual(state["plugin_version"], ENGINE.PLUGIN_VERSION)
         candidate = state["candidates"]["design"]
         candidate_path = Path(candidate["path"])
         self.assertTrue(str(candidate_path).startswith(str(target_root.resolve())))
@@ -897,6 +1102,31 @@ class PortableCliTests(unittest.TestCase):
         self.assertIn("malformed", json.loads(malformed.stdout)["conflicts"][0])
         self.assertTrue((self.repo / MIGRATION_LEGACY_ALLOWLIST["config_dir"]).exists())
         self.assertFalse((self.repo / ".megin").exists())
+
+    def test_lock_recovery_and_doctor_report_owner_state(self) -> None:
+        self.cli("init", "--repo", str(self.repo))
+        target = self.root / "lock-target"
+        lock = Path(str(target) + ".lock")
+        finished = subprocess.Popen([sys.executable, "-c", "pass"])
+        dead_pid = finished.pid
+        finished.wait(timeout=30)
+        lock.write_text(json.dumps({"pid": dead_pid, "created_at": "2026-01-01T00:00:00Z"}), encoding="utf-8")
+        self.assertEqual(ENGINE.inspect_state_lock(lock)["state"], "stale")
+        acquired = ENGINE.acquire_state_lock(target)
+        try:
+            self.assertEqual(json.loads(lock.read_text(encoding="utf-8"))["pid"], os.getpid())
+        finally:
+            ENGINE.release_state_lock(acquired)
+
+        binding = ENGINE.workspace_binding_path(self.repo)
+        binding.parent.mkdir(parents=True, exist_ok=True)
+        binding_lock = Path(str(binding) + ".lock")
+        binding_lock.write_text("active\n", encoding="utf-8")
+        doctor = self.cli_raw("doctor", "--repo", str(self.repo))
+        self.assertEqual(doctor.returncode, 1)
+        checks = json.loads(doctor.stdout)["checks"]
+        binding_check = next(item for item in checks if item["name"] == "workspace_binding_lock")
+        self.assertEqual(binding_check["state"], "unknown")
 
     def test_migrate_rejects_redirected_state_inputs(self) -> None:
         source_root, target_root, state_path = self.prepare_legacy_run()

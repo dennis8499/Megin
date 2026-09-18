@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Implement an approved change with an outside-in behavior red-green-refactor loop, focused evidence, and regression coverage for defects.
+description: Implement an approved Megin v2 change with an outside-in behavior red-green-refactor loop, focused evidence, and regression coverage for defects.
 ---
 
 # Test-Driven Development
@@ -22,7 +22,7 @@ Do not skip the red step merely because the change looks small. A small task may
 
 ## Boundaries and evidence
 
-The authorized writer is the only process that edits the worktree. Change only the product, test, and explicitly test-only configuration paths listed in the approved plan. If implementation needs an unlisted interface, dependency, migration, permission, or data change, stop and return to planning.
+The authorized writer is the only process that edits the workspace. Change only the product, test, and explicitly test-only configuration paths listed in the approved plan. If implementation needs an unlisted interface, dependency, migration, permission, or data change, stop and return to planning.
 
 Every evidence record must identify the work item, source/test snapshot, command, timestamp, exit status, and output location. Re-run affected obligations whenever code, configuration, dependencies, or test inputs change. Never cite an earlier green result for a different snapshot.
 

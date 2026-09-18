@@ -1,6 +1,6 @@
 {
   "name": "megin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Portable, evidence-driven Megin workflow for classifying, implementing, reviewing, verifying, and delivering repository changes.",
   "author": {
     "name": "Megin Contributors"
@@ -25,9 +25,9 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Classify this change and route the right Megin workflow.",
+      "Describe what you want to build and let Megin guide the design.",
       "Implement this approved plan with TDD and a fresh review.",
-      "Verify the change and prepare a draft pull request."
+      "Verify the change and leave an unstaged feature branch with a suggested commit."
     ]
   }
 }

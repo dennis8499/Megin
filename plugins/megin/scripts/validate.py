@@ -9,9 +9,9 @@ import sys
 from pathlib import Path
 
 try:
-    from megin import SCHEMA, PLUGIN_VERSION, compatible_plugin_version, approved_verification_commands, assignment_digest_payload, assignment_ticket_payload, allowed_path, candidate_payload, digest_bytes, digest_json, normalize_paths, read_json, state_root, validate_work_id, _candidate_summary, validate_candidate_bundles, validate_knowledge_record, verification_payload, validate_delivery_schema, load_diagnosis_assessment, _report_commands_passed, _report_commands_cover, _review_evidence_item_valid
+    from megin import SCHEMA, PLUGIN_VERSION, compatible_plugin_version, approved_verification_commands, assignment_digest_payload, assignment_ticket_payload, allowed_path, candidate_payload, digest_bytes, digest_json, normalize_paths, read_json, state_root, validate_work_id, _candidate_summary, validate_candidate_bundles, validate_knowledge_record, verification_payload, validate_delivery_schema, load_diagnosis_assessment, load_routing_evidence, _report_commands_passed, _report_commands_cover, _review_evidence_item_valid
 except ImportError:  # pragma: no cover - supports `python -m plugins.megin.scripts.validate`
-    from .megin import SCHEMA, PLUGIN_VERSION, compatible_plugin_version, approved_verification_commands, assignment_digest_payload, assignment_ticket_payload, allowed_path, candidate_payload, digest_bytes, digest_json, normalize_paths, read_json, state_root, validate_work_id, _candidate_summary, validate_candidate_bundles, validate_knowledge_record, verification_payload, validate_delivery_schema, load_diagnosis_assessment, _report_commands_passed, _report_commands_cover, _review_evidence_item_valid
+    from .megin import SCHEMA, PLUGIN_VERSION, compatible_plugin_version, approved_verification_commands, assignment_digest_payload, assignment_ticket_payload, allowed_path, candidate_payload, digest_bytes, digest_json, normalize_paths, read_json, state_root, validate_work_id, _candidate_summary, validate_candidate_bundles, validate_knowledge_record, verification_payload, validate_delivery_schema, load_diagnosis_assessment, load_routing_evidence, _report_commands_passed, _report_commands_cover, _review_evidence_item_valid
 
 
 def validate_plugin(root: Path) -> list[str]:
@@ -50,6 +50,7 @@ def validate_plugin(root: Path) -> list[str]:
         "knowledge-candidate-v2.schema.json", "bug-diagnosis-v1.schema.json",
         "megin-writer-report-v1.schema.json", "megin-review-report-v1.schema.json",
         "megin-knowledge-review-v1.schema.json", "megin-migration-v1.schema.json",
+        "megin-routing-v1.schema.json",
     ):
         schema_path = root / "schemas" / schema_name
         try:
@@ -110,6 +111,20 @@ def validate_state(path: Path) -> list[str]:
         normalize_paths(scope.get("knowledge_scope", []))
         if any(not allowed_path(item, scope.get("allowed_paths", [])) for item in scope.get("knowledge_scope", [])):
             errors.append("knowledge scope is outside the approved write scope")
+        scope_publication = scope.get("publication", {})
+        publication = state.get("publication", {})
+        approved_base_sha = scope_publication.get("base_sha")
+        if approved_base_sha and publication.get("base_sha") not in (None, approved_base_sha):
+            errors.append("publication base SHA does not match the approved scope")
+        mode = publication.get("finish_mode") or scope_publication.get("finish_mode")
+        if mode == "unstaged" and publication.get("commit_sha"):
+            errors.append("unstaged publication cannot contain a commit SHA")
+        if publication.get("state") == "delivered_unstaged" and mode != "unstaged":
+            errors.append("delivered_unstaged state requires finish_mode=unstaged")
+        workspace = state.get("workspace", {})
+        if workspace.get("mode") == "current" and workspace.get("worktree"):
+            if Path(workspace["worktree"]).expanduser().resolve() != Path(state["repo"]["path"]).expanduser().resolve():
+                errors.append("current workspace path does not match repository path")
     except Exception as exc:
         errors.append(f"invalid approved path scope: {exc}")
     if state.get("task", {}).get("task_class") == "bug":
@@ -127,6 +142,21 @@ def validate_state(path: Path) -> list[str]:
                 errors.append("diagnosis disposition does not match state")
         except Exception as exc:
             errors.append(f"diagnosis assessment is invalid: {exc}")
+    routing_record = (state.get("task", {}).get("classification") or {}).get("routing_evidence")
+    if routing_record:
+        try:
+            checked_routing = load_routing_evidence(
+                routing_record.get("path", ""),
+                state.get("task", {}).get("request", ""),
+                Path(state["repo"]["path"]),
+                verify_head=False,
+            )
+            if checked_routing.get("sha256") != routing_record.get("sha256"):
+                errors.append("routing evidence digest does not match state")
+            if routing_record.get("head_sha") and checked_routing.get("head_sha") != routing_record.get("head_sha"):
+                errors.append("routing evidence source changed")
+        except Exception as exc:
+            errors.append(f"routing evidence is invalid: {exc}")
     try:
         validate_candidate_bundles(state)
     except Exception as exc:

@@ -8,14 +8,14 @@
 
 `megin start` 或 Delivery Orchestrator 先對請求做唯讀探索與分類。分類只依影響
 範圍與不確定性，不依修改行數。分類結果、理由、輸入 digest 與建議流程要寫入
-v2 state，供 `doctor`、`status` 與 `resume` 重算；分類前不建立產品 worktree、
+v2 state，供 `doctor`、`status` 與 `resume` 重算；分類前不建立產品 workspace、
 branch 或 repository artifact。
 
 | `task_class` | 判定 | 流程與寫入邊界 |
 |---|---|---|
 | `read_only` | 解說、評估、診斷或審查，不要求改變產品 | 只查證與回報；不建立 delivery run、worktree 或 branch |
-| `small` | 既有流程內的單一明確成果；驗收可直接表達；沒有跨模組契約、資料遷移、權限、依賴或架構變更 | 保存一份精簡 design brief；一次 integrated human approval 後才建立 worktree 並執行 |
-| `large` | 新子系統、架構／介面／資料契約、依賴、權限或跨模組行為變更，或無法證明符合 `small` | Requirements gate 與 Planning gate 分開；第二次核准後才建立 worktree 並自動進 Implementation |
+| `small` | 既有流程內的單一明確成果；驗收可直接表達；沒有跨模組契約、資料遷移、權限、依賴或架構變更 | 保存一份精簡 design brief；一次 integrated human approval 後才建立核准 workspace 並執行 |
+| `large` | 新子系統、架構／介面／資料契約、依賴、權限或跨模組行為變更，或無法證明符合 `small` | Requirements gate 與 Planning gate 分開；第二次核准後才建立核准 workspace 並自動進 Implementation |
 | `bug` | 使用者描述的是既有行為的疑似錯誤 | 先走唯讀 bug diagnosis；只有 `confirmed`／`likely` 才依修復影響升級為 `small` 或 `large` bug run |
 
 純格式及微小文字修改可沿用既有直接處理例外，但一旦改變產品行為或契約，
@@ -31,6 +31,11 @@ v2 state 保存 `task_class` 與與它相符的 `approval_policy`。使用者核
 唯一的 design／requirements／plan bundle、驗收、允許修改範圍、test commands、
 knowledge scope 與 Git finish destination；state 以 digest 綁定該 payload，
 不要求使用者手動複製雜湊值。
+
+新的 v2 工作預設使用目前 checkout：核准 bundle 同時綁定解析出的主分支（`main`、
+`master` 或 repository 的明示 default）、base SHA、`feat/<work-id>` branch、
+`workspace_mode=current` 與 `finish_mode=unstaged`。需要隔離或 Git 發布時，必須在
+核准前明示 `workspace_mode=worktree` 或 `finish_mode=commit|draft-pr`。
 
 - `read_only`：沒有 approval，也沒有 mutation。
 - `small`：一份短 design brief 同時包含目標、in/out、驗收、修改位置、步驟、
@@ -54,8 +59,9 @@ state 位於使用者狀態區，依 repository identity 與 Work ID 隔離；�
 只保存核准後的需求／計畫、Outcome 與必要的知識變更。
 
 核准前的探索與候選 bundle 可以保存於該狀態區，但必須是唯讀／create-only，
-不能成為產品或 Git diff。核准後才建立 Work ID 專用 worktree 與 branch，並以
-state 的 exact identity 執行後續命令。
+不能成為產品或 Git diff。核准後預設在目前 checkout 從核准的 base branch 建立
+`feat/<work-id>`；只有明示 `workspace_mode=worktree` 才建立 Work ID 專用 worktree。
+後續命令都以 state 的 exact workspace identity 執行。
 
 每次狀態回報至少包含：`work_id`、`task_class`、phase／status、已完成工作、
 目前 writer／reviewer、下一個 action、knowledge state、publication state 及

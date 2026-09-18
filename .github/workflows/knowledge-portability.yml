@@ -45,6 +45,7 @@ jobs:
         run: |
           python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
           python -X utf8 -B plugins/megin/scripts/megin.py --help
+          python -X utf8 -B plugins/megin/scripts/validate.py
           python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
       - uses: actions/upload-artifact@v4
         if: always()
@@ -102,6 +103,7 @@ jobs:
         shell: bash
         run: |
           python -X utf8 -B plugins/megin/scripts/megin.py --help
+          python -X utf8 -B plugins/megin/scripts/validate.py
           python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
       - name: Benchmark cold and warm queries with portability oracle
         shell: bash

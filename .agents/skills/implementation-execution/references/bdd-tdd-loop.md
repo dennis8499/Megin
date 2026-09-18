@@ -2,7 +2,7 @@
 
 # Outside-in BDD 與內層 TDD 執行契約
 
-本文件是行為 slice 執行與 finding 修正的唯一權威，只在 Preflight 通過後讀取。v1 的主代理是唯一 writer，依 `WP-*` DAG 穩定拓撲序逐包執行；同一 frontier 依 Ready plan 順序、再依 WP ID 排序。v1 的 Implementer subagent 不取得寫入責任。v2 可由 current dispatch authorization 指派一名 implementation subagent writer，但同一 worktree 不得平行 writers；assignment、allowed paths 與 test commands 必須先綁定 state。
+本文件是行為 slice 執行與 finding 修正的唯一權威，只在 Preflight 通過後讀取。v1 的主代理是唯一 writer，依 `WP-*` DAG 穩定拓撲序逐包執行；同一 frontier 依 Ready plan 順序、再依 WP ID 排序。v1 的 Implementer subagent 不取得寫入責任。v2 可由 current dispatch authorization 指派一名 implementation subagent writer，但同一 workspace 不得平行 writers；assignment、allowed paths 與 test commands 必須先綁定 state。
 
 ## 1. 建立可執行 BDD 邊界
 

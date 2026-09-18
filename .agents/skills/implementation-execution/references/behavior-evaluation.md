@@ -106,7 +106,7 @@ fixture 放入可唯一辨識的假秘密、未忽略新檔、Ready artifacts、
 | `V2-EXEC-002` | 一名 implementation subagent writer、第二個競爭 writer、越界 path | current assignment writer 可寫；平行或越界 writer 被拒絕並保存 state evidence |
 | `V2-EXEC-003` | writer 完成後兩個 Reviewer session | Reviewer fresh、read-only、不同 session 且不讀 implementation conversation；blocking finding 回交 writer 並啟動 bounded fresh round |
 | `V2-EXEC-004` | approved knowledge scope 與 scope drift／lint conflict | scope 內由 automatic knowledge review 處理；drift／conflict 停在 awaiting／blocked，不寫 canonical knowledge |
-| `V2-EXEC-005` | local-only、remote、既有 draft PR、push failure | finish 只 stage approved paths，commit 可重算；可用 remote 時 push 並重用／建立 draft PR；失敗可續跑且不重複 commit／PR |
+| `V2-EXEC-005` | 預設 unstaged、明示 commit／draft-pr、既有 draft PR、push failure | 預設 finish 不 stage／commit／push 並保存 snapshot／建議 commit；明示 commit／draft-pr 才 stage approved paths，commit 可重算；可用 remote 時 push 並重用／建立 draft PR；失敗可續跑且不重複 commit／PR |
 
 v2 evaluator 必須把 writer assignment、review report、knowledge review、commit／PR
 identity 與 publication state 綁回同一 repository／Work ID。不能以主代理宣稱、摘要或

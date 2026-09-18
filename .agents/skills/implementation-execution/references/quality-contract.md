@@ -9,7 +9,7 @@
 | 檢查 | Pass |
 |---|---|
 | Ready contract | schema、approval／digest、artifacts／sources hashes、contracts／commands／DAG／impact 與 base binding 全部成立 |
-| Workspace | fresh Reviewer capability、linked non-primary worktree、branch、dirty-state、tools 與 side-effect probes 全部成立；若使用 orchestrated requirements 例外，`delivery-run/v1`、Work ID、generation、核准 evidence、path／SHA 與 handoff `kind: spec` binding 全部相同 |
+| Workspace | v1 要求 fresh Reviewer capability、linked non-primary worktree、branch、dirty-state、tools 與 side-effect probes；portable v2 要求核准的 current checkout 或 worktree、branch、single-writer lock、dirty-state、tools 與 side-effect probes；若使用 orchestrated requirements 例外，`delivery-run/v1`、Work ID、generation、核准 evidence、path／SHA 與 handoff `kind: spec` binding 全部相同 |
 | Ledger identity | host-temp root、repo／worktree／run IDs、atomic binding 與 resume lookup 全部可重算；競爭者沒有 record |
 | Baseline | 每個適用 Observed command fresh 通過 success／completeness，failure／skipped 為零；Proposed absence evidence 有效 |
 | Zero-write gate | 產品、測試、dependencies、Ready、orchestrated requirements、秘密與外部狀態 hashes 不變 |
@@ -48,11 +48,11 @@
 v2 在上述檢查前再確認 task classification 與 gate policy：`read_only` 不得 mutation；
 `small` 必須有一次 integrated approval；`large`／bug 必須有相符的 Requirements、
 Planning／diagnosis evidence。Implementation 只能由一名 current assignment writer
-寫入，subagent 可以擔任 writer，但同一 worktree 不得平行 writers；fresh Reviewer
+寫入，subagent 可以擔任 writer，但同一 workspace 不得平行 writers；fresh Reviewer
 必須是不同 read-only session。
 
 v2 的 completion 還要求 automatic knowledge review 只落在 approved knowledge scope，
-以及 `finish` handoff 的 publication state 可由 commit／push／draft PR evidence 重算。
+以及 `finish` handoff 的 publication state 可由未暫存 snapshot，或核准的 commit／push／draft PR evidence 重算。
 缺少 reviewer、scope／snapshot drift、failed／blocked／not_run command、knowledge
 conflict 或 publication prerequisite 時，結果維持 `awaiting_user`／`blocked`。既有
 v1 的 Pass／Fail、Ledger 與 terminal gate 仍按前文執行。

@@ -47,7 +47,7 @@ Implementation Ledger `Complete`不等於required delivery Complete。若deliver
 - Ledger 的精確 path。
 - BUG run 的assessment path／hash、`bug-verification/v1` path／hash、implementation verdict與獨立`verified | partial`結果；`partial`明示原始症狀未驗證、殘餘風險及staging／人工follow-up。
 
-v1 交付後被審內容與 Ledger 只讀；不自動 stage、commit、push、merge、部署、建立 ticket、清理 artifacts 或刪除 worktree。Portable v2 的 implementation／knowledge review 通過後，才把 approved scope 交給 `finish` handoff；v2 finish 的 stage／commit／push／draft PR 行為不改變 v1。
+v1 交付後被審內容與 Ledger 只讀；不自動 stage、commit、push、merge、部署、建立 ticket、清理 artifacts 或刪除 worktree。Portable v2 的 implementation／knowledge review 通過後，才把 approved scope 交給 `finish` handoff；v2 預設交付 `delivered_unstaged`，只有核准的 `commit`／`draft-pr` mode 才 stage／commit／push／建立 draft PR，且不改變 v1。
 
 BUG run若缺verification、結果為`failed`、review與verification雙結論不一致、verification evidence未實際保存並列入terminal index，或仍有未materialize的途中BUG evidence，均不得Complete。Legacy verification只在同一次`complete/complete` transition綁定；required overlay則在accepted review進`knowledge/active`時綁定並於promotion後重驗，更早綁定不得占用create-only path。Critical／high只改變優先與風險回報，不繞過gate；安全／隱私／資料風險只引用遮蔽摘要、安全evidence ref與具名人工reviewer。
 
@@ -83,10 +83,11 @@ Ready artifacts 維持唯讀。收到重新核准版本後由 Preflight/Ledger �
 v2 state 不使用本文件的 v1 Ledger terminal schema；它以 append-only assignments、review
 reports、knowledge review 與 publication events 保存同一條可續跑鏈。`status` 必須能
 區分 `local_verified`、`committed`、`pushed`、`draft_pr_created` 與
-`publication_pending`，並回報 state path、branch／commit identity 與下一個 action。
+`delivered_unstaged`、`publication_pending`，並回報 state path、workspace／branch、commit identity（如有）與下一個 action。
 
-v2 `finish` 的順序固定為：重算 approved path set 與 review snapshot → stage only
-approved paths → commit →（有 remote 且可用時）push → 建立或重用同一 branch／head 的
+v2 `finish` 的順序固定為：重算 approved path set 與 review snapshot → 在 `unstaged`
+mode 保存 diff、snapshot 與建議 commit；或在明示 `commit`／`draft-pr` mode 時 stage only
+approved paths → commit →（draft-pr 且有 remote 且可用時）push → 建立或重用同一 branch／head 的
 draft PR → 保存 publication event。任何 preflight drift、秘密、失敗或缺少權限都在
 對應狀態停止；`resume`／`finish` 只重試尚未完成的步驟，不能重複 commit 或 PR。
 Merge、deployment、cleanup 與刪除 worktree 不屬於 finish。v1 的 `Complete` terminal

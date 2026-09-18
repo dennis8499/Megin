@@ -37,13 +37,14 @@ state，也不要求目標專案安裝或包含本 repository 的 `.agents/skill
 v2 `start` 先做唯讀 classification。`read_only` 不建立 run；`small` 在一次 integrated
 approval 前只保存 create-only design bundle；`large`／bug 在完成各自 Requirements／
 Planning／diagnosis gates 前也只保存候選 state。核准與 payload digest 綁定後，才可建立
-Work ID 專用 worktree／branch。`doctor` 與 `status` 顯示 repository identity、task class、
+核准的 workspace／branch；v2 預設從 base branch 在目前 checkout 建立 `feat/<work-id>`，
+明示 worktree mode 才建立 Work ID 專用 worktree。`doctor` 與 `status` 顯示 repository identity、task class、
 phase／status、current assignment、review／knowledge／publication state 與 state path，
 `resume` 只重試第一個未完成 action。
 
 v2 state 與 v1 registry 不共用 record、approval 或 evidence。既有 v1 record 缺少
 `delivery-run/v2` discriminator 時，沿用本文件下方的 legacy host-temp rules；不做自動
-遷移。v2 finish handoff 的 commit／push／draft PR 規則見
+遷移。v2 finish handoff 的 unstaged／commit／push／draft PR 規則見
 [v2 派工、審查與交付收尾契約](../../implementation-execution/references/v2-dispatch-and-finish.md)。
 
 ## 公開 helper

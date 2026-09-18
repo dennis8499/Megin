@@ -20,9 +20,9 @@ v2 在任何 mutation 前先保存唯讀 classification：`read_only`、`small`�
 `bug`。`read_only` 只回報；`small` 以一份精簡 design brief 取得一次 integrated
 approval；`large` 依序取得 Requirements 與 Planning approvals；`bug` 先完成
 `confirmed`／`likely` diagnosis，再依影響進入 small 或 large。核准前不得建立
-產品 worktree／branch；核准後才建立 v2 Work ID workspace。
+產品 workspace／branch；核准後才建立 v2 Work ID workspace。
 
-v2 的 approval payload 同時綁定驗收、允許修改 paths、測試命令、knowledge scope
+v2 的 approval payload 同時綁定驗收、允許修改 paths、測試命令、knowledge scope、workspace mode
 與 Git finish destination。小任務的同一份 approval 授權 scoped implementation、
 fresh review、automatic knowledge review 與 finish handoff；大型變更只在第二次
 Planning approval 後 dispatch Implementation。新增跨模組、資料、權限、依賴或架構
@@ -90,7 +90,7 @@ Standard work的affecting assessment在重新核准後以`kind: supporting`來�
 
 Resume依 record phase/status進入最早未完成的 child action；不重跑已持久化核准或 Complete child。Blocked解除另追加 recovery evidence，再回同 phase active。
 
-每次 v1 交付回報 identity、current refs、next action與 record path。完成條件：回報值可由 record與實際 workspace重算，且沒有 stage、commit、push、merge、deploy或cleanup。v2 交付另回報 `task_class`、writer／reviewer assignment、knowledge 與 publication state；`finish` 可在 approved scope 內 stage／commit／push／建立 draft PR，但 merge、deploy 與 cleanup 仍為獨立動作。
+每次 v1 交付回報 identity、current refs、next action與 record path。完成條件：回報值可由 record與實際 workspace重算，且沒有 stage、commit、push、merge、deploy或cleanup。v2 交付另回報 `task_class`、writer／reviewer assignment、knowledge、workspace 與 publication state；預設 `finish` 交付未暫存 diff，只有核准 `commit`／`draft-pr` mode 才能 stage／commit／push／建立 draft PR；merge、deploy 與 cleanup 仍為獨立動作。
 
 ## v1 compatibility
 

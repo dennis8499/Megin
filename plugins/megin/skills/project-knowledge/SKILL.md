@@ -1,6 +1,6 @@
 ---
 name: project-knowledge
-description: Search and review target-project knowledge with source provenance, conflict checks, and explicit promotion boundaries.
+description: Search and review target-project knowledge for a Megin v2 delivery with source provenance, conflict checks, and explicit promotion boundaries.
 ---
 
 # Project Knowledge
