@@ -1,0 +1,20 @@
+{
+  "name": "megin-local",
+  "interface": {
+    "displayName": "Megin Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "megin",
+      "source": {
+        "source": "local",
+        "path": "./plugins/megin"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

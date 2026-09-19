@@ -238,6 +238,14 @@ class PortableCliTests(unittest.TestCase):
         output = self.cli("start", "--repo", str(self.repo), "--request", "請檢視目前流程")
         self.assertFalse(output["run_created"])
         self.cli("init", "--repo", str(self.repo))
+
+    def test_atomic_writer_handles_long_capability_paths(self) -> None:
+        target = (
+            self.root / "state" / ("r" * 64) / "work-long-capability-path" / "capabilities"
+            / ("writer-assignment-1-" + "a" * 16 + ".json")
+        )
+        ENGINE.write_json_atomic(target, {"schema": "megin-capability/v1"})
+        self.assertEqual(json.loads(target.read_text(encoding="utf-8"))["schema"], "megin-capability/v1")
         output = self.cli("start", "--repo", str(self.repo), "--request", "請檢視目前流程")
         self.assertFalse(output["run_created"])
 

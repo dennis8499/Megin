@@ -91,7 +91,10 @@ def json_dump(value: Any) -> str:
 
 def write_json_atomic(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    # Keep the temporary name short so Windows can still create it when the
+    # persistent state root and repository identity already make the directory
+    # path long.  The random suffix supplied by mkstemp preserves uniqueness.
+    descriptor, temporary = tempfile.mkstemp(prefix=".megin-", dir=str(path.parent))
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(json_dump(value))
@@ -125,6 +128,31 @@ def run_process(command: Sequence[str], cwd: Path, *, timeout: int = 120, check:
         raise MeginError(f"command timed out after {timeout}s: {' '.join(command)}") from exc
     except OSError as exc:
         raise MeginError(f"cannot execute {' '.join(command)}: {exc}") from exc
+
+
+def run_approved_command(command: str, cwd: Path, *, timeout: int = 300) -> subprocess.CompletedProcess[str]:
+    """Run a plan-approved shell command with consistent quoting semantics."""
+    if os.name == "nt":
+        # Approved commands use POSIX-compatible quoting (for example, unittest
+        # discovery patterns).  cmd.exe treats single quotes literally, while
+        # Windows PowerShell preserves the intended shell behavior.
+        for executable in ("powershell.exe", "pwsh.exe", "pwsh"):
+            shell = shutil.which(executable)
+            if shell:
+                return run_process(
+                    (shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command),
+                    cwd,
+                    timeout=timeout,
+                )
+    try:
+        return subprocess.run(
+            command, cwd=str(cwd), shell=True, text=True, encoding="utf-8", errors="replace",
+            capture_output=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise MeginError(f"command timed out after {timeout}s: {command}") from exc
+    except OSError as exc:
+        raise MeginError(f"cannot execute approved command: {exc}") from exc
 
 
 def git(repo: Path, *arguments: str, check: bool = True, timeout: int = 120) -> str:
@@ -185,7 +213,7 @@ def default_base_branch(repo: Path) -> str:
 
 
 def status_paths(repo: Path) -> list[str]:
-    raw = git(repo, "status", "--porcelain=v1", "-z", check=True)
+    raw = git(repo, "status", "--porcelain=v1", "-z", "-uall", check=True)
     result: list[str] = []
     for item in raw.split("\0"):
         if not item:
@@ -1001,6 +1029,38 @@ def cmd_resume(args: argparse.Namespace) -> int:
         return 0
     worktree = current_worktree(state)
     ensure_workspace_binding(state, worktree)
+    if args.scenario_command:
+        if args.writer_complete or args.review_verdict:
+            raise MeginError("scenario-command recovery cannot be combined with writer or review updates")
+        verification = state.get("verification", {})
+        records = verification.get("commands", [])
+        scenario_results = verification.get("scenario_results", [])
+        if verification.get("status") != "failed" or state["approval"]["scope"].get("scenario_command"):
+            raise MeginError("scenario-command recovery is only available after a failed verification without a scenario runner")
+        if not records or any(item.get("status") != "passed" for item in records if isinstance(item, dict)):
+            raise MeginError("scenario-command recovery requires every approved command to have passed")
+        if not scenario_results or any(
+            item.get("status") != "not_run" or item.get("reason") != "no approved scenario command was provided"
+            for item in scenario_results if isinstance(item, dict)
+        ):
+            raise MeginError("scenario-command recovery requires the only verification gap to be a missing runner")
+        state["approval"]["scope"]["scenario_command"] = args.scenario_command
+        state["approval"]["candidate_digest"] = candidate_digest(state)
+        state["verification"] = {"status": "not_run", "commands": [], "scenario_results": [], "snapshot": None, "record_sha256": None}
+        for task in state["tasks"]:
+            if task.get("status") == "reviewed":
+                task["status"] = "awaiting_review"
+        state["review"]["overall"] = "pending"
+        state["review"]["findings"] = []
+        state["review"]["no_progress_count"] = 0
+        state["review"]["snapshot"] = snapshot(worktree)
+        state["phase"] = "review"
+        state["status"] = "awaiting_review"
+        state["next_action"] = "fresh independent reviewer records an APPROVED verdict after adding the scenario runner"
+        event(state, "scenario_command_added_after_missing_runner", phase="review", status="awaiting_review")
+        save_state(state, path)
+        emit(state_summary(state, path), args)
+        return 0
     if args.writer_complete:
         task = task_for_id(state, args.task_id)
         assignment = next((item for item in reversed(state["assignments"]) if item["task_id"] == task["id"] and item["role"] == "writer" and item["status"] == "active"), None)
@@ -1143,7 +1203,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     failed = False
     for index, command in enumerate(state["approval"]["scope"]["test_commands"], 1):
         input_snapshot = snapshot(worktree)
-        result = subprocess.run(command, cwd=str(worktree), shell=True, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=300)
+        result = run_approved_command(command, worktree, timeout=300)
         raw = redact((result.stdout or "") + (result.stderr or ""))
         evidence_path = evidence_dir / f"verify-{index:02d}.log"
         evidence_path.write_text(raw, encoding="utf-8")
@@ -1161,7 +1221,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     scenario_results: list[dict[str, Any]]
     if scenario_command:
         input_snapshot = snapshot(worktree)
-        result = subprocess.run(scenario_command, cwd=str(worktree), shell=True, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=300)
+        result = run_approved_command(scenario_command, worktree, timeout=300)
         raw = redact((result.stdout or "") + (result.stderr or ""))
         evidence_path = evidence_dir / "scenario-evidence.json"
         evidence_path.write_text(raw, encoding="utf-8")
@@ -1409,6 +1469,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         {"name": "git_repository", "ok": True, "path": str(repo)},
         {"name": "python", "ok": sys.version_info >= (3, 13), "version": sys.version.split()[0], "required": "3.13+"},
         {"name": "git", "ok": shutil.which("git") is not None},
+        {"name": "rg", "ok": shutil.which("rg") is not None, "required": "ripgrep"},
         {"name": "delivery_schema_v3", "ok": DELIVERY_SCHEMA_PATH.exists(), "path": str(DELIVERY_SCHEMA_PATH)},
         {"name": "hooks", "ok": (PLUGIN_ROOT / "hooks" / "hooks.json").exists(), "path": str(PLUGIN_ROOT / "hooks" / "hooks.json"), "read_only": True},
         {"name": "state_root", "ok": True, "path": str(state_root(repo))},
@@ -1513,6 +1574,7 @@ def build_parser() -> argparse.ArgumentParser:
     resume_parser.add_argument("--writer-session")
     resume_parser.add_argument("--writer-ticket")
     resume_parser.add_argument("--writer-report")
+    resume_parser.add_argument("--scenario-command", help="supply a missing runner after all approved verification commands passed")
     resume_parser.add_argument("--review-verdict", choices=("APPROVED", "CHANGES_REQUIRED", "BLOCKED"))
     resume_parser.add_argument("--reviewer-id")
     resume_parser.add_argument("--reviewer-session")

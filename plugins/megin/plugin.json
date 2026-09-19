@@ -1,0 +1,40 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "megin",
+  "version": "0.4.0",
+  "description": "Portable Megin Workflow v3 for evidence-linked planning, executable behavior contracts, independent review, human acceptance, and local delivery.",
+  "author": {
+    "name": "Megin Contributors"
+  },
+  "license": "MIT",
+  "keywords": [
+    "megin",
+    "workflow",
+    "tdd",
+    "code-review",
+    "delivery",
+    "bdd",
+    "human-acceptance"
+  ],
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json",
+      "interface": {
+        "displayName": "Megin Delivery Workflow",
+        "shortDescription": "Align behavior, implementation, tests, review, and human acceptance.",
+        "longDescription": "Megin v3 asks evidence-based questions, binds executable Gherkin to one approved plan, dispatches independent writer and reviewer loops, waits for human acceptance, then updates knowledge and creates one local commit.",
+        "developerName": "Megin Contributors",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Interactive",
+          "Write"
+        ],
+        "defaultPrompt": [
+          "Describe the behavior you need and let Megin explore the codebase before asking one decision at a time.",
+          "Approve the Chat Summary and File Details once, then let Megin dispatch BDD/TDD tasks and independent reviews.",
+          "Run the approved verification, perform human acceptance, and create one local commit only after acceptance."
+        ]
+      }
+    }
+  }
+}

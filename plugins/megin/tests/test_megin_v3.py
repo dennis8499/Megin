@@ -67,17 +67,35 @@ class MeginV3CliTests(unittest.TestCase):
         work_id: str = "v3-readme",
         task_titles: tuple[str, ...] = (),
         scenario_command: str | None = None,
+        test_command: str = "python -c \"print(1)\"",
     ) -> dict:
         scenario_id = f"BDD-{work_id.upper()}-001"
         command = [
             "start", "--repo", str(self.repo), "--work-id", work_id, "--task-class", "small",
             "--request", "update README behavior", "--allowed-path", "README.md",
-            "--test-command", "python -c \"print(1)\"",
+            "--test-command", test_command,
             "--scenario-command", scenario_command or f"python -c \"import json; print(json.dumps({{'scenarios': [{{'id': '{scenario_id}', 'status': 'passed'}}]}}))\"",
         ]
         for title in task_titles:
             command.extend(["--task", title])
         return self.cli(*command)
+
+    def test_verify_preserves_single_quote_command_syntax(self) -> None:
+        self.start("v3-quoted-command", test_command="python -c 'print(1)'")
+        approved = self.cli("approve", "--repo", str(self.repo), "--work-id", "v3-quoted-command", "--confirm")
+        assignment = approved["assignment"]
+        (self.repo / "README.md").write_text("implemented\n", encoding="utf-8")
+        self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", "v3-quoted-command", "--writer-complete",
+            "--writer-id", assignment["identity"], "--writer-ticket", assignment["ticket"],
+        )
+        self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", "v3-quoted-command",
+            "--review-verdict", "APPROVED", "--reviewer-id", "fresh", "--reviewer-session", "fresh:quoted",
+        )
+        verified = self.cli("verify", "--repo", str(self.repo), "--work-id", "v3-quoted-command")
+        self.assertEqual(verified["status"], "awaiting_user_acceptance")
+        self.assertEqual(verified["verification"]["commands"][0]["status"], "passed")
 
     def test_plan_gate_acceptance_and_commit_order(self) -> None:
         candidate = self.start()
@@ -116,6 +134,27 @@ class MeginV3CliTests(unittest.TestCase):
         self.assertTrue(result["read_only"])
         status = self.cli("status", "--repo", str(self.repo))
         self.assertEqual(status["runs"], [])
+
+    def test_doctor_reports_ripgrep_as_a_required_dependency(self) -> None:
+        expected = 0 if shutil.which("rg") else 2
+        result = self.cli("doctor", "--repo", str(self.repo), expect=expected)
+        check = next(item for item in result["checks"] if item["name"] == "rg")
+        self.assertEqual(check["required"], "ripgrep")
+        self.assertNotIn("optional", check)
+
+    def test_portable_manifest_and_wrappers_are_self_contained(self) -> None:
+        portable = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
+        compatibility = json.loads((ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        self.assertEqual(portable["name"], "megin")
+        self.assertEqual(portable["version"], compatibility["version"])
+        self.assertEqual(portable["extensions"]["com.openai"]["hooks"], "./hooks/hooks.json")
+        self.assertTrue((ROOT / "skills").is_dir())
+        self.assertTrue((ROOT / "bin" / "megin").is_file())
+        self.assertTrue((ROOT / "bin" / "megin.cmd").is_file())
+        wrapper = (ROOT / "bin" / "megin").read_text(encoding="utf-8")
+        self.assertIn("python3", wrapper)
+        self.assertIn("python", wrapper)
+        self.assertIn("megin_v3.py", wrapper)
 
     def test_explicit_mutating_class_cannot_override_read_only_intent(self) -> None:
         result = self.cli(
@@ -298,6 +337,44 @@ class MeginV3CliTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         status = self.cli("status", "--repo", str(self.repo), "--work-id", "v3-no-scenario")
         self.assertEqual(status["verification"]["scenario_results"][0]["status"], "not_run")
+
+    def test_missing_scenario_runner_can_be_added_only_after_passing_commands(self) -> None:
+        work_id = "v3-repair-scenario"
+        scenario_id = "BDD-V3-REPAIR-SCENARIO-001"
+        self.cli(
+            "start", "--repo", str(self.repo), "--work-id", work_id, "--task-class", "small",
+            "--request", "update README behavior", "--allowed-path", "README.md",
+            "--test-command", "python -c \"print(1)\"",
+        )
+        approved = self.cli("approve", "--repo", str(self.repo), "--work-id", work_id, "--confirm")
+        assignment = approved["assignment"]
+        (self.repo / "README.md").write_text("implemented\n", encoding="utf-8")
+        self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", work_id, "--writer-complete",
+            "--writer-id", assignment["identity"], "--writer-ticket", assignment["ticket"],
+        )
+        self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", work_id, "--review-verdict", "APPROVED",
+            "--reviewer-id", "fresh", "--reviewer-session", "fresh:missing-runner",
+        )
+        failed = self.cli("verify", "--repo", str(self.repo), "--work-id", work_id, expect=2)
+        self.assertEqual(failed["verification"]["commands"][0]["status"], "passed")
+        scenario_command = (
+            "python -c \"import json; print(json.dumps({'scenarios': "
+            f"[{{'id': '{scenario_id}', 'status': 'passed'}}]}}))\""
+        )
+        repaired = self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", work_id,
+            "--scenario-command", scenario_command,
+        )
+        self.assertEqual(repaired["status"], "awaiting_review")
+        self.cli(
+            "resume", "--repo", str(self.repo), "--work-id", work_id, "--review-verdict", "APPROVED",
+            "--reviewer-id", "fresh-after-repair", "--reviewer-session", "fresh:scenario-repair",
+        )
+        verified = self.cli("verify", "--repo", str(self.repo), "--work-id", work_id)
+        self.assertEqual(verified["status"], "awaiting_user_acceptance")
+        self.assertEqual(verified["verification"]["scenario_results"][0]["status"], "passed")
 
     def test_knowledge_candidate_is_promoted_only_after_commit(self) -> None:
         result = self.cli(

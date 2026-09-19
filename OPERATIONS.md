@@ -7,8 +7,13 @@
 先安裝 plugin；安裝只提供技能／CLI，不會替目標 repository 建立功能 branch、worktree 或寫入產品：
 
 ```console
-codex plugin install ./plugins/megin
+codex plugin marketplace add .
 ```
+
+Refresh the Plugin Directory and install `megin` from the repository-scoped `megin-local` market.
+The repository provides both `plugin.json` (portable manifest) and `.codex-plugin/plugin.json`
+(compatibility fallback). A source checkout can invoke `plugins/megin/bin/megin` or
+`plugins/megin/bin/megin.cmd`; installation is not assumed to expose a global `megin` executable.
 
 在目標 Git repository 執行一次 `init`，接著由 `start` 做唯讀分類與候選建立；核准前不建立功能 branch：
 

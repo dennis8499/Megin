@@ -43,6 +43,7 @@ jobs:
         if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
         shell: bash
         run: |
+          python -X utf8 -B -c "import json, pathlib; root=json.loads(pathlib.Path('plugins/megin/plugin.json').read_text(encoding='utf-8')); fallback=json.loads(pathlib.Path('plugins/megin/.codex-plugin/plugin.json').read_text(encoding='utf-8')); assert root['name'] == fallback['name'] == 'megin'; assert root['version'] == fallback['version']; assert root['extensions']['com.openai']['hooks'] == './hooks/hooks.json'"
           python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
           python -X utf8 -B plugins/megin/scripts/megin_v3.py --help
           python -X utf8 -B plugins/megin/scripts/validate.py
@@ -103,6 +104,11 @@ jobs:
         if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
         shell: bash
         run: |
+          if [ "${{ matrix.os_name }}" = "windows" ]; then
+            cmd.exe /d /c plugins/megin/bin/megin.cmd --help
+          else
+            ./plugins/megin/bin/megin --help
+          fi
           python -X utf8 -B plugins/megin/scripts/megin_v3.py --help
           python -X utf8 -B plugins/megin/scripts/validate.py
           python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_megin_v3.py'

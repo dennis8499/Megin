@@ -10,6 +10,7 @@ Codex skills provide the human and sub-agent orchestration around it.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import datetime as _dt
 import errno
 import hashlib
@@ -22,6 +23,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+from ctypes import wintypes
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 from urllib.parse import urlsplit, urlunsplit
@@ -134,7 +136,9 @@ def redact_value(value: Any) -> Any:
 def write_json_atomic(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    # Keep the temporary name short: capability paths can approach Windows'
+    # legacy MAX_PATH limit after the repository and Work ID are included.
+    fd, temporary = tempfile.mkstemp(prefix=".megin-", dir=str(path.parent))
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(payload)
@@ -1757,7 +1761,9 @@ def _run_migration(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
     source_files = _migration_files(source_state)
     manifest = _migration_manifest(source_files)
     migration_id = digest_json({"config_sha256": digest_bytes(config_raw), "state": manifest})
-    state_backup = source_root / f"{repo_id}.sdlc-migrated-{migration_id}"
+    # The full repository identity is already retained in the state payload;
+    # keep the backup directory name short enough for deep Windows checkouts.
+    state_backup = source_root / f"{repo_id[:16]}.sdlc-migrated-{migration_id}"
     config_backup = repo / f".sdlc.migrated-{migration_id}"
     if source_state.exists() and state_backup.exists():
         raise MeginError(f"migration backup already exists: {state_backup}")
@@ -1782,7 +1788,12 @@ def _run_migration(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
             shutil.rmtree(stage_root, ignore_errors=True)
 
     target_root.parent.mkdir(parents=True, exist_ok=True)
-    stage_root = Path(tempfile.mkdtemp(prefix=f".{repo_id}.megin-migration-", dir=str(target_root.parent)))
+    # Stage in the short system temp directory so copying a deep legacy state
+    # tree does not add another repository-id segment and exceed Windows'
+    # legacy path limit.  The normal temp directory is on the same system
+    # volume as a local checkout, allowing the final directory swap to remain
+    # atomic.
+    stage_root = Path(tempfile.mkdtemp(prefix="megin-migration-"))
     stage_state = stage_root / repo_id
     state_published = False
     config_started = False
@@ -1826,7 +1837,7 @@ def _run_migration(args: argparse.Namespace, repo: Path) -> dict[str, Any]:
         )
     except Exception as exc:
         recovery: list[str] = []
-        failed_state = target_root / f"{repo_id}.megin-failed-{migration_id}"
+        failed_state = target_root / f"{repo_id[:16]}.megin-failed-{migration_id}"
         failed_config = repo / f".megin.failed-{migration_id}"
         try:
             if state_published and target_state.exists():
@@ -2231,8 +2242,10 @@ def register_capability(
     }
     digest = digest_json(payload)
     payload["capability_sha256"] = digest
-    filename_key = f"{assignment_id}-{digest[:16]}" if assignment_id else digest[:16]
-    path = capability_root(state, repo) / f"{kind}-{filename_key}.json"
+    # The digest already includes the assignment identity.  Avoid repeating a
+    # long assignment label in the filename so reviewer capabilities remain
+    # writable on Windows when the persistent state path is deep.
+    path = capability_root(state, repo) / f"{kind}-{digest[:16]}.json"
     write_json_atomic(path, payload)
     return str(path), digest
 
@@ -3144,7 +3157,7 @@ def candidate_for_stage(state: dict[str, Any], stage: str) -> dict[str, Any] | N
 
 def write_text_atomic(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    fd, temporary = tempfile.mkstemp(prefix=".megin-", dir=str(path.parent))
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(value)
@@ -3161,7 +3174,7 @@ def write_text_atomic(path: Path, value: str) -> None:
 
 def write_bytes_atomic(path: Path, value: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    fd, temporary = tempfile.mkstemp(prefix=".megin-", dir=str(path.parent))
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(value)
@@ -5045,6 +5058,29 @@ def _process_liveness(pid: int) -> str:
 
     if os.name == "nt":
         try:
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+            kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
+            handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                error = ctypes.get_last_error()
+                if error in (6, 87, 1168):  # invalid handle/parameter or not found
+                    return "dead"
+                return "unknown"
+            try:
+                exit_code = wintypes.DWORD()
+                if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                    return "unknown"
+                return "alive" if exit_code.value == 259 else "dead"  # STILL_ACTIVE
+            finally:
+                kernel32.CloseHandle(handle)
+        except (AttributeError, OSError):
+            pass
+        try:
             result = subprocess.run(
                 ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
                 stdin=subprocess.DEVNULL,
@@ -5056,7 +5092,8 @@ def _process_liveness(pid: int) -> str:
             if result.returncode == 0:
                 return "alive" if re.search(rf"(?<!\d){pid}(?!\d)", result.stdout or "") else "dead"
         except (OSError, subprocess.SubprocessError):
-            return "unknown"
+            pass
+        return "unknown"
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

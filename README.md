@@ -20,8 +20,14 @@ Megin 另外保留本 repository 原有的 Work ID、來源追溯、核准綁定
 repository 初始化設定或寫入程式碼：
 
 ~~~console
-codex plugin install ./plugins/megin
+# Run from the repository root to register the repository-scoped marketplace.
+codex plugin marketplace add .
 ~~~
+
+在 Codex／ChatGPT Desktop 的 Plugin Directory 重新整理 `megin-local`，再從該市場安裝 `megin`。
+這個 repository 不假設安裝後會把 `megin` 加入全域 shell PATH；source checkout 請直接使用
+`<plugin-root>/bin/megin`（POSIX）或 `<plugin-root>/bin/megin.cmd`（Windows）。以下命令中的
+`megin` 代表已啟用的 plugin CLI 入口。
 
 進入目標 repository 後，初始化一次專案 binding，再讓 `start` 先做唯讀分類：
 
@@ -66,7 +72,9 @@ repository 不需要這個 repository 的 `.agents/skills` tree。`verify` 和 `
 
 完整的新流程以 [delivery-run-v3.schema.json](plugins/megin/schemas/delivery-run-v3.schema.json)、
 [Megin v3 orchestrator](plugins/megin/skills/megin-orchestrator/SKILL.md) 與 plugin README 為準；v2
-契約只作歷史遷移參考。
+契約只作歷史遷移參考。跨 owner 的授權與交付順序另見
+[stage-authorization.md](.agents/skills/delivery-orchestrator/references/stage-authorization.md) 與
+[delivery-protocol.md](.agents/skills/implementation-execution/references/delivery-protocol.md)。
 
 ## 快速開始
 
@@ -360,13 +368,13 @@ README 或 `doctor` 輸出為準；它們不得把 runtime state 寫回目標 re
 
 ~~~console
 # 在 plugin source checkout 驗證 manifest 與 portable CLI
-python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
-python -X utf8 -B plugins/megin/scripts/megin.py --help
+python -X utf8 -B -c "import json, pathlib; root=json.loads(pathlib.Path('plugins/megin/plugin.json').read_text(encoding='utf-8')); fallback=json.loads(pathlib.Path('plugins/megin/.codex-plugin/plugin.json').read_text(encoding='utf-8')); assert root['name'] == fallback['name'] == 'megin'; assert root['version'] == fallback['version']; assert root['extensions']['com.openai']['hooks'] == './hooks/hooks.json'"
+python -X utf8 -B plugins/megin/scripts/megin_v3.py --help
 python -X utf8 -B -m unittest discover -s plugins/megin/tests -p "test_*.py"
 ~~~
 
-若 plugin 尚未安裝，先使用前面的 `codex plugin install ./plugins/megin`；上述命令不會
-取代目標專案自己的 build／test。v2 `finish` 的 commit／push／draft PR evidence 也要
+若 plugin 尚未安裝，先依前面的 local marketplace 流程註冊並從 Plugin Directory 安裝；source
+checkout 可直接執行 wrapper。上述命令不會取代目標專案自己的 build／test。v2 `finish` 的 commit／push／draft PR evidence 也要
 納入 CI artifact；沒有 remote 或 credentials 的測試應驗證 `publication_pending` 可續跑。
 
 ### 快速 gate

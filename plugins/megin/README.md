@@ -33,13 +33,24 @@ while retaining this repository's Work ID, evidence, approval, and v1 compatibil
 
 The plugin does not assume that a target repository contains `.agents/skills`. Resolve the target repository and its own validators or CLI explicitly. Repository-specific contracts remain authoritative for schemas, commands, and knowledge promotion.
 
+For a source checkout, register the repository-scoped marketplace from the repository root:
+
+```console
+codex plugin marketplace add .
+```
+
+Refresh the Plugin Directory and install `megin` from `megin-local`. The marketplace entry is
+[`../../.agents/plugins/marketplace.json`](../../.agents/plugins/marketplace.json); it points to this
+portable plugin directory.
+
 ## CLI
 
 The portable entry point is `bin/megin` (or `bin/megin.cmd` on Windows). A source checkout can
-invoke the Python implementation directly:
+invoke the Python implementation directly. The wrapper requires Python 3.13+ and `rg`; the bundled
+`tgrep.exe` is an optional Windows search accelerator, not a replacement for `rg`.
 
 ```console
-<plugin-root>/bin/megin classify --repo <target-repo> --request "<request>"
+<plugin-root>/bin/megin classify --request "<request>"
 <plugin-root>/bin/megin init --repo <target-repo>
 <plugin-root>/bin/megin doctor --repo <target-repo>
 <plugin-root>/bin/megin start --repo <target-repo> --request "<request>"
@@ -130,7 +141,9 @@ anchored to its original product snapshot during this recovery.
 
 Approval authorizes only the recorded work identity, behavior contract, scope, acceptance, knowledge update, and local delivery target. Scope drift requires a new plan version and approval. The default base is resolved from explicit configuration, remote symbolic HEAD, or an unambiguous `main`／`master`; an unresolved base never falls back to the current HEAD. Current-directory workspaces use an atomic repository lock and release it only after successful finish. Reviewers stay read-only. Automated verification stops at `awaiting_user_acceptance`; before that gate no knowledge promotion, staging, or commit is possible. `finish` validates knowledge source encoding, JSON shape, source pre/post digests, and target Project Knowledge lint before marking it promoted; it creates one local commit after acceptance and never pushes, merges, deploys, deletes branches, or cleans worktrees. Re-running `megin init` on an existing project repairs the local `.megin/` Git exclude.
 
-The manifest is at `.codex-plugin/plugin.json`; the plugin can be installed through the Codex plugin mechanism or a local marketplace that points at this directory.
+The portable manifest is at `plugin.json`; `.codex-plugin/plugin.json` remains as the Codex
+compatibility fallback. The plugin can be installed through a local marketplace that points at this
+directory.
 
 ## Measuring the workflow
 
