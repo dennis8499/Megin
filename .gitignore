@@ -507,6 +507,7 @@ docs/*
 
 # Local Megin scratch and validation output.
 /.tmp/
+/.test-run-tmp/
 /_review-temp/
 /_testtemp/
 /.validation-tmp/

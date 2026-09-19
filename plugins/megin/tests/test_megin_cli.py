@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
+import stat
 import subprocess
 import sys
-import tempfile
 import unittest
+import uuid
 from unittest import mock
 from pathlib import Path
 import importlib.util
@@ -23,6 +25,15 @@ MIGRATION_LEGACY_ALLOWLIST = {
     "writer_report_schema": "sdlc-writer-report/v1",
     "review_report_schema": "sdlc-review-report/v1",
 }
+
+
+def remove_fixture(path: Path) -> None:
+    def remove_readonly(function, target, _exc_info) -> None:
+        os.chmod(target, stat.S_IREAD | stat.S_IWRITE)
+        function(target)
+
+    if path.exists():
+        shutil.rmtree(path, onerror=remove_readonly)
 _SPEC = importlib.util.spec_from_file_location("megin_engine", SCRIPT)
 assert _SPEC and _SPEC.loader
 ENGINE = importlib.util.module_from_spec(_SPEC)
@@ -31,8 +42,10 @@ _SPEC.loader.exec_module(ENGINE)
 
 class PortableCliTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp = tempfile.TemporaryDirectory()
-        self.root = Path(self.temp.name)
+        fixture_root = Path(__file__).parents[3] / ".test-run-tmp"
+        fixture_root.mkdir(parents=True, exist_ok=True)
+        self.root = fixture_root / f"v2-test-{os.getpid()}-{uuid.uuid4().hex}"
+        self.root.mkdir(parents=True, exist_ok=True)
         self.repo = self.root / "project with 中文"
         self.repo.mkdir()
         self.env = os.environ.copy()
@@ -57,13 +70,17 @@ class PortableCliTests(unittest.TestCase):
                     candidate = Path(line[len("worktree "):].strip())
                     if candidate.resolve() != self.repo.resolve() and candidate.exists():
                         subprocess.run(["git", "worktree", "remove", "--force", str(candidate)], cwd=str(self.repo), env=self.env, capture_output=True, text=True)
+            subprocess.run(["git", "worktree", "prune", "--expire", "now"], cwd=str(self.repo), env=self.env, capture_output=True, text=True)
         except (AssertionError, OSError):
             pass
         if self.previous_state_root is None:
             os.environ.pop("MEGIN_STATE_ROOT", None)
         else:
             os.environ["MEGIN_STATE_ROOT"] = self.previous_state_root
-        self.temp.cleanup()
+        try:
+            remove_fixture(self.root)
+        except OSError:
+            pass
 
     def git(self, *args: str, cwd: Path | None = None) -> str:
         result = subprocess.run(["git", *args], cwd=str(cwd or self.repo), env=self.env, text=True, encoding="utf-8", capture_output=True)

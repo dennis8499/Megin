@@ -259,11 +259,20 @@ Approval and execution results are recorded explicitly. For a small task, bind t
 paths and tests to one integrated approval, then record the writer and fresh reviewer results:
 
 ~~~console
-megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" --approve --approval-ref user:approval
-megin resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-megin resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
-megin finish --repo <target-repo> --work-id <work-id>
+megin start --repo <target-repo> --work-id example-small-task --request "<request>" \
+  --allowed-path src/example.py --test-command "python -m unittest" \
+  --scenario-command "python -c \"import json; print(json.dumps({'scenarios': [{'id': 'BDD-EXAMPLE-SMALL-TASK-001', 'status': 'passed'}]}))\""
+megin approve --repo <target-repo> --work-id example-small-task --confirm
+megin resume --repo <target-repo> --work-id example-small-task --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+megin resume --repo <target-repo> --work-id example-small-task --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+megin verify --repo <target-repo> --work-id example-small-task
+megin accept --repo <target-repo> --work-id example-small-task --confirm
+megin finish --repo <target-repo> --work-id example-small-task
 ~~~
+
+若 `verify` 因 snapshot drift 阻擋，先對所有 `awaiting_review` task 逐一取得 fresh APPROVED
+review，再重跑 verification；knowledge validation 失敗則修正來源或 lint 後，以同一 Work ID
+重新完成 review → verify → accept → finish。source bytes 改變時不能繞過這些 gate。
 
 Large work uses `--approve requirements` and `--approve plan` on separate approval steps. Bug
 repair first runs `megin diagnose` with a read-only oracle and falsifiable hypothesis, then passes

@@ -74,21 +74,32 @@ the review gate; after checking its Chat Summary and File Details, confirm the e
 plan version:
 
 ```console
-<plugin-root>/bin/megin start --repo <target-repo> --request "<request>" \
-  --allowed-path src/example.py --test-command "python -m unittest" \
+<plugin-root>/bin/megin start --repo <target-repo> --work-id example-small-task \
+  --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" \
+  --scenario-command "python -c \"import json; print(json.dumps({'scenarios': [{'id': 'BDD-EXAMPLE-SMALL-TASK-001', 'status': 'passed'}]}))\"" \
   --workspace-mode current
-<plugin-root>/bin/megin approve --repo <target-repo> --work-id <work-id> \
-  --response "確認計畫 <work-id> plan-1，依此開始開發。"
-<plugin-root>/bin/megin resume --repo <target-repo> --work-id <work-id> \
+<plugin-root>/bin/megin approve --repo <target-repo> --work-id example-small-task \
+  --response "確認計畫 example-small-task plan-1，依此開始開發。"
+<plugin-root>/bin/megin resume --repo <target-repo> --work-id example-small-task \
   --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-<plugin-root>/bin/megin resume --repo <target-repo> --work-id <work-id> \
+<plugin-root>/bin/megin resume --repo <target-repo> --work-id example-small-task \
   --review-verdict APPROVED --reviewer-id fresh-reviewer \
   --review-report <review-report.json>
-<plugin-root>/bin/megin verify --repo <target-repo> --work-id <work-id>
-<plugin-root>/bin/megin accept --repo <target-repo> --work-id <work-id> \
-  --response "驗測通過 <work-id> acceptance-1，同意更新知識並建立本機 commit。"
-<plugin-root>/bin/megin finish --repo <target-repo> --work-id <work-id>
+<plugin-root>/bin/megin verify --repo <target-repo> --work-id example-small-task
+<plugin-root>/bin/megin accept --repo <target-repo> --work-id example-small-task \
+  --response "驗測通過 example-small-task acceptance-1，同意更新知識並建立本機 commit。"
+<plugin-root>/bin/megin finish --repo <target-repo> --work-id example-small-task
 ```
+
+若候選包含 Gherkin，必須同時提供 `--scenario-command`。該命令需輸出
+`{"scenarios":[{"id":"BDD-...","status":"passed|failed|undefined|skipped|error"}]}`；
+parser 成功或一般測試命令成功本身不構成 scenario 通過證據。驗證前 controller 會比對
+最後一次 APPROVED review 的 branch、HEAD 與 workspace snapshot。
+
+若 `verify` 回報 snapshot drift，依序對所有 `awaiting_review` task 重新提交 fresh APPROVED
+review，再重跑 `verify`；不需要建立新的 Work ID。若 `finish` 的 knowledge validation 失敗，
+先修正來源或 lint，再以同一 Work ID 重新完成 review → verify → accept；source bytes 改變時，
+controller 會重新要求完整 gate，不提供人工 unlock bypass。
 
 Large changes use the same single `approve` call after their complete design and Task graph are
 reviewed. Bug repairs first require `megin diagnose --command <read-only-oracle> --disposition confirmed|likely
@@ -117,7 +128,7 @@ anchored to its original product snapshot during this recovery.
 
 ## Safety boundaries
 
-Approval authorizes only the recorded work identity, behavior contract, scope, acceptance, knowledge update, and local delivery target. Scope drift requires a new plan version and approval. Reviewers stay read-only. Automated verification stops at `awaiting_user_acceptance`; before that gate no knowledge promotion, staging, or commit is possible. `finish` creates one local commit after acceptance and never pushes, merges, deploys, deletes branches, or cleans worktrees. Re-running `megin init` on an existing project repairs the local `.megin/` Git exclude.
+Approval authorizes only the recorded work identity, behavior contract, scope, acceptance, knowledge update, and local delivery target. Scope drift requires a new plan version and approval. The default base is resolved from explicit configuration, remote symbolic HEAD, or an unambiguous `main`／`master`; an unresolved base never falls back to the current HEAD. Current-directory workspaces use an atomic repository lock and release it only after successful finish. Reviewers stay read-only. Automated verification stops at `awaiting_user_acceptance`; before that gate no knowledge promotion, staging, or commit is possible. `finish` validates knowledge source encoding, JSON shape, source pre/post digests, and target Project Knowledge lint before marking it promoted; it creates one local commit after acceptance and never pushes, merges, deploys, deletes branches, or cleans worktrees. Re-running `megin init` on an existing project repairs the local `.megin/` Git exclude.
 
 The manifest is at `.codex-plugin/plugin.json`; the plugin can be installed through the Codex plugin mechanism or a local marketplace that points at this directory.
 

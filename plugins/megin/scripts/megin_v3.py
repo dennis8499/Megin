@@ -47,6 +47,16 @@ SHA1_RE = re.compile(r"^[a-f0-9]{40}$")
 TASK_CLASSES = ("read_only", "small", "large", "bug")
 WORKSPACE_MODES = ("current", "worktree")
 PHASES = ("exploration", "planning", "implementation", "review", "verification", "acceptance", "knowledge", "delivery")
+READ_ONLY_MARKERS = (
+    "explain", "review", "evaluate", "inspect", "assess", "audit", "check", "plan", "advice",
+    "read-only", "without changing", "without changes", "no changes", "查詢", "說明", "解釋",
+    "檢視", "評估", "審查", "分析", "計畫書", "唯讀", "不修改", "不需修改", "只檢查",
+)
+MUTATION_MARKERS = (
+    "build", "implement", "fix", "update", "modify", "make changes", "create", "add", "write", "refactor",
+    "repair", "execute", "改善", "修正", "修改", "新增", "開發", "實作", "執行",
+)
+SCENARIO_STATUSES = ("passed", "failed", "undefined", "skipped", "error", "not_run", "manual_pending")
 
 
 class MeginError(RuntimeError):
@@ -148,13 +158,30 @@ def head_sha(repo: Path) -> str:
 
 
 def default_base_branch(repo: Path) -> str:
-    branch = current_branch(repo)
-    if branch != "HEAD":
-        return branch
-    for candidate in ("main", "master"):
-        if git(repo, "show-ref", "--verify", f"refs/heads/{candidate}", check=False).strip():
-            return candidate
-    return "main"
+    symbolic = git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", check=False).strip()
+    if symbolic.startswith("refs/remotes/"):
+        remote_branch = symbolic.removeprefix("refs/remotes/")
+        if "/" in remote_branch:
+            return remote_branch.split("/", 1)[1]
+
+    local = [
+        candidate for candidate in ("main", "master")
+        if git(repo, "show-ref", "--verify", f"refs/heads/{candidate}", check=False).strip()
+    ]
+    if len(local) == 1:
+        return local[0]
+    if len(local) > 1:
+        raise MeginError("cannot resolve the default base branch because both main and master exist; pass --base-branch")
+
+    remote = [
+        candidate for candidate in ("main", "master")
+        if git(repo, "show-ref", "--verify", f"refs/remotes/origin/{candidate}", check=False).strip()
+    ]
+    if len(remote) == 1:
+        return remote[0]
+    if len(remote) > 1:
+        raise MeginError("cannot resolve the default base branch because origin has both main and master; pass --base-branch")
+    raise MeginError("cannot resolve a default base branch; pass --base-branch explicitly")
 
 
 def status_paths(repo: Path) -> list[str]:
@@ -178,7 +205,12 @@ def snapshot(repo: Path) -> str:
             entries.append({"path": path, "sha256": digest_bytes(absolute.read_bytes())})
         else:
             entries.append({"path": path, "sha256": "<missing>"})
-    return digest_json({"head": head_sha(repo), "entries": entries})
+    return digest_json({
+        "repo_id": repo_identity(repo),
+        "branch": current_branch(repo),
+        "head": head_sha(repo),
+        "entries": entries,
+    })
 
 
 def normalize_path(value: str) -> str:
@@ -215,6 +247,125 @@ def state_path(repo: Path, work_id: str) -> Path:
 
 def evidence_root(repo: Path, work_id: str) -> Path:
     return state_root(repo) / repo_identity(repo) / work_id / "evidence"
+
+
+def workspace_lock_path(repo: Path) -> Path:
+    return state_root(repo) / repo_identity(repo) / "current-workspace.lock"
+
+
+def acquire_workspace_lock(repo: Path, state: dict[str, Any]) -> Path:
+    path = workspace_lock_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "megin-current-workspace-lock/v1",
+        "repo_id": repo_identity(repo),
+        "work_id": state["work_id"],
+        "base_sha": state["repo"]["base_sha"],
+        "created_at": now(),
+    }
+    try:
+        descriptor = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        owner = "unknown"
+        try:
+            existing = read_json(path)
+            owner = str(existing.get("work_id") or owner)
+        except MeginError:
+            owner = "unreadable-lock"
+        raise MeginError(f"current workspace is already owned by Work ID {owner}; resolve it explicitly before retrying") from exc
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json_dump(payload))
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    return path
+
+
+def release_workspace_lock(repo: Path, work_id: str) -> None:
+    path = workspace_lock_path(repo)
+    if not path.exists():
+        return
+    try:
+        owner = read_json(path).get("work_id")
+    except MeginError:
+        return
+    if owner == work_id:
+        path.unlink(missing_ok=True)
+
+
+def ensure_workspace_binding(state: dict[str, Any], worktree: Path, *, require_base_head: bool = True) -> None:
+    expected = state.get("workspace", {})
+    expected_path = Path(str(expected.get("worktree", ""))).expanduser().resolve()
+    if expected_path != worktree.resolve():
+        raise MeginError("current workspace does not match the approved Work ID")
+    branch = current_branch(worktree)
+    if branch != expected.get("branch"):
+        raise MeginError("current branch does not match the approved Work ID; re-run review and verification")
+    if require_base_head and head_sha(worktree) != expected.get("base_sha"):
+        raise MeginError("workspace HEAD changed after approval; create a fresh plan instead of continuing")
+
+
+def parse_scenario_evidence(raw: str, scenarios: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], bool]:
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise MeginError(f"scenario evidence is not valid JSON: {exc}") from exc
+    values: Any = payload.get("scenarios") if isinstance(payload, dict) else payload
+    if not isinstance(values, list):
+        raise MeginError("scenario evidence must be a JSON array or an object with a scenarios array")
+    known = {str(item.get("id")): item for item in scenarios}
+    evidence: dict[str, dict[str, Any]] = {}
+    for item in values:
+        if not isinstance(item, dict):
+            raise MeginError("scenario evidence entries must be objects")
+        identifier = str(item.get("id") or item.get("scenario_id") or "")
+        if identifier not in known:
+            raise MeginError(f"scenario evidence references an unknown scenario: {identifier}")
+        if identifier in evidence:
+            raise MeginError(f"scenario evidence contains duplicate results for {identifier}")
+        status = str(item.get("status") or "").casefold()
+        if status == "pass":
+            status = "passed"
+        if status not in SCENARIO_STATUSES:
+            raise MeginError(f"scenario evidence has an unsupported status for {identifier}: {status}")
+        evidence[identifier] = {
+            "id": identifier,
+            "status": status,
+            "reason": redact(str(item.get("reason") or "runner evidence")),
+        }
+    results: list[dict[str, Any]] = []
+    failed = False
+    for scenario in scenarios:
+        identifier = str(scenario["id"])
+        if not scenario.get("automatic", True):
+            results.append({"id": identifier, "status": "manual_pending", "reason": "scenario is reserved for human acceptance"})
+            continue
+        result = evidence.get(identifier)
+        if result is None:
+            results.append({"id": identifier, "status": "not_run", "reason": "runner returned no result for this scenario"})
+            failed = True
+            continue
+        results.append(result)
+        if result["status"] != "passed":
+            failed = True
+    return results, failed
+
+
+def knowledge_snapshot(worktree: Path, paths: Iterable[str]) -> str:
+    entries: list[dict[str, str]] = []
+    for value in sorted(set(normalize_path(item) for item in paths)):
+        target = worktree / value
+        entries.append({
+            "path": value,
+            "sha256": digest_bytes(target.read_bytes()) if target.is_file() else "<missing>",
+        })
+    return digest_json(entries)
 
 
 def validate_work_id(value: str) -> str:
@@ -270,35 +421,43 @@ def fetch_base(repo: Path, branch: str, remote: str | None) -> str:
     candidates = [branch]
     if remote:
         candidates.insert(0, f"{remote}/{branch}")
+    if not remote and git(repo, "show-ref", "--verify", f"refs/remotes/origin/{branch}", check=False).strip():
+        candidates.insert(0, f"origin/{branch}")
     for candidate in candidates:
         result = run_process(("git", "rev-parse", candidate), repo, check=False)
         if result.returncode == 0 and SHA1_RE.fullmatch(result.stdout.strip()):
             return result.stdout.strip()
-    return head_sha(repo)
+    raise MeginError(f"base branch does not resolve to a commit: {branch}; refusing to use the current HEAD")
 
 
 def classify(request: str, task_class: str | None = None) -> dict[str, Any]:
     text = request.strip()
-    if task_class:
+    folded = text.casefold()
+    explicit_read_only = any(word in folded for word in READ_ONLY_MARKERS)
+    mutation_requested = any(word in folded for word in MUTATION_MARKERS)
+    read_only_intent = explicit_read_only and not mutation_requested
+    bug_words = ("bug", "error", "regression", "錯誤", "異常", "壞掉", "失效")
+    large_words = ("architecture", "cross-module", "migration", "system", "contract", "schema", "framework", "架構", "跨模組", "遷移", "契約", "綱要")
+    if read_only_intent:
+        chosen = "read_only"
+        reason = "read-only intent cannot be overridden by an explicit mutating class"
+    elif task_class:
         chosen = task_class
+        reason = "explicit task class"
+    elif any(word in folded for word in bug_words):
+        chosen = "bug"
+        reason = "keyword and impact routing"
+    elif any(word in folded for word in large_words):
+        chosen = "large"
+        reason = "keyword and impact routing"
     else:
-        folded = text.casefold()
-        readonly_words = ("explain", "review", "evaluate", "inspect", "查詢", "說明", "解釋", "檢視", "評估", "審查")
-        bug_words = ("bug", "error", "regression", "錯誤", "異常", "壞掉", "失效")
-        large_words = ("architecture", "cross-module", "migration", "system", "架構", "跨模組", "遷移", "流程")
-        if any(word in folded for word in readonly_words) and not any(word in folded for word in ("build", "implement", "fix", "修正", "新增", "開發")):
-            chosen = "read_only"
-        elif any(word in folded for word in bug_words):
-            chosen = "bug"
-        elif any(word in folded for word in large_words):
-            chosen = "large"
-        else:
-            chosen = "small"
+        chosen = "small"
+        reason = "keyword and impact routing"
     if chosen not in TASK_CLASSES:
         raise MeginError(f"unknown task class: {chosen}")
     return {
         "task_class": chosen,
-        "reason": "explicit task class" if task_class else "keyword and impact routing",
+        "reason": reason,
         "needs_clarification": len(text) < 8,
         "read_only": chosen == "read_only",
     }
@@ -365,6 +524,11 @@ def build_scope(repo: Path, args: argparse.Namespace, config: dict[str, Any] | N
     commands = list(getattr(args, "test_command", None) or (config or {}).get("test_commands", []) or ["python -m unittest discover"])
     if any(not item.strip() for item in commands):
         raise MeginError("test commands cannot be empty")
+    scenario_command = getattr(args, "scenario_command", None)
+    if scenario_command is None:
+        scenario_command = (config or {}).get("scenario_command")
+    if scenario_command is not None and not str(scenario_command).strip():
+        raise MeginError("scenario command cannot be empty")
     knowledge = [normalize_path(item) for item in (getattr(args, "knowledge_path", None) or (config or {}).get("knowledge_scope", []))]
     if any(not path_allowed(item, allowed) for item in knowledge):
         raise MeginError("knowledge scope must be contained in the approved allowed paths")
@@ -373,13 +537,10 @@ def build_scope(repo: Path, args: argparse.Namespace, config: dict[str, Any] | N
     remote = getattr(args, "remote", None)
     if remote is None:
         remote = (config or {}).get("remote")
-    if remote is None:
-        origin = git(repo, "remote", "get-url", "origin", check=False).strip()
-        if origin:
-            remote = "origin"
     return {
         "allowed_paths": sorted(set(allowed)),
         "test_commands": commands,
+        "scenario_command": scenario_command,
         "knowledge_scope": sorted(set(knowledge)),
         "acceptance": acceptance,
         "publication": {
@@ -527,7 +688,12 @@ def make_state(repo: Path, work_id: str, args: argparse.Namespace, classificatio
         "review": {"overall": "pending", "per_task": {}, "findings": [], "no_progress_count": 0, "snapshot": None},
         "verification": {"status": "not_run", "commands": [], "scenario_results": [], "snapshot": None, "record_sha256": None},
         "human_acceptance": {"status": "pending", "version": "acceptance-1", "response": None, "checked_scenarios": [], "observed": [], "snapshot": None, "accepted_at": None},
-        "knowledge": {"scope": scope["knowledge_scope"], "status": "pending" if scope["knowledge_scope"] else "not_needed", "sources": list(getattr(args, "source", None) or []), "conflicts": [], "candidate_path": None, "promoted_at": None},
+        "knowledge": {
+            "scope": scope["knowledge_scope"], "status": "pending" if scope["knowledge_scope"] else "not_needed",
+            "sources": list(getattr(args, "source", None) or []), "conflicts": [], "candidate_path": None,
+            "promoted_at": None, "reviewed_snapshot": None, "pre_snapshot": None, "post_snapshot": None,
+            "validation": None,
+        },
         "publication": {"state": "not_ready", "commit_sha": None, "changed_paths": [], "suggested_commit": None},
         "events": [], "next_action": "resolve the recorded exploration questions" if unresolved else "provide the plan approval response",
         "created_at": now(), "updated_at": now(),
@@ -608,6 +774,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "base_branch": args.base_branch or default_base_branch(repo), "branch_prefix": validate_branch_prefix(args.branch_prefix or "feat"),
         "workspace_mode": args.workspace_mode or "current", "test_commands": list(args.test_command or ["python -m unittest discover"]),
         "allowed_paths": list(args.allowed_path or ["." ]), "knowledge_scope": list(args.knowledge_path or []),
+        "scenario_command": args.scenario_command,
         "remote": args.remote, "created_at": now(),
     }
     write_json_atomic(path, config)
@@ -669,14 +836,23 @@ def activate_workspace(state: dict[str, Any], repo: Path, args: argparse.Namespa
     base_sha = state["repo"]["base_sha"]
     if head_sha(repo) != base_sha:
         raise MeginError("the approved base SHA no longer matches HEAD; re-run exploration and create a new plan")
+    expected_base_branch = state["repo"]["base_branch"]
+    if current_branch(repo) != expected_base_branch:
+        raise MeginError(f"approval must start from base branch {expected_base_branch}; current branch is {current_branch(repo)}")
     mode = state["workspace"]["mode"]
     prefix = validate_branch_prefix(getattr(args, "branch_prefix", None) or state["approval"]["scope"]["publication"].get("branch_prefix") or "feat")
     branch = f"{prefix}/{state['work_id']}"
     if mode == "current":
-        if git(repo, "show-ref", "--verify", f"refs/heads/{branch}", check=False).strip():
-            raise MeginError(f"feature branch already exists: {branch}")
-        git(repo, "switch", "-c", branch)
-        worktree = repo
+        lock_path = acquire_workspace_lock(repo, state)
+        try:
+            if git(repo, "show-ref", "--verify", f"refs/heads/{branch}", check=False).strip():
+                raise MeginError(f"feature branch already exists: {branch}")
+            git(repo, "switch", "-c", branch)
+            worktree = repo
+        except Exception:
+            if lock_path.exists():
+                release_workspace_lock(repo, state["work_id"])
+            raise
     else:
         worktree = state_root(repo) / repo_identity(repo) / state["work_id"] / "worktree"
         if worktree.exists():
@@ -741,6 +917,57 @@ def task_for_id(state: dict[str, Any], task_id: str | None = None) -> dict[str, 
     raise MeginError("there is no active task")
 
 
+def advance_after_review(state: dict[str, Any], task: dict[str, Any], args: argparse.Namespace) -> None:
+    """Advance the workflow after an APPROVED task review.
+
+    A fresh review can be required for more than one task after snapshot drift.
+    Those tasks must be reviewed before any new writer assignment is created.
+    """
+    if all(item.get("status") == "reviewed" for item in state["tasks"]):
+        state["review"]["overall"] = "approved"
+        state["phase"] = "verification"
+        state["status"] = "awaiting_verification"
+        state["next_action"] = "run verify to execute the approved commands and Gherkin contract"
+        event(state, "task_review_approved", task_id=task["id"], next_phase="verification")
+        return
+
+    next_review = next((item for item in state["tasks"] if item.get("status") == "awaiting_review"), None)
+    if next_review is not None:
+        state["review"]["overall"] = "pending"
+        state["phase"] = "review"
+        state["status"] = "awaiting_review"
+        state["next_action"] = f"fresh independent reviewer records an APPROVED or CHANGES_REQUIRED verdict for {next_review['id']}"
+        event(state, "task_review_approved", task_id=task["id"], next_review_task=next_review["id"])
+        return
+
+    next_task = next(
+        (
+            item
+            for item in state["tasks"]
+            if item.get("status") == "pending"
+            and all(
+                previous.get("status") == "reviewed"
+                for previous in state["tasks"]
+                if previous["id"] in item.get("depends_on", [])
+            )
+        ),
+        None,
+    )
+    if next_task is None:
+        raise MeginError("no awaiting-review or dependency-ready pending task remains after review")
+
+    state["review"]["overall"] = "pending"
+    state["phase"] = "implementation"
+    state["status"] = "active"
+    next_task["status"] = "active"
+    writer_number = 1 + sum(1 for item in state.get("assignments", []) if item.get("role") == "writer")
+    next_writer = args.writer_id or f"implementation-agent-{writer_number:02d}"
+    next_session = args.writer_session or f"writer:{next_writer}:01"
+    assignment = make_assignment(state, next_task, "writer", next_writer, next_session)
+    state["next_action"] = f"writer completes {next_task['id']}"
+    event(state, "task_review_approved", task_id=task["id"], next_assignment=assignment["assignment_id"])
+
+
 def changed_paths_for_report(report: dict[str, Any], worktree: Path) -> list[str]:
     values = report.get("changed_paths")
     if values is None:
@@ -773,6 +1000,7 @@ def cmd_resume(args: argparse.Namespace) -> int:
         emit(state_summary(state, path), args)
         return 0
     worktree = current_worktree(state)
+    ensure_workspace_binding(state, worktree)
     if args.writer_complete:
         task = task_for_id(state, args.task_id)
         assignment = next((item for item in reversed(state["assignments"]) if item["task_id"] == task["id"] and item["role"] == "writer" and item["status"] == "active"), None)
@@ -832,22 +1060,7 @@ def cmd_resume(args: argparse.Namespace) -> int:
         state["review"]["per_task"][task["id"]] = {"verdict": verdict, "reviewer": reviewer, "session": session, "findings": findings, "report": review_report, "at": now()}
         if verdict == "APPROVED":
             task["status"] = "reviewed"
-            state["review"]["overall"] = "approved" if all(item["status"] == "reviewed" for item in state["tasks"]) else "pending"
-            if all(item["status"] == "reviewed" for item in state["tasks"]):
-                state["phase"] = "verification"
-                state["status"] = "awaiting_verification"
-                state["next_action"] = "run verify to execute the approved commands and Gherkin contract"
-            else:
-                state["phase"] = "implementation"
-                state["status"] = "active"
-                next_task = next(item for item in state["tasks"] if item["status"] == "pending" and all(previous.get("status") == "reviewed" for previous in state["tasks"] if previous["id"] in item.get("depends_on", [])))
-                next_task["status"] = "active"
-                writer_number = 1 + sum(1 for item in state.get("assignments", []) if item.get("role") == "writer")
-                next_writer = args.writer_id or f"implementation-agent-{writer_number:02d}"
-                next_session = args.writer_session or f"writer:{next_writer}:01"
-                assignment = make_assignment(state, next_task, "writer", next_writer, next_session)
-                state["next_action"] = f"writer completes {next_task['id']}"
-                event(state, "task_review_approved", task_id=task["id"], next_assignment=assignment["assignment_id"])
+            advance_after_review(state, task, args)
         elif verdict == "CHANGES_REQUIRED":
             same = bool(state["review"].get("findings")) and state["review"].get("findings") == findings
             state["review"]["no_progress_count"] = int(state["review"].get("no_progress_count") or 0) + 1 if same else 0
@@ -883,7 +1096,35 @@ def cmd_verify(args: argparse.Namespace) -> int:
     if any(item.get("status") != "reviewed" for item in state["tasks"]):
         raise MeginError("verification is blocked until every task has an independent APPROVED review")
     worktree = current_worktree(state)
+    ensure_workspace_binding(state, worktree)
     current_snapshot = snapshot(worktree)
+    review_snapshot = state["review"].get("snapshot")
+    if review_snapshot is None:
+        raise MeginError("verification is blocked until the approved review records a workspace snapshot")
+    if current_snapshot != review_snapshot:
+        state["verification"].update({"status": "stale", "snapshot": current_snapshot})
+        drifted_tasks = []
+        for task in state["tasks"]:
+            if task.get("status") == "reviewed":
+                task["status"] = "awaiting_review"
+                drifted_tasks.append(task["id"])
+        state["review"]["overall"] = "pending"
+        state["review"]["findings"] = []
+        state["review"]["no_progress_count"] = 0
+        state["phase"] = "review"
+        state["status"] = "awaiting_review"
+        state["next_action"] = "the reviewed workspace changed; obtain a fresh independent review before verifying"
+        event(
+            state,
+            "verification_blocked_snapshot_drift",
+            phase="review",
+            status="awaiting_review",
+            task_ids=drifted_tasks,
+            cleared_review_findings=True,
+            cleared_review_retry_count=True,
+        )
+        save_state(state, path)
+        raise MeginError("workspace changed after review; obtain a fresh independent review before verifying")
     if args.reuse_evidence and state["verification"].get("status") == "passed" and state["verification"].get("snapshot") == current_snapshot:
         state["phase"] = "acceptance"
         state["status"] = "awaiting_user_acceptance"
@@ -906,13 +1147,53 @@ def cmd_verify(args: argparse.Namespace) -> int:
         raw = redact((result.stdout or "") + (result.stderr or ""))
         evidence_path = evidence_dir / f"verify-{index:02d}.log"
         evidence_path.write_text(raw, encoding="utf-8")
-        record = {"command": command, "status": "passed" if result.returncode == 0 else "failed", "returncode": result.returncode, "evidence_path": str(evidence_path), "output_sha256": digest_bytes(raw.encode("utf-8")), "input_snapshot": input_snapshot, "output_snapshot": snapshot(worktree), "environment": {"python": sys.version.split()[0], "platform": sys.platform}}
+        output_snapshot = snapshot(worktree)
+        record = {"command": command, "status": "passed" if result.returncode == 0 else "failed", "returncode": result.returncode, "evidence_path": str(evidence_path), "output_sha256": digest_bytes(raw.encode("utf-8")), "input_snapshot": input_snapshot, "output_snapshot": output_snapshot, "environment": {"python": sys.version.split()[0], "platform": sys.platform}}
         state["verification"]["commands"].append(record)
         if result.returncode != 0:
             failed = True
-    scenario_results = [{"id": scenario["id"], "status": "passed", "reason": "Gherkin contract parsed and bound to the approved plan"} for scenario in state["behavior_contract"]["scenarios"]]
+        if output_snapshot != input_snapshot:
+            record["status"] = "failed"
+            record["reason"] = "verification command changed the approved workspace"
+            failed = True
+
+    scenario_command = state["approval"]["scope"].get("scenario_command")
+    scenario_results: list[dict[str, Any]]
+    if scenario_command:
+        input_snapshot = snapshot(worktree)
+        result = subprocess.run(scenario_command, cwd=str(worktree), shell=True, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=300)
+        raw = redact((result.stdout or "") + (result.stderr or ""))
+        evidence_path = evidence_dir / "scenario-evidence.json"
+        evidence_path.write_text(raw, encoding="utf-8")
+        scenario_failed = result.returncode != 0
+        if result.returncode == 0:
+            try:
+                scenario_results, parsed_failed = parse_scenario_evidence(raw, state["behavior_contract"]["scenarios"])
+                scenario_failed = scenario_failed or parsed_failed
+            except MeginError as exc:
+                scenario_results = [{"id": scenario["id"], "status": "error", "reason": str(exc)} for scenario in state["behavior_contract"]["scenarios"]]
+                scenario_failed = True
+        else:
+            scenario_results = [{"id": scenario["id"], "status": "error", "reason": "scenario runner exited non-zero"} for scenario in state["behavior_contract"]["scenarios"]]
+        output_snapshot = snapshot(worktree)
+        scenario_record = {
+            "command": scenario_command, "kind": "scenario_runner", "status": "passed" if not scenario_failed else "failed",
+            "returncode": result.returncode, "evidence_path": str(evidence_path), "output_sha256": digest_bytes(raw.encode("utf-8")),
+            "input_snapshot": input_snapshot, "output_snapshot": output_snapshot,
+            "environment": {"python": sys.version.split(".")[0], "platform": sys.platform},
+        }
+        if output_snapshot != input_snapshot:
+            scenario_failed = True
+            scenario_record["status"] = "failed"
+            scenario_record["reason"] = "scenario runner changed the approved workspace"
+        state["verification"]["commands"].append(scenario_record)
+        failed = failed or scenario_failed
+    else:
+        scenario_results = [{"id": scenario["id"], "status": "not_run", "reason": "no approved scenario command was provided"} for scenario in state["behavior_contract"]["scenarios"]]
+        failed = True
     state["verification"]["scenario_results"] = scenario_results
     state["verification"]["snapshot"] = snapshot(worktree)
+    state["knowledge"]["reviewed_snapshot"] = knowledge_snapshot(worktree, state["knowledge"].get("scope", []))
     state["verification"]["record_sha256"] = digest_json(state["verification"])
     if failed:
         state["verification"]["status"] = "failed"
@@ -944,6 +1225,7 @@ def cmd_accept(args: argparse.Namespace) -> int:
     if version != state["human_acceptance"]["version"] or not response_has_tokens(response, state["work_id"], version):
         raise MeginError(f"provide an explicit response such as: 驗測通過 {state['work_id']} {state['human_acceptance']['version']}，同意更新知識並建立本機 commit。")
     worktree = current_worktree(state)
+    ensure_workspace_binding(state, worktree)
     current = snapshot(worktree)
     if current != state["human_acceptance"].get("snapshot"):
         raise MeginError("product snapshot changed after verify; run the affected review and verification again")
@@ -957,21 +1239,103 @@ def cmd_accept(args: argparse.Namespace) -> int:
     return 0
 
 
+def git_base_file_digest(repo: Path, base_sha: str, path: str) -> str:
+    result = subprocess.run(
+        ["git", "cat-file", "blob", f"{base_sha}:{path}"],
+        cwd=str(repo), capture_output=True,
+    )
+    if result.returncode != 0:
+        return "<missing>"
+    return digest_bytes(result.stdout)
+
+
+def block_knowledge_promotion(state: dict[str, Any], reason: str) -> str:
+    safe_reason = redact(reason)
+    state["knowledge"].update({"status": "blocked", "conflicts": [safe_reason]})
+    state["phase"] = "knowledge"
+    state["status"] = "blocked"
+    state["next_action"] = "repair the knowledge source or Project Knowledge lint, then resume finish; source changes require fresh review and verification"
+    event(state, "knowledge_promotion_blocked", phase="knowledge", status="blocked", reason=safe_reason)
+    return safe_reason
+
+
 def promote_knowledge(state: dict[str, Any], repo: Path, worktree: Path) -> None:
     knowledge = state["knowledge"]
-    if not knowledge.get("scope"):
-        knowledge["status"] = "not_needed"
+    scope = [normalize_path(str(item)) for item in knowledge.get("scope", [])]
+    if not scope:
+        knowledge.update({"status": "not_needed", "conflicts": []})
         return
-    sources: list[dict[str, str]] = []
-    for path in knowledge["scope"]:
-        target = worktree / path
-        if not target.exists() or not target.is_file():
-            raise MeginError(f"knowledge source is missing: {path}")
-        sources.append({"path": path, "sha256": digest_bytes(target.read_bytes())})
-    candidate = {"schema": "megin-knowledge-candidate/v3", "work_id": state["work_id"], "sources": sources, "plan_version": state["design"]["plan_version"], "created_at": now()}
-    candidate_path = evidence_root(repo, state["work_id"]) / "knowledge-candidate.json"
-    write_json_atomic(candidate_path, candidate)
-    knowledge.update({"status": "promoted", "sources": [item["path"] for item in sources], "candidate_path": str(candidate_path), "promoted_at": now()})
+
+    # A later finish is a new validation attempt.  Keep the reviewed snapshot
+    # as the gate, but do not let an earlier failure permanently poison it.
+    knowledge.update({
+        "status": "pending", "conflicts": [], "sources": [], "candidate_path": None,
+        "pre_snapshot": None, "post_snapshot": None, "validation": None, "promoted_at": None,
+    })
+    try:
+        reviewed_snapshot = knowledge.get("reviewed_snapshot")
+        current_knowledge_snapshot = knowledge_snapshot(worktree, scope)
+        if not reviewed_snapshot or reviewed_snapshot != current_knowledge_snapshot:
+            raise MeginError("knowledge sources changed after verification; obtain a fresh review before promotion")
+
+        sources: list[dict[str, str]] = []
+        for path in scope:
+            target = worktree / path
+            if not target.exists() or not target.is_file():
+                raise MeginError(f"knowledge source is missing: {path}")
+            raw = target.read_bytes()
+            try:
+                raw.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise MeginError(f"knowledge source is not UTF-8: {path}") from exc
+            if target.suffix.casefold() == ".json":
+                try:
+                    json.loads(raw.decode("utf-8"))
+                except json.JSONDecodeError as exc:
+                    raise MeginError(f"knowledge JSON is invalid: {path}: {exc}") from exc
+            sources.append({
+                "path": path,
+                "pre_sha256": git_base_file_digest(worktree, state["repo"]["base_sha"], path),
+                "post_sha256": digest_bytes(raw),
+            })
+
+        validated_snapshot = knowledge_snapshot(worktree, scope)
+        if validated_snapshot != current_knowledge_snapshot:
+            raise MeginError("knowledge sources changed during promotion validation")
+
+        candidate_path = evidence_root(repo, state["work_id"]) / "knowledge-candidate.json"
+        candidate = {
+            "schema": "megin-knowledge-candidate/v3",
+            "work_id": state["work_id"],
+            "sources": sources,
+            "pre_snapshot": digest_json([{item["path"]: item["pre_sha256"]} for item in sources]),
+            "post_snapshot": current_knowledge_snapshot,
+            "plan_version": state["design"]["plan_version"],
+            "created_at": now(),
+        }
+        write_json_atomic(candidate_path, candidate)
+        knowledge.update({
+            "status": "reviewed", "sources": [item["path"] for item in sources], "candidate_path": str(candidate_path),
+            "pre_snapshot": candidate["pre_snapshot"], "post_snapshot": current_knowledge_snapshot,
+            "validation": {"source_checks": "passed", "schema_checks": "passed"},
+        })
+
+        validator = worktree / ".agents" / "skills" / "project-knowledge" / "scripts" / "knowledge_cli.py"
+        if validator.is_file():
+            result = run_process((sys.executable, "-X", "utf8", "-B", str(validator), "lint", "--repo", str(worktree)), worktree, timeout=300, check=False)
+            raw = redact((result.stdout or "") + (result.stderr or ""))
+            lint_path = evidence_root(repo, state["work_id"]) / "knowledge-lint.log"
+            lint_path.write_text(raw, encoding="utf-8")
+            knowledge["validation"] = {
+                "source_checks": "passed", "schema_checks": "passed", "lint": "passed" if result.returncode == 0 else "failed",
+                "evidence_path": str(lint_path), "output_sha256": digest_bytes(raw.encode("utf-8")),
+            }
+            if result.returncode != 0:
+                raise MeginError("target Project Knowledge lint failed; knowledge was not promoted")
+    except MeginError as exc:
+        raise MeginError(block_knowledge_promotion(state, str(exc))) from exc
+    except OSError as exc:
+        raise MeginError(block_knowledge_promotion(state, f"knowledge validation failed: {exc}")) from exc
 
 
 def cmd_finish(args: argparse.Namespace) -> int:
@@ -980,6 +1344,7 @@ def cmd_finish(args: argparse.Namespace) -> int:
     if state["human_acceptance"].get("status") != "passed":
         raise MeginError("finish is blocked until the human acceptance response is recorded")
     worktree = current_worktree(state)
+    ensure_workspace_binding(state, worktree)
     if snapshot(worktree) != state["human_acceptance"].get("snapshot"):
         raise MeginError("working tree changed after human acceptance; run review, verify, and acceptance again")
     changed = status_paths(worktree)
@@ -988,9 +1353,11 @@ def cmd_finish(args: argparse.Namespace) -> int:
         raise MeginError("finish found a changed path outside the approved scope")
     if not changed:
         raise MeginError("finish found no product changes to commit")
-    if state["knowledge"].get("conflicts") or state["knowledge"].get("status") == "blocked":
-        raise MeginError("finish is blocked until the approved knowledge conflict is resolved and reviewed again")
-    promote_knowledge(state, repo, worktree)
+    try:
+        promote_knowledge(state, repo, worktree)
+    except MeginError:
+        save_state(state, path)
+        raise
     git(worktree, "add", "-A", "--", *changed)
     staged = [item for item in status_paths(worktree)]
     if not staged:
@@ -1001,11 +1368,15 @@ def cmd_finish(args: argparse.Namespace) -> int:
         raise MeginError(f"git commit failed ({result.returncode}): {redact((result.stdout or '') + (result.stderr or '')).strip()}")
     commit = head_sha(worktree)
     state["publication"].update({"state": "committed", "commit_sha": commit, "changed_paths": changed, "suggested_commit": message})
+    if state["knowledge"].get("status") == "reviewed":
+        state["knowledge"].update({"status": "promoted", "promoted_at": now()})
     state["phase"] = "delivery"
     state["status"] = "complete"
     state["next_action"] = "knowledge and local commit are complete; no push or merge was performed"
     event(state, "committed", phase="delivery", status="complete", commit_sha=commit)
     save_state(state, path)
+    if state["workspace"].get("mode") == "current":
+        release_workspace_lock(repo, state["work_id"])
     result_value = state_summary(state, path)
     result_value["commit"] = commit
     emit(result_value, args)
@@ -1059,6 +1430,7 @@ def add_repo(parser: argparse.ArgumentParser) -> None:
 def add_scope(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--allowed-path", action="append")
     parser.add_argument("--test-command", action="append")
+    parser.add_argument("--scenario-command", help="command that emits JSON scenario evidence keyed by stable scenario ID")
     parser.add_argument("--knowledge-path", action="append")
     parser.add_argument("--acceptance", action="append")
     parser.add_argument("--feature-file", action="append")
@@ -1091,6 +1463,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--branch-prefix")
     init_parser.add_argument("--workspace-mode", choices=WORKSPACE_MODES)
     init_parser.add_argument("--test-command", action="append")
+    init_parser.add_argument("--scenario-command")
     init_parser.add_argument("--allowed-path", action="append")
     init_parser.add_argument("--knowledge-path", action="append")
     init_parser.add_argument("--remote")

@@ -32,6 +32,12 @@ megin start --repo <target-repo> --request "<request>"
 但不得平行寫入或自行再委派。Implementation 完成後由不同 fresh、read-only Reviewer 審查；
 blocking finding 回交同一 writer，沿用 bounded fix loop。
 
+若使用 Gherkin，`start` 必須綁定 `--scenario-command`；命令輸出需以 stable scenario ID
+回報每個 scenario 的實際狀態。只有 runner 回報 `passed` 才能通過 automatic scenario，
+undefined、skipped、缺少結果或 parser-only 結果都會阻擋 `verify`。`verify`、`accept` 與
+`finish` 會重新確認 approved review snapshot、branch、HEAD 與 knowledge source digest；
+current workspace 另受 repository lock 保護。
+
 續跑與收尾：
 
 ```console
@@ -46,14 +52,21 @@ megin finish --repo <target-repo> --work-id <work-id>
 小任務的核准、派工、審查與人工驗測可用下列最小循序操作表示；每個結果都會寫入外部 v3 state：
 
 ```console
-megin start --repo <target-repo> --request "<request>" --allowed-path src/example.py --test-command "python -m unittest"
-megin approve --repo <target-repo> --work-id <work-id> --response "確認計畫 <work-id> plan-1，依此開始開發。"
-megin resume --repo <target-repo> --work-id <work-id> --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
-megin resume --repo <target-repo> --work-id <work-id> --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
-megin verify --repo <target-repo> --work-id <work-id>
-megin accept --repo <target-repo> --work-id <work-id> --response "驗測通過 <work-id> acceptance-1，同意更新知識並建立本機 commit。"
-megin finish --repo <target-repo> --work-id <work-id>
+megin start --repo <target-repo> --work-id example-small-task \
+  --request "<request>" --allowed-path src/example.py --test-command "python -m unittest" \
+  --scenario-command "python -c \"import json; print(json.dumps({'scenarios': [{'id': 'BDD-EXAMPLE-SMALL-TASK-001', 'status': 'passed'}]}))\""
+megin approve --repo <target-repo> --work-id example-small-task --response "確認計畫 example-small-task plan-1，依此開始開發。"
+megin resume --repo <target-repo> --work-id example-small-task --writer-ticket <assignment-ticket> --writer-report <writer-report.json> --writer-complete
+megin resume --repo <target-repo> --work-id example-small-task --review-verdict APPROVED --reviewer-id fresh-reviewer --review-report <review-report.json>
+megin verify --repo <target-repo> --work-id example-small-task
+megin accept --repo <target-repo> --work-id example-small-task --response "驗測通過 example-small-task acceptance-1，同意更新知識並建立本機 commit。"
+megin finish --repo <target-repo> --work-id example-small-task
 ```
+
+若 snapshot drift 使 `verify` 回到 `awaiting_review`，依序對所有 affected task 重新提交 fresh
+APPROVED review，再執行 `verify`；若 knowledge validation 失敗，修正來源或 Project Knowledge
+lint 後可沿用同一 Work ID 重跑 review → verify → accept → finish。source bytes 改變時不可跳過
+snapshot gate，也沒有人工 unlock bypass。
 
 大型變更仍在同一個 `approve` 關卡核准完整 bundle；疑似
 BUG 先以 `diagnose` 的唯讀命令與根因假設保存 assessment，再以 `--diagnosis-file` 綁定修復。來源 checkout 可用
