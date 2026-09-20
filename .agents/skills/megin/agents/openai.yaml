@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin delivery workflow"
+  short_description: "Run a complete Skills-only delivery workflow"
+  default_prompt: "Use $megin to guide this repository change from requirements through acceptance and local delivery."
+policy:
+  allow_implicit_invocation: true

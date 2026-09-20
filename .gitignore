@@ -500,11 +500,6 @@ docs/*
 # tgrep maintains a separate on-disk index for each worktree.
 .tgrep/
 
-# The portable plugin ships executable wrappers under a directory name that the
-# Visual Studio template otherwise ignores.
-!plugins/megin/bin/
-!plugins/megin/bin/**
-
 # Local Megin scratch and validation output.
 /.tmp/
 /.test-run-tmp/

@@ -1,7 +1,0 @@
-interface:
-  display_name: "Delivery Orchestrator"
-  short_description: "交付軟體變更的統一入口與 v1／v2 Gate 流程"
-  default_prompt: "使用 $delivery-orchestrator 作為唯一 mutating Megin 入口；先將 portable 請求分類為 read_only、small、large 或 bug，依 v2 Gate policy 建立或續接隔離 workspace，路由需求、規劃、單一 authorized writer 實作與 fresh review。沒有 v2 state 的既有工作維持 v1 人工 Gate。"
-
-policy:
-  allow_implicit_invocation: true

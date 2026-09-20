@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin test-driven development"
+  short_description: "Prove behavior with an outside-in TDD loop"
+  default_prompt: "Use $megin-test-driven-development to implement this approved behavior with a red-green-refactor loop."
+policy:
+  allow_implicit_invocation: true

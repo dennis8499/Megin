@@ -1,9 +1,0 @@
-interface:
-  display_name: "Project Knowledge"
-  short_description: "Search and govern cited repository engineering knowledge"
-  brand_color: "#2563EB"
-  default_prompt: "Use $project-knowledge to find cited repository evidence for this engineering task."
-policy:
-  allow_implicit_invocation: true
-
-

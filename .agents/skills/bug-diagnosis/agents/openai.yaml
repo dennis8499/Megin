@@ -1,6 +1,0 @@
-interface:
-  display_name: "BUG Diagnosis"
-  short_description: "唯讀收斂 BUG 症狀、根因假設與交接證據"
-  default_prompt: "Use $bug-diagnosis to diagnose this unexpected engineering behavior before proposing a fix."
-policy:
-  allow_implicit_invocation: true

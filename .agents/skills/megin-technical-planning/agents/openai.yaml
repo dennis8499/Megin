@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin technical planning"
+  short_description: "Produce a bounded implementation plan"
+  default_prompt: "Use $megin-technical-planning to turn the approved requirements into a complete technical plan."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin finishing delivery"
+  short_description: "Review knowledge and create one local commit"
+  default_prompt: "Use $megin-finishing-delivery to finish the accepted change within its approved local scope."
+policy:
+  allow_implicit_invocation: true

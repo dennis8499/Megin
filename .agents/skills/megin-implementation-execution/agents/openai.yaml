@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin implementation"
+  short_description: "Implement an approved work package safely"
+  default_prompt: "Use $megin-implementation-execution to implement the approved work package with focused evidence."
+policy:
+  allow_implicit_invocation: true

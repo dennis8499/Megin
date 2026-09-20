@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin bug diagnosis"
+  short_description: "Reproduce and explain defects safely"
+  default_prompt: "Use $megin-bug-diagnosis to diagnose this failure with read-only evidence before changing code."
+policy:
+  allow_implicit_invocation: true

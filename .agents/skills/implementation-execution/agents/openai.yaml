@@ -1,7 +1,0 @@
-interface:
-  display_name: "實作執行"
-  short_description: "執行經統一交付入口授權的 v1／v2 計畫"
-  default_prompt: "使用 $delivery-orchestrator 統一入口路由 $implementation-execution；取得 v1 implementation 階段授權或 v2 current writer assignment 後，循序執行工作包、全量驗證與 fresh 唯讀 review，再依適用 path 交給 knowledge review 與 finish handoff。"
-
-policy:
-  allow_implicit_invocation: true

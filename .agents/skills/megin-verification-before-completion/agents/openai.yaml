@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin completion verification"
+  short_description: "Verify a reviewed change before acceptance"
+  default_prompt: "Use $megin-verification-before-completion to run every approved obligation against the reviewed snapshot."
+policy:
+  allow_implicit_invocation: true

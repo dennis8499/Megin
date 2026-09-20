@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin project knowledge"
+  short_description: "Keep repository knowledge source-backed"
+  default_prompt: "Use $megin-project-knowledge to review the relevant project knowledge and source provenance."
+policy:
+  allow_implicit_invocation: true

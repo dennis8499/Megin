@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin behavior contract"
+  short_description: "Write stable executable acceptance scenarios"
+  default_prompt: "Use $megin-behavior-contract to define the executable scenarios for this approved behavior."
+policy:
+  allow_implicit_invocation: true

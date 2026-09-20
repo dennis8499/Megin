@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin human acceptance"
+  short_description: "Guide the approved manual acceptance gate"
+  default_prompt: "Use $megin-human-acceptance to present and record the approved user-visible acceptance scenarios."
+policy:
+  allow_implicit_invocation: true

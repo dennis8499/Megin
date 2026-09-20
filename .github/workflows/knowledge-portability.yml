@@ -1,66 +1,48 @@
-name: Knowledge portability
+name: Megin Skills portability
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - ".agents/skills/**"
-      - "plugins/megin/**"
-      - "docs/**"
       - "README.md"
       - "OPERATIONS.md"
-      - "THIRD_PARTY_NOTICES.md"
-      - "tgrep.exe"
-      - ".gitattributes"
+      - "megin-skills.zip"
       - ".github/workflows/knowledge-portability.yml"
+      - ".gitattributes"
       - ".gitignore"
 
 jobs:
-  quick:
-    name: Quick contracts and knowledge checks
+  skills:
+    name: Validate Skills bundle
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Ensure ripgrep
+      - name: Validate Skills source and distributable archive
+        run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
+      - name: Check pull-request whitespace
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if ! command -v rg >/dev/null 2>&1; then
-            cargo install ripgrep --locked
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA...$GITHUB_SHA"
+          else
+            git diff --check "$GITHUB_SHA^" "$GITHUB_SHA"
           fi
-          git --version
-          rg --version
-      - name: Syntax, schemas, owner contracts, and knowledge sources
-        shell: bash
-        run: >-
-          python -X utf8 -B
-          .agents/skills/project-knowledge/scripts/run_quick_checks.py
-          > knowledge-quick.json
-      - name: Validate portable megin plugin and v3 CLI
-        if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
-        shell: bash
-        run: |
-          python -X utf8 -B -c "import json, pathlib; root=json.loads(pathlib.Path('plugins/megin/plugin.json').read_text(encoding='utf-8')); fallback=json.loads(pathlib.Path('plugins/megin/.codex-plugin/plugin.json').read_text(encoding='utf-8')); assert root['name'] == fallback['name'] == 'megin'; assert root['version'] == fallback['version']; assert root['extensions']['com.openai']['hooks'] == './hooks/hooks.json'"
-          python -X utf8 -B -c "import json, pathlib; p=pathlib.Path('plugins/megin/.codex-plugin/plugin.json'); m=json.loads(p.read_text(encoding='utf-8')); assert m['name'] == 'megin'; assert m['skills'] == './skills/'"
-          python -X utf8 -B plugins/megin/scripts/megin_v3.py --help
-          python -X utf8 -B plugins/megin/scripts/validate.py
-          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_megin_v3.py'
-          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: knowledge-quick
-          path: knowledge-quick.json
-          if-no-files-found: error
 
   platform:
-    name: ${{ matrix.os_name }}
-    needs: quick
+    name: Validate on ${{ matrix.os_name }}
+    needs: skills
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -71,102 +53,14 @@ jobs:
             runner: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Ensure ripgrep
-        shell: bash
+      - name: Check runtime prerequisites
         run: |
-          if ! command -v rg >/dev/null 2>&1; then
-            cargo install ripgrep --locked
-          fi
+          python --version
           git --version
-          rg --version
-      - name: Verify Linux uses rg fallback without executing the binary
-        if: matrix.os_name == 'linux'
-        shell: bash
-        run: >-
-          python -X utf8 -B
-          .agents/skills/project-knowledge/scripts/test_tgrep.py
-          TgrepLinuxFallbackTests
-      - name: Verify bundled tgrep index and smoke query
-        if: matrix.os_name == 'windows'
-        shell: pwsh
-        run: |
-          $expected = "bac0a288f6e588e7708c87ace2e381f50d5190269c471c10e1ffb9c524fc02de"
-          $actual = (Get-FileHash -LiteralPath .\tgrep.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actual -ne $expected) { throw "tgrep.exe SHA-256 mismatch: $actual" }
-          $version = (& .\tgrep.exe --version | Select-Object -First 1).Trim()
-          if ($version -ne "tgrep 1.0.4") { throw "unexpected tgrep version: $version" }
-          python -X utf8 -B .agents/skills/project-knowledge/scripts/knowledge_cli.py tgrep-index --repo . --force > tgrep-index-windows.json
-          python -X utf8 -B .agents/skills/project-knowledge/scripts/test_tgrep.py TgrepWindowsParityTests
-      - name: Run portable v3 CLI smoke tests on both operating systems
-        if: hashFiles('plugins/megin/.codex-plugin/plugin.json') != ''
-        shell: bash
-        run: |
-          if [ "${{ matrix.os_name }}" = "windows" ]; then
-            cmd.exe /d /c plugins/megin/bin/megin.cmd --help
-          else
-            ./plugins/megin/bin/megin --help
-          fi
-          python -X utf8 -B plugins/megin/scripts/megin_v3.py --help
-          python -X utf8 -B plugins/megin/scripts/validate.py
-          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_megin_v3.py'
-          python -X utf8 -B -m unittest discover -s plugins/megin/tests -p 'test_*.py'
-      - name: Benchmark cold and warm queries with portability oracle
-        shell: bash
-        run: >-
-          python -X utf8 -B
-          .agents/skills/project-knowledge/scripts/knowledge_benchmark.py
-          --fixture-root .knowledge-test-tmp
-          > knowledge-portability-${{ matrix.os_name }}.json
-      - name: Full functional and owner suite
-        shell: bash
-        env:
-          KNOWLEDGE_PORTABILITY_REPORT: knowledge-portability-${{ matrix.os_name }}.json
-        run: >-
-          python -X utf8 -B
-          .agents/skills/project-knowledge/scripts/run_full_suite.py
-          --scope all --profile release
-          --fixture-root .knowledge-test-tmp/fixtures --jobs 4
-          --evidence-root .knowledge-test-tmp/evidence
-          --run-label release-${{ matrix.os_name }}
-          --metrics-output knowledge-suite-metrics-${{ matrix.os_name }}.json
-          > knowledge-suite-${{ matrix.os_name }}.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: knowledge-portability-${{ matrix.os_name }}
-          path: |
-            knowledge-portability-${{ matrix.os_name }}.json
-            knowledge-suite-${{ matrix.os_name }}.json
-            knowledge-suite-metrics-${{ matrix.os_name }}.json
-            .knowledge-test-tmp/evidence/release-${{ matrix.os_name }}
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        if: always() && matrix.os_name == 'windows'
-        with:
-          name: tgrep-index-windows
-          path: tgrep-index-windows.json
-          if-no-files-found: error
-
-  compare:
-    name: Compare normalized results
-    needs: platform
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: knowledge-portability-*
-          path: reports
-          merge-multiple: true
-      - name: Require equivalent cold and warm Windows and Linux reports
-        run: >-
-          python -X utf8 -B
-          .agents/skills/project-knowledge/scripts/compare_portability_reports.py
-          --root reports
+      - name: Validate Skills source and distributable archive
+        run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
