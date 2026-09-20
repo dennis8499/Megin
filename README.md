@@ -52,8 +52,9 @@ appropriate Skill. A description match is a routing hint; it does not bypass app
 acceptance gates.
 
 To continue work, say “繼續上次的 Megin 工作”. The Skill reads `docs/work/*/workflow.md`, resumes
-the only active Work ID, or lists active IDs when there is more than one. Historical delivery-run
-records and approvals are evidence only; they are never reused as current authorization.
+the only active Work ID, or lists active IDs when there is more than one. A retained work record is
+the current state surface; completed historical records are available through Git history and are
+never reused as current authorization.
 
 ## Workflow rules
 
@@ -95,6 +96,7 @@ The release archive is `megin-skills.zip`. It is assembled from the repository's
 ## From the old installation
 
 If an older Megin Plugin or command is installed in Codex, remove or disable that installation and
-delete its old repository-local copies before installing this bundle. Existing historical work and
-evidence under `docs/work/` and `docs/knowledge/` remain readable; their approvals are not migrated
-or reused. New work starts with a new Skills workflow record.
+delete its old repository-local copies before installing this bundle. The repository keeps only the
+current Skills source and active delivery records; completed historical work, bug reports, and
+knowledge notes remain recoverable in Git history but are not migrated or reused. New work starts
+with a new Skills workflow record.

@@ -63,6 +63,6 @@ one local commit after acceptance. External publication and cleanup are separate
 
 ## Historical material
 
-Historical `docs/work/` and `docs/knowledge/` records remain for traceability. Old runtime records,
-approvals, and design references are not current authorization. New work must use the Skills-only
-record and the current source snapshot.
+The working tree keeps only the current Skills source and active delivery records. Completed work,
+bug, and knowledge history is recoverable from Git commits; old approvals and design references are
+never current authorization. New work must use the Skills-only record and current source snapshot.

@@ -1,10 +1,7 @@
 * text=auto eol=lf
 
-.agents/skills/megin*/** text eol=lf
+.agents/skills/** text eol=lf
 docs/work/** text eol=lf
-docs/bugs/** text eol=lf
-docs/knowledge/** text eol=lf
 .github/workflows/** text eol=lf
 
-# Microsoft/tgrep is distributed as a Windows executable.
-tgrep.exe binary
+megin-skills.zip binary
