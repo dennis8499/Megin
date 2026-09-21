@@ -5,8 +5,9 @@ description: Define executable behavior scenarios shared by Megin planning, test
 
 # Megin behavior contract
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
-creating or updating feature files. Keep Gherkin keywords and control identifiers in English while
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating or
+updating feature files. Keep Gherkin keywords and control identifiers in English while
 writing feature names, scenario descriptions, and step text in Traditional Chinese.
 
 For every external behavior, write one stable scenario ID and one concrete Given/When/Then path in
@@ -17,7 +18,9 @@ behavior; do not manufacture a red test merely to fill a template.
 Keep the feature wording as the shared source for implementation, review, verification, and manual
 acceptance. An undefined, skipped, pending, or environment-error step is not passing evidence.
 After plan approval, changing an ID, wording, expected result, or automatic/manual boundary creates
-a new plan version and approval.
+a new plan version and approval. The feature file and its evidence are bound to the recorded feature
+branch snapshot; a base-branch advance or feature change requires the recovery cycle in
+[branch-policy.md](../megin/references/branch-policy.md).
 
 Handoff: a feature inventory linked from `workflow.md`, with each scenario mapped to a task and a
 verification command.

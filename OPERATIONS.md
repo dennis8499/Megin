@@ -23,11 +23,12 @@ check only. It is not a workflow runner and is not part of the user interaction 
 
 Create `docs/work/<work-id>/workflow.md` using schema `megin-skills-workflow/v1`. The record binds:
 
-- repository, base commit, branch, and Work ID;
+- repository, base branch, base commit, feature branch, merge strategy, branch, and Work ID;
 - route, phase, status, and plan version;
 - intent, scope, assumptions, risks, and acceptance scenarios;
 - approved paths, interfaces, dependencies, commands, evidence, and knowledge scope;
-- task ownership, fresh review, verification, user acceptance, delivery, blockers, and next action.
+- task ownership, fresh review, verification, user acceptance, feature commit, local merge, delivery,
+  blockers, and next action.
 
 Append dated events. Do not overwrite an old approval or review; create a new plan/review version
 when scope or the source snapshot changes. Preserve unrelated dirty changes and stop on branch,
@@ -40,11 +41,14 @@ Use `megin` for the complete route:
 1. Explore requirements and source-backed project knowledge without mutation.
 2. Define stable behavior scenarios and a dependency-ordered technical plan.
 3. Present one exact plan approval for the current Work ID and version.
-4. Implement with one writer and outside-in BDD/TDD evidence.
+4. Create the named feature branch from the recorded base commit; implement with one writer and
+   outside-in BDD/TDD evidence on that branch.
 5. Obtain a fresh, read-only review from a different context.
 6. Rerun every approved command and scenario against the reviewed snapshot.
 7. Pause for the user's listed manual acceptance response.
-8. Review the approved knowledge scope, stage approved paths, and create one local commit.
+8. Review the approved knowledge scope, stage approved paths, and create one feature commit.
+9. Confirm the base branch has not advanced and merge the feature branch locally with
+   `git merge --no-ff`; verify both parents and content equivalence.
 
 Pure explanations, reviews, and bug diagnosis can end without a delivery record or product
 mutation. A bug repair requires a read-only diagnosis first. A changed requirement, interface,
@@ -59,7 +63,9 @@ cannot approve its own changes; if no independent reviewer is available, leave t
 
 Knowledge is source-backed and scoped to the approved result. Unsupported or conflicting claims stay
 pending. Knowledge review does not stage or commit. Finishing stages only approved files and creates
-one local commit after acceptance. External publication and cleanup are separate authorization.
+one feature commit after acceptance, then performs the local `--no-ff` merge. A base-branch advance,
+branch mismatch, conflict, or reviewed-snapshot change stops delivery and requires fresh review,
+verification, and acceptance. External publication and cleanup are separate authorization.
 
 ## Historical material
 

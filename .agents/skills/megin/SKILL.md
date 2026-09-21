@@ -28,7 +28,9 @@ search, editor, and test tools directly, and record the workflow in
 
 The record format and append-only event rules are in [workflow-record.md](references/workflow-record.md).
 The output language and requirements waiting rules are in [language-policy.md](references/language-policy.md);
-read it before creating or updating any human-readable delivery document.
+read it before creating or updating any human-readable delivery document. The Git branch, acceptance,
+and local integration rules are in [branch-policy.md](references/branch-policy.md); read it before
+planning or executing a repository change.
 
 ## Complete delivery path
 
@@ -42,10 +44,11 @@ For a change, route the same Work ID through these phases:
 3. `approval`: present the exact current plan and wait for the user to name the Work ID and
    plan version. This is the one plan gate for small and large work. A changed scope,
    interface, scenario, or acceptance criterion creates a new plan version.
-4. `implementation`: after approval, use `megin-implementation-execution` and
-   `megin-test-driven-development`. Keep one authorized writer in the workspace, follow
-   outside-in behavior red → inner test red → minimal green → refactor, and save command
-   evidence in the Work ID record.
+4. `implementation`: after approval, create the recorded feature branch from the recorded base
+   branch and use `megin-implementation-execution` and `megin-test-driven-development` only there.
+   Keep one authorized writer in the workspace, follow outside-in behavior red → inner test red →
+   minimal green → refactor, and save command evidence in the Work ID record. The base branch stays
+   unchanged until human acceptance.
 5. `review`: start a fresh read-only `megin-code-review` context. It must inspect the current
    snapshot, approved scope, tests, compatibility, and knowledge claims. A writer cannot
    approve its own work.
@@ -55,10 +58,11 @@ For a change, route the same Work ID through these phases:
 7. `acceptance`: use `megin-human-acceptance` to show only the approved user-visible scenarios
    and wait for a response identifying the Work ID and acceptance version. Do not stage or
    commit before this response.
-8. `delivery`: use `megin-project-knowledge` to review approved source-backed knowledge, then
-   use `megin-finishing-delivery` to stage only approved paths and create one local commit.
-   Push, pull requests, merge, deployment, branch deletion, and worktree cleanup remain
-   outside this workflow.
+8. `delivery`: after the exact acceptance response, use `megin-project-knowledge` and
+   `megin-finishing-delivery` to stage approved paths and create one feature commit. Confirm the
+   base branch has not drifted, then merge the feature branch back locally with `git merge --no-ff`
+   and record the parent and content checks. Push, pull requests, deployment, branch deletion, and
+   worktree cleanup remain outside this workflow.
 
 ## Conversation and safety rules
 
@@ -70,14 +74,17 @@ For a change, route the same Work ID through these phases:
 - Natural-language approval is bound to the exact Work ID, plan version, scope, scenarios,
   tests, knowledge scope, and local delivery target shown in the current record. Do not infer
   approval from a skill mention, a test result, or “continue” without an exact current target.
-- Keep the current checkout and branch identity visible in the record. Preserve unrelated dirty
-  changes. Scope drift, stale evidence, missing context, or repeated no-progress findings return
-  the work to planning or mark it blocked with evidence.
+- Keep the current checkout and branch identity visible in the record. Product writes after approval
+  require the recorded feature branch; the base branch must remain free of the Work ID until
+  acceptance. Preserve unrelated dirty changes. Scope drift, branch drift, stale evidence, missing
+  context, or repeated no-progress findings return the work to planning or mark it blocked with
+  evidence. Follow [branch-policy.md](references/branch-policy.md) for recovery.
 - Never claim a test, review, acceptance, knowledge promotion, or commit that did not happen.
   If an independent reviewer is unavailable, stop at `awaiting_review`.
 - Keep secrets out of records; store paths, summaries, byte counts, and digests where evidence
   must be referenced.
 
 Completion means the record contains the final review, fresh verification, acceptance response,
-knowledge result, commit identity, changed paths, and one clear next state. The workflow is
-governed by these Skills and Markdown records; there is no Megin-specific executable to invoke.
+knowledge result, feature commit, `--no-ff` merge identity, changed paths, integration checks, and
+one clear next state. The workflow is governed by these Skills and Markdown records; there is no
+Megin-specific executable to invoke.

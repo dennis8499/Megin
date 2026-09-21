@@ -5,19 +5,22 @@ description: Prove a Megin change is complete with fresh commands, scenarios, re
 
 # Megin verification
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
-creating verification records. Write verification explanations and scenario results in Traditional
-Chinese while preserving commands, status values, paths, digests, and raw output exactly.
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating
+verification records. Write verification explanations and scenario results in Traditional Chinese
+while preserving commands, status values, paths, digests, and raw output exactly.
 
 Load the exact approved scope, acceptance, commands, latest writer reports, fresh review verdict,
-knowledge scope, and delivery destination. Inspect status, diff, branch, and snapshot; reject scope
-drift or stale evidence. Run every approved focused, related, full, static, build, contract, and
-scenario command that applies, recording the exact command, exit status, output path, and digest
-where required.
+knowledge scope, and delivery destination. Inspect status, diff, `base_branch`, `base_commit`,
+`feature_branch`, and snapshot; reject scope or branch drift and stale evidence. Run every approved
+focused, related, full, static, build, contract, and scenario command that applies, recording the
+exact command, exit status, output path, and digest where required. Do not stage, commit, or merge
+as part of automated verification.
 
 Confirm the fresh reviewer approved the same snapshot and that knowledge claims retain source paths,
-digests, certainty, and conflict results. A failed command returns the affected task to implementation
-for a bounded fix, then requires a fresh review and verification.
+digests, certainty, and conflict results. A failed command, base-branch advance, or feature snapshot
+change returns the affected task to implementation for a bounded fix or rebase/merge recovery, then
+requires a fresh review and verification.
 
 When all automated obligations pass, write a final verification record and set `status:
 awaiting_user` with `phase: acceptance`. Product files, knowledge, staging, and commit state remain
