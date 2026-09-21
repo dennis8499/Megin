@@ -36,5 +36,7 @@ Knowledge result：`no-change`。本次變更本身就是已核准的 Skills 與
 canonical project knowledge claim 可以提升；既有 canonical source 不變。沒有發現 stale、
 contested、superseded 或 hash-drifted source，也沒有 pending conflict。
 
-feature implementation commit 已建立為 `7c2fbdc`。下一步是確認 `main` 未漂移後以
-`git merge --no-ff` 本機整合，並保存 feature 與 merge 的 Git 識別碼及父提交檢查。
+feature implementation commit `7c2fbdc6ad0c49b3dc4a4c5b31cd4f623d8bc891` 與 delivery evidence commit
+`4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891` 已建立，並以 `git merge --no-ff` 產生 merge commit
+`c814ad33864351dd1e806093735f9c7d6d58b04c`。父提交、祖先關係、產品樹一致性與 feature branch 保留
+檢查均通過，knowledge result 維持 `no-change`。

@@ -9,7 +9,7 @@
 - base_commit：`44e29147209099368d8eed8cc773582148c26eaa`
 - HEAD：`44e29147209099368d8eed8cc773582148c26eaa`
 - feature commit：`7c2fbdc`
-- merge commit：pending（人工驗收前不得建立）
+- merge commit：`c814ad33864351dd1e806093735f9c7d6d58b04c`
 
 ## 命令結果
 
@@ -27,5 +27,7 @@
 ## 判定
 
 第二輪 fresh review 已在 [review-2.md](review-2.md) 回傳 `APPROVED`，且本次驗證命令均通過。
-人工驗收 `acceptance-1` 已通過，feature commit `7c2fbdc` 已建立；目前只剩確認 `main` 未漂移與
-`--no-ff` merge 的整合檢查。
+人工驗收 `acceptance-1` 已通過，feature implementation commit `7c2fbdc6ad0c49b3dc4a4c5b31cd4f623d8bc891`
+與 delivery evidence commit `4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891` 已建立；
+`--no-ff` merge commit `c814ad33864351dd1e806093735f9c7d6d58b04c` 的雙親、祖先關係、產品樹一致性與
+feature branch 保留檢查均通過。

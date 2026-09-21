@@ -11,7 +11,7 @@
 - delivery_target: base_branch
 - route: large
 - phase: delivery
-- status: active
+- status: complete
 - plan_version: plan-1
 - last_updated: 2026-09-21
 
@@ -61,7 +61,7 @@
 | T5 — 新鮮唯讀審查 | T4 | fresh reviewer | completed | `review-2.md` |
 | T6 — 完成前自動驗證 | T5 | writer | completed | `verification.md`、`implementation/verification-output.txt` |
 | T7 — 人工驗收 | T6 | user | completed | `acceptance.md` |
-| T8 — 知識檢視、feature commit 與 `--no-ff` 整合 | T7 | writer | in_progress | `knowledge.md`、feature commit `7c2fbdc`、整合證據 |
+| T8 — 知識檢視、feature commit 與 `--no-ff` 整合 | T7 | writer | completed | `knowledge.md`、feature commit `7c2fbdc`、`integration.md` |
 
 ## 證據
 
@@ -75,19 +75,25 @@
 - [verification.md](verification.md)
 - [acceptance.md](acceptance.md)
 - [knowledge.md](knowledge.md)
+- [integration.md](integration.md)
 
 ## 阻礙與下一步
 
 第二輪新鮮唯讀審查已在 `review-2.md` 回傳 `APPROVED`；完成前驗證的所有核准命令已對相同
 feature 快照重新通過。`acceptance-1` 已接受，source-backed knowledge review 結果為 `no-change`，
-feature implementation commit 已建立為 `7c2fbdc`。目前只剩在未漂移的 `main` 建立 `--no-ff` merge；
-若主分支漂移或合併衝突，保留現場並依 branch-policy 回到重新審查、驗證與驗收；workflow.md 記錄
-目前 branch、提交與下一個恢復動作。
+feature implementation commit 為 `7c2fbdc6ad0c49b3dc4a4c5b31cd4f623d8bc891`，delivery evidence
+commit 為 `4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891`，並已成功以 `--no-ff` 建立 merge commit
+`c814ad33864351dd1e806093735f9c7d6d58b04c`。主分支產品樹與 feature tip 一致，feature branch 保留；
+本 Work ID 已完成。
+若日後發現整合漂移或需恢復，workflow.md 保留目前 branch、提交與下一個恢復動作的事件紀錄。
 
 ## 交付
 
-Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature commit：`7c2fbdc`。Merge commit：pending。
-只有 feature commit 建立且 `git merge --no-ff` 的整合檢查通過後，才可改為 `status: complete`。
+Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature implementation commit：
+`7c2fbdc6ad0c49b3dc4a4c5b31cd4f623d8bc891`。Delivery evidence commit：
+`4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891`。Merge commit：
+`c814ad33864351dd1e806093735f9c7d6d58b04c`。Merge parents、祖先關係、產品樹一致性與 feature branch
+保留檢查均通過。最終狀態：`complete`。
 
 ## 事件紀錄
 
@@ -114,3 +120,7 @@ Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature c
   source digest 與範圍記錄於 `knowledge.md` — 下一步是在 feature branch 建立提交。
 - 2026-09-21 — delivery — 在已接受的 feature branch 建立 implementation commit `7c2fbdc`，只包含
   27 個核准路徑 — 下一步是記錄提交證據並在未漂移的 `main` 使用 `--no-ff` 整合。
+- 2026-09-21 — delivery — 建立 delivery evidence commit `4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891` 後，
+  在未漂移的 `main` 執行 `git merge --no-ff` — merge commit 為
+  `c814ad33864351dd1e806093735f9c7d6d58b04c`，兩個父提交、祖先關係、產品樹一致性與 feature branch
+  保留均通過；Work ID 狀態改為 `complete`。

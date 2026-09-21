@@ -76,3 +76,28 @@ Output: (empty)
 Command: git status --short --branch; git rev-parse main; git rev-parse feature/work-20260921-feature-branch-delivery; git diff --cached --name-status
 Exit status: 0
 Output: current branch is `feature/work-20260921-feature-branch-delivery`; `main` and feature refs are both `44e29147209099368d8eed8cc773582148c26eaa`; no staged paths.
+
+Post-merge verification on `main`:
+Command: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
+Exit status: 0
+Output: validated 12 Megin Skills
+
+Command: python -X utf8 -B docs/work/work-20260921-requirements-language/implementation/verify_language_policy.py
+Exit status: 0
+Output: validated language policy references for 12 Skills
+
+Command: python -X utf8 -B docs/work/work-20260921-feature-branch-delivery/implementation/verify_branch_policy.py
+Exit status: 0
+Output: policy contract passed; REQ-BRANCH-001 through REQ-BRANCH-006 passed; validated 6 isolated Git branch-policy scenarios
+
+Command: git diff --check
+Exit status: 0
+Output: (empty)
+
+Command: git diff --exit-code main feature/work-20260921-feature-branch-delivery -- .agents README.md OPERATIONS.md megin-skills.zip
+Exit status: 0
+Output: product paths are identical after merge
+
+Command: git show -s --format='%H%n%P%n%s' HEAD; git merge-base --is-ancestor feature/work-20260921-feature-branch-delivery main; git branch --list feature/work-20260921-feature-branch-delivery
+Exit status: 0
+Output: merge `c814ad33864351dd1e806093735f9c7d6d58b04c`; parents `44e29147209099368d8eed8cc773582148c26eaa` and `4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891`; feature branch retained and is an ancestor.
