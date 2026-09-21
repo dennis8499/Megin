@@ -61,7 +61,7 @@
 | T5 — 新鮮唯讀審查 | T4 | fresh reviewer | completed | `review-2.md` |
 | T6 — 完成前自動驗證 | T5 | writer | completed | `verification.md`、`implementation/verification-output.txt` |
 | T7 — 人工驗收 | T6 | user | completed | `acceptance.md` |
-| T8 — 知識檢視、feature commit 與 `--no-ff` 整合 | T7 | writer | in_progress | `knowledge.md`、整合證據 |
+| T8 — 知識檢視、feature commit 與 `--no-ff` 整合 | T7 | writer | in_progress | `knowledge.md`、feature commit `7c2fbdc`、整合證據 |
 
 ## 證據
 
@@ -79,13 +79,14 @@
 ## 阻礙與下一步
 
 第二輪新鮮唯讀審查已在 `review-2.md` 回傳 `APPROVED`；完成前驗證的所有核准命令已對相同
-feature 快照重新通過。`acceptance-1` 已接受，目前進行 source-backed knowledge review、feature
-commit 與 `--no-ff` 本機整合。若主分支漂移或合併衝突，保留現場並依 branch-policy 回到重新審查、
-驗證與驗收；workflow.md 記錄目前 branch、提交與下一個恢復動作。
+feature 快照重新通過。`acceptance-1` 已接受，source-backed knowledge review 結果為 `no-change`，
+feature implementation commit 已建立為 `7c2fbdc`。目前只剩在未漂移的 `main` 建立 `--no-ff` merge；
+若主分支漂移或合併衝突，保留現場並依 branch-policy 回到重新審查、驗證與驗收；workflow.md 記錄
+目前 branch、提交與下一個恢復動作。
 
 ## 交付
 
-Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature commit：pending。Merge commit：pending。
+Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature commit：`7c2fbdc`。Merge commit：pending。
 只有 feature commit 建立且 `git merge --no-ff` 的整合檢查通過後，才可改為 `status: complete`。
 
 ## 事件紀錄
@@ -111,3 +112,5 @@ Acceptance version：`acceptance-1`。Knowledge result：`no-change`。Feature c
   六個核准情境通過，轉入 `phase: delivery`；下一步是 knowledge review、feature commit 與本機整合。
 - 2026-09-21 — delivery — source-backed knowledge review 回傳 `no-change`，沒有 canonical promotion，
   source digest 與範圍記錄於 `knowledge.md` — 下一步是在 feature branch 建立提交。
+- 2026-09-21 — delivery — 在已接受的 feature branch 建立 implementation commit `7c2fbdc`，只包含
+  27 個核准路徑 — 下一步是記錄提交證據並在未漂移的 `main` 使用 `--no-ff` 整合。

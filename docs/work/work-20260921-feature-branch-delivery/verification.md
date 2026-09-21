@@ -8,7 +8,7 @@
 - base_branch：`main`
 - base_commit：`44e29147209099368d8eed8cc773582148c26eaa`
 - HEAD：`44e29147209099368d8eed8cc773582148c26eaa`
-- feature commit：pending（人工驗收前不得建立）
+- feature commit：`7c2fbdc`
 - merge commit：pending（人工驗收前不得建立）
 
 ## 命令結果
@@ -27,5 +27,5 @@
 ## 判定
 
 第二輪 fresh review 已在 [review-2.md](review-2.md) 回傳 `APPROVED`，且本次驗證命令均通過。
-目前只剩 [acceptance.md](acceptance.md) 的人工驗收；在取得指定回覆前不暫存、不提交、不更新
-canonical knowledge，也不合併至 `main`。
+人工驗收 `acceptance-1` 已通過，feature commit `7c2fbdc` 已建立；目前只剩確認 `main` 未漂移與
+`--no-ff` merge 的整合檢查。

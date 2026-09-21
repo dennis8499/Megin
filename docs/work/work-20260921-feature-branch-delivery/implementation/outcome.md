@@ -10,5 +10,5 @@
 分支漂移、衝突現場與中斷恢復。既有語言政策回歸與 Skills 封裝驗證也通過。驗證原始輸出見
 [verification-output.txt](verification-output.txt)。
 
-目前工作樹仍在 feature branch，產品檔案未暫存、未提交，`main` 尚未包含本 Work ID 的內容；等待
-新鮮唯讀審查與完成前驗證後進入人工驗收。
+人工驗收已通過，feature implementation commit 為 `7c2fbdc`；`main` 尚未包含本 Work ID 的內容。
+目前只待未漂移檢查與 `--no-ff` 本機整合。

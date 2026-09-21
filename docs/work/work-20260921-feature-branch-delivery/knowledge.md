@@ -36,5 +36,5 @@ Knowledge result：`no-change`。本次變更本身就是已核准的 Skills 與
 canonical project knowledge claim 可以提升；既有 canonical source 不變。沒有發現 stale、
 contested、superseded 或 hash-drifted source，也沒有 pending conflict。
 
-下一步是只暫存 `plan-1` 允許路徑，在 feature branch 建立 feature commit，確認 `main` 未漂移後
-以 `git merge --no-ff` 本機整合，並保存 feature 與 merge 的 Git 識別碼及父提交檢查。
+feature implementation commit 已建立為 `7c2fbdc`。下一步是確認 `main` 未漂移後以
+`git merge --no-ff` 本機整合，並保存 feature 與 merge 的 Git 識別碼及父提交檢查。
