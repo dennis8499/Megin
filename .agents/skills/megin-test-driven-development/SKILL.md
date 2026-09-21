@@ -5,6 +5,10 @@ description: Run Megin's outside-in behavior red-green-refactor loop for an appr
 
 # Megin test-driven development
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating test evidence. Write scenario summaries and results in Traditional Chinese, and preserve
+test commands, code, identifiers, and raw output in their original technical form.
+
 Start from the approved behavior scenario. Add or update the smallest executable acceptance check,
 run it red when a new behavior needs proof, then add the smallest implementation that makes it
 green. Follow with inner unit or integration tests for the changed seam, refactor while green, and

@@ -5,6 +5,10 @@ description: Execute an approved Megin work package in the bound checkout with o
 
 # Megin implementation execution
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating implementation evidence. Write summaries and handoff notes in Traditional Chinese while
+keeping commands, paths, identifiers, and raw output unchanged.
+
 Accept work only when `workflow.md` contains the current Work ID, approved plan version, branch or
 workspace, allowed paths, interfaces, acceptance scenarios, commands, knowledge scope, and delivery
 destination. Before each write, confirm branch and baseline identity and preserve unrelated dirty

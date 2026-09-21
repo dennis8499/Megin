@@ -5,9 +5,18 @@ description: Explore and clarify a repository change before implementation. Use 
 
 # Megin requirements discovery
 
-Work read-only. Inspect repository instructions, relevant code, tests, project knowledge, current
-branch, and existing Megin records before asking questions. Resolve facts from evidence; ask one
-frontier question at a time only for priorities, boundaries, or trade-offs.
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating or updating a work document. Work read-only. Inspect repository instructions, relevant
+code, tests, project knowledge, current branch, and existing Megin records before asking questions.
+Resolve facts from evidence. Check the goal, audience, boundaries, exclusions, and observable
+acceptance before writing a completed candidate.
+
+If any major unknown could change the product choice or scope, ask exactly one highest-impact
+question in Traditional Chinese and wait for the user's answer. Keep the Work ID at
+`phase: requirements` and `status: awaiting_user`, record the known facts and unanswered question,
+and do not claim that requirements are complete or hand off to planning. On resume, re-check the
+remaining unknowns and ask the next one if needed. When the information is sufficient, do not ask a
+formal extra question merely to satisfy a template.
 
 Create or update the current Work ID's `requirements.md` and `workflow.md` with the goal, audience,
 in/out scope, affected interfaces, constraints, risks, assumptions, knowledge scope, and acceptance

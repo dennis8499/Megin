@@ -5,6 +5,10 @@ description: Search, validate, and update source-backed repository knowledge dur
 
 # Megin project knowledge
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating or updating knowledge notes. Write human-readable provenance, decisions, and event text in
+Traditional Chinese while preserving source paths, identifiers, commands, and digests verbatim.
+
 Use the repository's documented knowledge layout and source references. Search before requirements,
 planning, implementation, diagnosis, or an ad-hoc engineering answer. Re-read every selected source
 at its recorded path and locator; exclude stale, contested, superseded, hash-drifted, or self-

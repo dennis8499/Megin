@@ -5,6 +5,10 @@ description: Prove a Megin change is complete with fresh commands, scenarios, re
 
 # Megin verification
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating verification records. Write verification explanations and scenario results in Traditional
+Chinese while preserving commands, status values, paths, digests, and raw output exactly.
+
 Load the exact approved scope, acceptance, commands, latest writer reports, fresh review verdict,
 knowledge scope, and delivery destination. Inspect status, diff, branch, and snapshot; reject scope
 drift or stale evidence. Run every approved focused, related, full, static, build, contract, and

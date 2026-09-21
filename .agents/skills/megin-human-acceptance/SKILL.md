@@ -5,6 +5,10 @@ description: Guide the Megin human acceptance gate using only approved user-visi
 
 # Megin human acceptance
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+presenting or recording acceptance. Show user operations and expected results in Traditional
+Chinese, preserving Work IDs, versions, paths, commands, and other control values verbatim.
+
 Use only after a fresh review and automated verification pass. Present the Work ID, acceptance
 version, workspace/branch, environment, each approved user operation, and its expected observable
 result. Do not turn internal tests or reviewer checks into extra manual work.

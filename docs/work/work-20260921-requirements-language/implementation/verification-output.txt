@@ -1,0 +1,67 @@
+# 自動驗證原始輸出
+
+時間：2026-09-21 09:33:47 +08:00
+快照：`main` 工作樹，基線 `db669c7db35af31ab6fc22c63d4f0eca8c60da63`
+
+## 語言政策與情境規則
+
+命令：
+
+```text
+python -X utf8 -B docs/work/work-20260921-requirements-language/implementation/verify_language_policy.py
+```
+
+結束狀態：`0`
+
+```text
+validated language policy references for 12 Skills
+```
+
+## 封裝重建
+
+命令：
+
+```text
+python -X utf8 -B docs/work/work-20260921-requirements-language/implementation/rebuild_archive.py
+```
+
+結束狀態：`0`
+
+```text
+rebuilt megin-skills.zip with 28 entries
+```
+
+## Skills 來源與封裝驗證
+
+命令：
+
+```text
+python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
+```
+
+結束狀態：`0`
+
+```text
+validated 12 Megin Skills
+```
+
+## ZIP CRC
+
+命令：
+
+```text
+python -c "import zipfile; z=zipfile.ZipFile('megin-skills.zip'); print('entries',len(z.namelist())); print('crc_ok',all(i.CRC == zipfile.crc32(z.read(i.filename)) for i in z.infolist()))"
+```
+
+結束狀態：`0`
+
+```text
+entries 28
+crc_ok True
+```
+
+## 差異檢查
+
+命令：`git diff --check`
+
+結束狀態：`0`；無輸出。

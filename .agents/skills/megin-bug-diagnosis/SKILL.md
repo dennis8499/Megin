@@ -5,6 +5,10 @@ description: Diagnose a suspected bug with read-only evidence before repair. Use
 
 # Megin bug diagnosis
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating or updating `bug-diagnosis.md`. Write the human-readable diagnosis in Traditional Chinese
+and preserve command output, identifiers, paths, and control values as technical source text.
+
 Keep diagnosis read-only. Reproduce the symptom with the smallest safe oracle, inspect relevant
 history and code paths, and state a falsifiable root-cause hypothesis. Record environment, trigger,
 observed result, expected result, reproduction command, evidence paths, confidence (`confirmed`,

@@ -5,6 +5,10 @@ description: Perform a fresh read-only review of an approved Megin snapshot. Use
 
 # Megin code review
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating a review report. Write findings, explanations, and event text in Traditional Chinese;
+retain verdict tokens, paths, symbols, commands, and evidence identifiers in English or verbatim.
+
 Start in a fresh reviewer context after the writer reports completion. Load the exact approved Work
 ID and plan, inspect the full diff and surrounding code, tests, configuration, documentation,
 generated artifacts, knowledge claims, and current branch/snapshot. Confirm every changed path is

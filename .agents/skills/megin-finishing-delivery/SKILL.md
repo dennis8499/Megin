@@ -5,6 +5,10 @@ description: Finish a verified and human-accepted Megin change with source-backe
 
 # Megin finishing delivery
 
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating delivery notes. Write human-readable delivery summaries in Traditional Chinese while
+preserving commit IDs, staged paths, commands, and status values exactly.
+
 Use only after `megin-human-acceptance` records the exact Work ID and acceptance version. Confirm
 workspace, branch, approved paths, reviewed and verified snapshot, knowledge scope, destination,
 and final diff. Stop on unrelated files, branch drift, stale evidence, or an unauthorized target.

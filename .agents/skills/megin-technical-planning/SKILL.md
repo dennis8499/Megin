@@ -5,7 +5,11 @@ description: Turn a clarified Megin request into an implementation-ready plan. U
 
 # Megin technical planning
 
-Work read-only after `megin-requirements-discovery` has produced a current requirements revision.
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+creating or updating a plan. Work read-only after `megin-requirements-discovery` has produced a
+current requirements revision. If the requirements still contain a major unknown about goal,
+audience, boundary, or acceptance, return to requirements discovery and keep
+`phase: requirements` with `status: awaiting_user`; do not write or present a plan.
 Read the target code, tests, project knowledge, and available validation commands. Keep the smallest
 safe design; classify the work as small or large by impact and uncertainty rather than line count.
 

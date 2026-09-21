@@ -16,13 +16,19 @@ search, editor, and test tools directly, and record the workflow in
    and existing `docs/work/*/workflow.md` records without changing product files.
 2. Use `megin-project-knowledge` to retrieve applicable source-backed project knowledge. Treat
    repository-local contracts as evidence, not as permission to mutate.
-3. If one active Megin record exists for this repository, verify its identity and resume its
+3. Classify the request as `read_only`, `small`, `large`, or `bug` before creating a new record.
+   A pure explanation or review is `read_only` and ends after evidence without a delivery record. A
+   suspected defect is `bug` and goes through `megin-bug-diagnosis`; create a requirements record
+   only if diagnosis hands off to an authorized repair.
+4. If one active Megin record exists for this repository, verify its identity and resume its
    earliest incomplete action. If several records are active, show their Work IDs and ask which
-   one to continue. If none exists, create a new record only after the request is understood.
-4. Classify the request as `read_only`, `small`, `large`, or `bug`. A pure explanation or review
-   ends after evidence. A suspected bug goes through `megin-bug-diagnosis` before repair.
+   one to continue. If no active record exists for a `small` or `large` change, create a new
+   requirements record; when major unknowns remain, initialize it at `phase: requirements` with
+   `status: awaiting_user` instead of treating the request as understood.
 
 The record format and append-only event rules are in [workflow-record.md](references/workflow-record.md).
+The output language and requirements waiting rules are in [language-policy.md](references/language-policy.md);
+read it before creating or updating any human-readable delivery document.
 
 ## Complete delivery path
 
@@ -45,7 +51,7 @@ For a change, route the same Work ID through these phases:
    approve its own work.
 6. `verification`: use `megin-verification-before-completion` to rerun every approved command
    and scenario against the reviewed snapshot. A passing automated verification stops at
-   `awaiting_user_acceptance`.
+   `phase: acceptance` and `status: awaiting_user`.
 7. `acceptance`: use `megin-human-acceptance` to show only the approved user-visible scenarios
    and wait for a response identifying the Work ID and acceptance version. Do not stage or
    commit before this response.
@@ -56,8 +62,11 @@ For a change, route the same Work ID through these phases:
 
 ## Conversation and safety rules
 
-- Ask at most one highest-impact requirements question at a time. Resolve discoverable facts by
-  reading the repository first; ask the user about priorities, boundaries, and trade-offs.
+- Read [language-policy.md](references/language-policy.md) before producing a work document. Ask at
+  most one highest-impact requirements question at a time. When a major unknown remains, pause in
+  `phase: requirements` with `status: awaiting_user`; do not infer a product decision or hand off
+  to planning until the answer resolves it. Resolve discoverable facts by reading the repository
+  first; ask the user about priorities, boundaries, and trade-offs.
 - Natural-language approval is bound to the exact Work ID, plan version, scope, scenarios,
   tests, knowledge scope, and local delivery target shown in the current record. Do not infer
   approval from a skill mention, a test result, or “continue” without an exact current target.
