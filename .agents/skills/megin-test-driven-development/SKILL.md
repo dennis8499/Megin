@@ -5,8 +5,9 @@ description: Run Megin's outside-in behavior red-green-refactor loop for an appr
 
 # Megin test-driven development
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
-creating test evidence. Write scenario summaries and results in Traditional Chinese, and preserve
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating test
+evidence. Write scenario summaries and results in Traditional Chinese, and preserve
 test commands, code, identifiers, and raw output in their original technical form.
 
 Start from the approved behavior scenario. Add or update the smallest executable acceptance check,
@@ -16,7 +17,8 @@ rerun the focused command. Preserve raw output, exit status, source snapshot, an
 the Work ID evidence.
 
 Keep tests deterministic and meaningful. A parser success, skipped scenario, or unrelated passing
-test is not behavior evidence. When a failure reveals a broader contract or scope change, stop and
-return to planning; do not silently add code or tests outside the approved package.
+test is not behavior evidence. Run the loop on the recorded feature branch and preserve its base
+commit in the evidence. When a failure reveals a broader contract or scope change, stop and return to
+planning; do not silently add code or tests outside the approved package.
 
 Handoff: focused red/green evidence and a clean package result for implementation and review.

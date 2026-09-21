@@ -6,7 +6,7 @@ server, or dedicated workflow controller to install or run.
 
 The bundle keeps a complete delivery path:
 
-`requirements → behavior contract and plan → one plan approval → BDD/TDD implementation → fresh review → automated verification → human acceptance → knowledge review and one local commit`
+`requirements → behavior contract and plan → one plan approval → feature branch → BDD/TDD implementation → fresh review → automated verification → human acceptance → feature commit → local --no-ff merge`
 
 The workflow is driven by Skills and a readable `docs/work/<work-id>/workflow.md` record. Git,
 repository search, project tests, and the project's own tools remain available as ordinary tools.
@@ -65,21 +65,30 @@ explanation of a bug ends with evidence and does not silently become a fix.
 
 Changes have one plan approval. The approved plan binds Work ID, behavior scenarios, allowed paths,
 interfaces, tests, knowledge scope, and the local delivery target. After approval, one writer works
-in the workspace at a time. BDD/TDD evidence and a different fresh reviewer are required before
-automated verification. Verification runs every approved command against the reviewed snapshot and
-then pauses at `awaiting_user` for the listed manual acceptance scenarios.
+in the recorded feature branch at a time; the base branch remains unchanged until acceptance.
+BDD/TDD evidence and a different fresh reviewer are required before automated verification.
+Verification runs every approved command against the reviewed snapshot and then pauses at
+`awaiting_user` for the listed manual acceptance scenarios.
 
 After the user names the Work ID and acceptance version, Megin reviews only the approved,
-source-backed knowledge scope, stages only approved paths, and creates one local commit. Push,
-pull requests, merge, deployment, branch deletion, and worktree cleanup are separate actions and
-are not performed by this workflow.
+source-backed knowledge scope, stages only approved paths on the feature branch, and creates one
+feature commit. It then verifies the base branch has not drifted and runs
+`git merge --no-ff <feature_branch>` locally, preserving a merge commit and recording its parent and
+content checks. Push, pull requests, deployment, branch deletion, and worktree cleanup are separate
+actions and are not performed by this workflow.
+
+The shared Git rules are in `.agents/skills/megin/references/branch-policy.md`. If the base branch
+advances, a reviewed snapshot changes, or a conflict occurs, Megin preserves the state and requires
+fresh review, verification, and human acceptance before integration. The feature branch remains
+available after a successful merge.
 
 ## Work records
 
 Each work item uses `docs/work/<work-id>/workflow.md` with schema `megin-skills-workflow/v1`.
 Requirements, plan, feature files, test output, review, verification, acceptance, and knowledge
-notes stay beside that file. The record keeps the base commit, branch, plan version, evidence paths,
-current status, blockers, and one next action. See [the workflow-record contract](.agents/skills/megin/references/workflow-record.md).
+notes stay beside that file. The record keeps the base branch and commit, feature branch, plan
+version, evidence paths, current status, blockers, feature and merge commit identities, and one next
+action. See [the workflow-record contract](.agents/skills/megin/references/workflow-record.md).
 
 Do not put secrets in a record. When a repository has a formal knowledge or test evidence contract,
 follow that contract and record the source path, command, result, and digest it requires.
