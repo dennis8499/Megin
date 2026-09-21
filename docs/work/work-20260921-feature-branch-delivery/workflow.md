@@ -4,7 +4,7 @@
 - work_id: work-20260921-feature-branch-delivery
 - repository: C:/Users/denni/OneDrive/Desktop/新增資料夾/Megin
 - base_commit: 44e29147209099368d8eed8cc773582148c26eaa
-- branch: feature/work-20260921-feature-branch-delivery
+- branch: main
 - base_branch: main
 - feature_branch: feature/work-20260921-feature-branch-delivery
 - merge_strategy: --no-ff
@@ -84,7 +84,8 @@ feature 快照重新通過。`acceptance-1` 已接受，source-backed knowledge 
 feature implementation commit 為 `7c2fbdc6ad0c49b3dc4a4c5b31cd4f623d8bc891`，delivery evidence
 commit 為 `4d472ef6ad0c49b3dc4a4c5b31cd4f623d8bc891`，並已成功以 `--no-ff` 建立 merge commit
 `c814ad33864351dd1e806093735f9c7d6d58b04c`。主分支產品樹與 feature tip 一致，feature branch 保留；
-本 Work ID 已完成。
+本 Work ID 已完成；目前 checkout 在 `main`，feature branch `feature/work-20260921-feature-branch-delivery`
+仍保留。
 若日後發現整合漂移或需恢復，workflow.md 保留目前 branch、提交與下一個恢復動作的事件紀錄。
 
 ## 交付
