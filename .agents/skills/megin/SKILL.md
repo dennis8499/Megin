@@ -27,7 +27,8 @@ search, editor, and test tools directly, and record the workflow in
    `status: awaiting_user` instead of treating the request as understood.
 
 The record format and append-only event rules are in [workflow-record.md](references/workflow-record.md).
-The output language and requirements waiting rules are in [language-policy.md](references/language-policy.md);
+The output language rules are in [language-policy.md](references/language-policy.md); the shared requirements
+exploration semantics are in [requirements-discovery-protocol.md](references/requirements-discovery-protocol.md).
 read it before creating or updating any human-readable delivery document. The Git branch, acceptance,
 and local integration rules are in [branch-policy.md](references/branch-policy.md); read it before
 planning or executing a repository change.
@@ -66,11 +67,12 @@ For a change, route the same Work ID through these phases:
 
 ## Conversation and safety rules
 
-- Read [language-policy.md](references/language-policy.md) before producing a work document. Ask at
-  most one highest-impact requirements question at a time. When a major unknown remains, pause in
-  `phase: requirements` with `status: awaiting_user`; do not infer a product decision or hand off
-  to planning until the answer resolves it. Resolve discoverable facts by reading the repository
-  first; ask the user about priorities, boundaries, and trade-offs.
+- Read [language-policy.md](references/language-policy.md) and
+  [requirements-discovery-protocol.md](references/requirements-discovery-protocol.md) before producing a work
+  document. Ask at most one prerequisite-ready highest-impact requirements question at a time. When a major unknown
+  remains, pause in `phase: requirements` with `status: awaiting_user`; do not infer a product decision or hand off
+  to planning until the protocol's completion conditions hold. Resolve discoverable facts by reading the repository
+  and applicable sources first; ask the user about priorities, boundaries, and trade-offs.
 - Natural-language approval is bound to the exact Work ID, plan version, scope, scenarios,
   tests, knowledge scope, and local delivery target shown in the current record. Do not infer
   approval from a skill mention, a test result, or “continue” without an exact current target.

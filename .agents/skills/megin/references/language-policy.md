@@ -22,14 +22,10 @@ step text in Traditional Chinese.
 
 ## Requirements discovery waiting rule
 
-Before requirements discovery or any handoff, check the purpose, audience, functional boundaries,
-exclusions, and observable acceptance results. If any unknown could change the product choice or
-scope, ask exactly one highest-impact clarification question in Traditional Chinese and wait for the
-user's answer. Keep the Work ID at `phase: requirements` and `status: awaiting_user`, record known
-facts and the unanswered question, and do not claim requirements are complete, create a planning
-handoff, or turn an unconfirmed product choice into an approved decision.
-
-After the user answers, re-check the remaining unknowns and ask the next single question if needed.
-When the information is sufficient to define the goal, boundaries, and acceptance, do not add a
-formal question merely to satisfy a template and hand off to `phase: planning`. Resolve facts that
-can be learned from code, tests, or project documentation before asking the user.
+The shared business rules for research triggers, source evidence, capability coverage, prerequisite-ready question
+selection, completion, and recovery are in
+[requirements-discovery-protocol.md](requirements-discovery-protocol.md). Before requirements discovery or any
+handoff, apply that protocol and write its revision, blockers, and source references in the Work ID. If a protocol
+condition is not met, ask exactly one question in Traditional Chinese, keep `phase: requirements` and
+`status: awaiting_user`, and do not claim requirements are complete or create a planning handoff. This section keeps
+the output-language and waiting-state contract; it does not duplicate the protocol's business rules.

@@ -11,6 +11,7 @@ on:
       - ".github/workflows/knowledge-portability.yml"
       - ".gitattributes"
       - ".gitignore"
+      - "tests/requirements-discovery/**"
 
 jobs:
   skills:
@@ -26,6 +27,11 @@ jobs:
           python-version: "3.13"
       - name: Validate Skills source and distributable archive
         run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
+      - name: Validate requirements-discovery evaluation materials
+        run: |
+          python -X utf8 -B tests/requirements-discovery/check_materials.py
+          python -X utf8 -B tests/requirements-discovery/test_materials.py
+          python -X utf8 -B tests/requirements-discovery/test_rules.py
       - name: Check pull-request whitespace
         shell: bash
         env:

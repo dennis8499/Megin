@@ -11,6 +11,18 @@ The bundle keeps a complete delivery path:
 The workflow is driven by Skills and a readable `docs/work/<work-id>/workflow.md` record. Git,
 repository search, project tests, and the project's own tools remain available as ordinary tools.
 
+## 需求探索
+
+面對陌生外部框架、版本差異或「完整支援」等廣泛需求時，需求探索會先依
+`.agents/skills/megin/references/requirements-discovery-protocol.md` 查證必要來源，建立
+`SRC-*`、`CAP-*`、`Q-*` 與 `SCN-*` 的能力和決策覆蓋，再一次提出一個前提已具備且影響最高的問題。
+上游能力、整合能力與應用層需求分開記錄；重大未知、矛盾或會改變驗收的延後事項會留在
+`phase: requirements`，不會因題數或 `ready_for_planning` 欄位而提前交接。
+
+`tests/requirements-discovery/` 提供官方來源摘要、最小 fixtures、案例、評分規準與結構檢查器。
+檢查器只驗證材料參照與雜湊，不代表模型對話行為已完成評測；後續新舊模型比較需另行保存對話、工具
+順序、檔案差異及獨立評閱結果。
+
 ## Install the Skills
 
 Download `megin-skills.zip` from this repository's release or checkout. The archive contains the
