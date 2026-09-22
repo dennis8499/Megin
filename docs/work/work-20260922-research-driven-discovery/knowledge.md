@@ -40,6 +40,6 @@ knowledge 檔案；README 與 OPERATIONS 均指向 `.agents/skills/` 為現行 S
 promotion contract 提升到另一個 canonical knowledge 位置的內容。`knowledge_result` 維持 `no-change`，沒有
 canonical promotion。
 
-feature implementation commit `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd` 已依核准路徑建立。下一步是記錄
-delivery evidence、確認 `main` 仍停在 `6afd0e817bb22894aac8d801df60a81cfdd7ff4c`，再使用
-`git merge --no-ff`；本紀錄不執行 merge。
+feature implementation commit `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`、delivery evidence commit
+`bffe48f833a6fd9434789c236f261e3bab27a853` 與 `--no-ff` merge commit
+`8b4b7937c43a2396c2380fe3b108e134299f2b5d` 均已建立；整合檢查記錄於 `integration.md`。

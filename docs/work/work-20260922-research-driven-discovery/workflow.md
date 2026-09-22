@@ -4,16 +4,16 @@
 - work_id: work-20260922-research-driven-discovery
 - repository: C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin
 - base_commit: 6afd0e817bb22894aac8d801df60a81cfdd7ff4c
-- branch: feature/work-20260922-research-driven-discovery
+- branch: main
 - base_branch: main
 - feature_branch: feature/work-20260922-research-driven-discovery
 - merge_strategy: --no-ff
 - delivery_target: base_branch
 - feature_commit: 329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd
-- merge_commit: pending
+- merge_commit: 8b4b7937c43a2396c2380fe3b108e134299f2b5d
 - route: large
 - phase: delivery
-- status: active
+- status: complete
 - plan_version: plan-1
 - requirements_revision: req-1
 - requirements_ref: requirements.md
@@ -98,6 +98,7 @@ CI、文件與 ZIP；實際新舊模型對照不在本次交付。
 - verification：`verification.md`（所有核准命令 exit 0）。
 - 自行驗收重播：`evidence/acceptance/self-run-20260922.md`（11 個情境均通過；模型對照仍 `not-run`）。
 - knowledge review：`knowledge.md`（`no-change`；沒有 canonical promotion）。
+- integration：`integration.md`（`--no-ff` merge、兩個父提交、祖先關係與產品樹一致）。
 
 ## 探索摘要與缺口
 
@@ -110,15 +111,18 @@ CI、文件與 ZIP；實際新舊模型對照不在本次交付。
 
 ## 阻礙與下一步
 
-目前沒有產品或範圍阻礙；fresh review r8、核准命令與使用者授權的自行驗收均已通過，下一步是
-source-backed knowledge review、feature commit 與本機整合。
+目前沒有阻礙。fresh review r8、核准命令、使用者授權的自行驗收、source-backed knowledge review、feature
+commit 與本機 `--no-ff` 整合均已完成；Work ID 已交付。
 
 ## 交付
 
 `acceptance-1` 已完成。使用者指示「請先自己實做一遍，如果有問題我會再開新案」，並授權以
 `evidence/acceptance/self-run-20260922.md` 的自行重播作為目前 feature snapshot 的驗收方式；模型評測仍為
 `not-run`。source-backed knowledge review 結果為 `no-change`。Feature implementation commit 為
-`329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`；尚未建立 delivery evidence commit 或整合 `main`。
+`329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`，delivery evidence commit 為
+`bffe48f833a6fd9434789c236f261e3bab27a853`，merge commit 為
+`8b4b7937c43a2396c2380fe3b108e134299f2b5d`。兩個父提交、祖先關係、產品樹一致性與 clean worktree 檢查均通過；
+feature branch 保留，最終狀態為 `complete`。
 
 ## 事件紀錄
 
@@ -144,3 +148,4 @@ source-backed knowledge review、feature commit 與本機整合。
 - 2026-09-22 15:00 — acceptance — 使用者指示「請先自己實做一遍，如果有問題我會再開新案」 — result: 以 `acceptance-1` 記錄自行重播，11 個情境通過，模型評測仍 `not-run` — next action: source-backed knowledge review。
 - 2026-09-22 15:15 — delivery — source-backed knowledge review — result: `no-change`，沒有 canonical promotion，來源 digest 與核准 scope 一致 — next action: 只暫存核准路徑並建立 feature commit。
 - 2026-09-22 15:30 — delivery — 建立 feature implementation commit `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd` — result: 51 個核准路徑已提交，工作樹後續只保留交付證據更新 — next action: 記錄 delivery evidence 並檢查 `main` 漂移。
+- 2026-09-22 15:45 — delivery — 建立 delivery evidence commit `bffe48f833a6fd9434789c236f261e3bab27a853` 並在未漂移的 `main` 執行 `git merge --no-ff` — result: merge commit `8b4b7937c43a2396c2380fe3b108e134299f2b5d`，兩個父提交、祖先關係、產品樹一致與合併後驗證均通過 — next action: 完成 Work ID 紀錄，feature branch 保留。

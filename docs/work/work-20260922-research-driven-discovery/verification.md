@@ -4,11 +4,11 @@
 - plan_version: plan-1
 - reviewed_snapshot: `fresh-review-20260922-r8.md`
 - verified_at: 2026-09-22
-- branch: feature/work-20260922-research-driven-discovery
+- branch: main
 - base_branch: main
 - base_commit: 6afd0e817bb22894aac8d801df60a81cfdd7ff4c
 - feature_commit: `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`
-- merge_commit: pending
+- merge_commit: `8b4b7937c43a2396c2380fe3b108e134299f2b5d`
 - verification_result: passed
 - model_evaluation: not-run
 
