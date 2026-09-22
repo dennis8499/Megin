@@ -5,12 +5,15 @@ description: Turn a clarified Megin request into an implementation-ready plan. U
 
 # Megin technical planning
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
-[../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating or
-updating a plan. Work read-only after `megin-requirements-discovery` has produced a
-current requirements revision. If the requirements still contain a major unknown about goal,
-audience, boundary, or acceptance, return to requirements discovery and keep
-`phase: requirements` with `status: awaiting_user`; do not write or present a plan.
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md),
+[../megin/references/branch-policy.md](../megin/references/branch-policy.md), and
+[../megin/references/requirements-discovery-protocol.md](../megin/references/requirements-discovery-protocol.md)
+before creating or updating a plan. Work read-only after `megin-requirements-discovery` has produced a current
+requirements revision. Re-read `requirements.md`, its sources, capability coverage, decisions, blockers, and acceptance
+against the protocol's completion conditions. If any major unknown could change the goal, audience, boundary, interface,
+important risk, core behavior, or acceptance, return to requirements discovery and keep `phase: requirements` with
+`status: awaiting_user`; do not write or present a plan. Never treat a `ready_for_planning` flag, question count, or
+document existence as proof of completion.
 Read the target code, tests, project knowledge, and available validation commands. Keep the smallest
 safe design; classify the work as small or large by impact and uncertainty rather than line count.
 

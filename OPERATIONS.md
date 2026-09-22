@@ -72,3 +72,12 @@ verification, and acceptance. External publication and cleanup are separate auth
 The working tree keeps only the current Skills source and active delivery records. Completed work,
 bug, and knowledge history is recoverable from Git commits; old approvals and design references are
 never current authorization. New work must use the Skills-only record and current source snapshot.
+
+## 需求探索材料
+
+`.agents/skills/megin/references/requirements-discovery-protocol.md` 是研究觸發、來源證據、能力覆蓋、
+依賴式選題與 planning 交接的共用語義；`requirements.md` 是單一需求主檔，`workflow.md` 只引用
+revision、摘要與阻礙。外部來源不可讀時必須保留查證限制，不能以模型記憶補成已確認事實。
+
+常設材料位於 `tests/requirements-discovery/`。執行 `check_materials.py` 與 `test_materials.py` 可驗證
+案例 ID、官方來源快照 SHA-256、fixture 與參照；這些命令不執行模型評測，也不會取代人工探索、審查或驗收。

@@ -24,6 +24,8 @@
 - phase: requirements | planning | approval | implementation | review | verification | acceptance | delivery
 - status: active | awaiting_user | awaiting_review | blocked | complete
 - plan_version: <version or pending>
+- requirements_revision: <revision or pending>
+- requirements_ref: <requirements.md path or pending>
 - last_updated: YYYY-MM-DD
 ```
 
@@ -56,6 +58,10 @@
 
 ## 阻礙與下一步
 一個附有證據的具體阻礙，或最早的下一步及其負責人。
+
+需求階段另記錄 `requirements_revision`、`requirements_ref`、研究摘要、能力覆蓋摘要、未解 `Q-*` 與下一個
+問題的參照。完整需求只保存在 `requirements.md`；`workflow.md` 不複製需求表格。來源較多時，
+`requirements.md` 可引用同一 Work ID 下的 `research.md`。
 
 ## 交付
 驗收版本、知識結果、feature branch 的已暫存路徑與提交識別碼、merge commit 識別碼、兩個父提交、
