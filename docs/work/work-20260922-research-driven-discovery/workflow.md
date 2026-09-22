@@ -9,6 +9,8 @@
 - feature_branch: feature/work-20260922-research-driven-discovery
 - merge_strategy: --no-ff
 - delivery_target: base_branch
+- feature_commit: 329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd
+- merge_commit: pending
 - route: large
 - phase: delivery
 - status: active
@@ -115,7 +117,8 @@ source-backed knowledge review、feature commit 與本機整合。
 
 `acceptance-1` 已完成。使用者指示「請先自己實做一遍，如果有問題我會再開新案」，並授權以
 `evidence/acceptance/self-run-20260922.md` 的自行重播作為目前 feature snapshot 的驗收方式；模型評測仍為
-`not-run`。source-backed knowledge review 結果為 `no-change`，尚未建立 feature commit 或整合 `main`。
+`not-run`。source-backed knowledge review 結果為 `no-change`。Feature implementation commit 為
+`329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`；尚未建立 delivery evidence commit 或整合 `main`。
 
 ## 事件紀錄
 
@@ -140,3 +143,4 @@ source-backed knowledge review、feature commit 與本機整合。
 - 2026-09-22 14:45 — verification — 重新執行所有核准命令與 branch/snapshot 檢查 — result: 全部 exit 0，manual-only 與模型評測仍 `not-run` — next action: human acceptance。
 - 2026-09-22 15:00 — acceptance — 使用者指示「請先自己實做一遍，如果有問題我會再開新案」 — result: 以 `acceptance-1` 記錄自行重播，11 個情境通過，模型評測仍 `not-run` — next action: source-backed knowledge review。
 - 2026-09-22 15:15 — delivery — source-backed knowledge review — result: `no-change`，沒有 canonical promotion，來源 digest 與核准 scope 一致 — next action: 只暫存核准路徑並建立 feature commit。
+- 2026-09-22 15:30 — delivery — 建立 feature implementation commit `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd` — result: 51 個核准路徑已提交，工作樹後續只保留交付證據更新 — next action: 記錄 delivery evidence 並檢查 `main` 漂移。

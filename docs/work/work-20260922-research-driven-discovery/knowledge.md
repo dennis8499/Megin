@@ -40,5 +40,6 @@ knowledge 檔案；README 與 OPERATIONS 均指向 `.agents/skills/` 為現行 S
 promotion contract 提升到另一個 canonical knowledge 位置的內容。`knowledge_result` 維持 `no-change`，沒有
 canonical promotion。
 
-下一步是只暫存 `plan-1` 允許路徑，在 feature branch 建立一個 feature commit，確認 `main` 仍停在
-`6afd0e817bb22894aac8d801df60a81cfdd7ff4c` 後使用 `git merge --no-ff`；本紀錄不執行 staging、commit 或 merge。
+feature implementation commit `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd` 已依核准路徑建立。下一步是記錄
+delivery evidence、確認 `main` 仍停在 `6afd0e817bb22894aac8d801df60a81cfdd7ff4c`，再使用
+`git merge --no-ff`；本紀錄不執行 merge。

@@ -7,7 +7,8 @@
 - branch: feature/work-20260922-research-driven-discovery
 - base_branch: main
 - base_commit: 6afd0e817bb22894aac8d801df60a81cfdd7ff4c
-- feature_commit: pending human acceptance
+- feature_commit: `329f4142c7ff6751fac50fe0d9fbd2435b5e1dbd`
+- merge_commit: pending
 - verification_result: passed
 - model_evaluation: not-run
 
