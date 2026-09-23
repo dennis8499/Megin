@@ -15,6 +15,9 @@ version, `base_branch`, `base_commit`, `feature_branch`, workspace, environment,
 operation, and its expected observable result. The user accepts the exact feature-branch snapshot;
 the base branch must still be unchanged at its recorded target before delivery. Do not turn internal
 tests or reviewer checks into extra manual work.
+For a new or resumed change, require the `acceptance` gate from
+[../megin/references/quality-gates.md](../megin/references/quality-gates.md) to pass first. A
+structural pass is not the user's acceptance response.
 
 Wait for a response that identifies the displayed Work ID and acceptance version and confirms the
 listed scenarios. Record the response, timestamp, and accepted feature snapshot in `workflow.md`. If
@@ -22,6 +25,8 @@ a scenario fails, the base branch drifts, or the feature snapshot changes, recor
 and return to the affected implementation task for a new review and verification cycle. Before this
 response, do not update formal knowledge, stage paths, create a feature commit, or merge into the
 base branch.
+The cited raw acceptance record starts with the exact machine-readable `work_id`, `version`,
+`snapshot`, and `verdict: ACCEPTED` lines from the shared reference, followed by the user's response.
 
 Handoff: `phase: delivery` and an exact acceptance record, or a named failed scenario with the next
 repair action. The delivery handoff is responsible for the feature commit and local `--no-ff`

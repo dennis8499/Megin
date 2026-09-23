@@ -1,0 +1,7 @@
+Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+Exit code: 0
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 49.210s
+
+OK

@@ -1,0 +1,17 @@
+Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+Exit code: 1
+Snapshot: 5fdf5bc3b5c59b51a024d750d5664000ad17ecb28726aac4366f5c2bef4a0357
+......F...
+======================================================================
+FAIL: test_output_count_needs_a_locator_in_raw_log (__main__.QualityGateTests.test_output_count_needs_a_locator_in_raw_log)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 175, in test_output_count_needs_a_locator_in_raw_log
+    self.assertEqual(1, self.run_gate("check", "acceptance").returncode)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 10 tests in 14.176s
+
+FAILED (failures=1)

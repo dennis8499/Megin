@@ -10,6 +10,8 @@ The bundle keeps a complete delivery path:
 
 The workflow is driven by Skills and a readable `docs/work/<work-id>/workflow.md` record. Git,
 repository search, project tests, and the project's own tools remain available as ordinary tools.
+The Skills bundle also includes a small read-only quality gate helper. It checks structural evidence
+at review, acceptance, and delivery handoffs; it does not run a workflow or judge code behavior.
 
 ## 需求探索
 
@@ -81,6 +83,16 @@ in the recorded feature branch at a time; the base branch remains unchanged unti
 BDD/TDD evidence and a different fresh reviewer are required before automated verification.
 Verification runs every approved command against the reviewed snapshot and then pauses at
 `awaiting_user` for the listed manual acceptance scenarios.
+For new change work, [quality evidence rules](.agents/skills/megin/references/quality-gates.md)
+bind observable assertions, raw command output, the approved snapshot, and reviewer provenance.
+A compile error alone is setup evidence, and required tests that fail, are blocked, match zero
+tests, or are skipped do not qualify as passing verification. The read-only helper at
+`.agents/skills/megin/scripts/quality_gate.py` checks these recorded conditions; the independent
+reviewer still judges whether the tests prove the promised behavior.
+The approved quality contract names every excluded process record exactly. At delivery, the helper
+compares the staged Git blobs with the user-accepted product digest and rejects remaining unstaged
+product paths. Structured command, review, and acceptance outcomes also point to the exact matching
+lines in their hashed raw sources.
 
 After the user names the Work ID and acceptance version, Megin reviews only the approved,
 source-backed knowledge scope, stages only approved paths on the feature branch, and creates one

@@ -16,6 +16,10 @@ important risk, core behavior, or acceptance, return to requirements discovery a
 document existence as proof of completion.
 Read the target code, tests, project knowledge, and available validation commands. Keep the smallest
 safe design; classify the work as small or large by impact and uncertainty rather than line count.
+Read [../megin/references/quality-gates.md](../megin/references/quality-gates.md) for the shared
+obligation and snapshot contract. Map each observable result to a meaningful assertion, exact
+command, and required environment; split independently failing promises. Include failure paths
+only when the change makes them relevant. The plan remains the sole source of approved obligations.
 
 Write `plan.md` beside the Work ID record. It must bind the requirements revision to interfaces,
 dependency-ordered work packages, exact allowed paths, forbidden paths, acceptance scenarios,

@@ -1,0 +1,164 @@
+{
+  "schema": "megin-replay-source-manifest/v1",
+  "captured_on": "2026-09-23",
+  "repositories": [
+    {
+      "name": "Test",
+      "source_root": "C:\\Users\\denni\\OneDrive\\Desktop\\新增資料夾\\Test",
+      "head": "71540d80eb7aa37e5f52989a4f007793d01bb4a9",
+      "files": [
+        {
+          "path": "docs/work/work-20260922-ai-first-dotnet10-template/review.md",
+          "sha256": "f52f4ec889d28a1931ab69f87661f795e95db1dc6994b1327929b4a8d5e2e652",
+          "bytes": 2265,
+          "git_status": "?? docs/work/work-20260922-ai-first-dotnet10-template/review.md"
+        },
+        {
+          "path": "docs/work/work-20260922-ai-first-dotnet10-template/workflow.md",
+          "sha256": "1dbed6e35f607607ff10aca9bbd32fba2d5eee89393440f139d4614df29764dc",
+          "bytes": 7666,
+          "git_status": "?? docs/work/work-20260922-ai-first-dotnet10-template/workflow.md"
+        },
+        {
+          "path": "docs/work/work-20260922-ai-first-dotnet10-template/implementation-evidence.md",
+          "sha256": "2fe94dc23397e04c19d9c4a2b0cc0b4104532629a96a5d9b2819c33039b3db40",
+          "bytes": 4296,
+          "git_status": "?? docs/work/work-20260922-ai-first-dotnet10-template/implementation-evidence.md"
+        },
+        {
+          "path": "docs/work/work-20260922-ai-first-dotnet10-template/requirements.md",
+          "sha256": "86e777b49b80ea5011fa13b60ad904ab22502148ff48dabae69508025f1b9697",
+          "bytes": 8765,
+          "git_status": "?? docs/work/work-20260922-ai-first-dotnet10-template/requirements.md"
+        },
+        {
+          "path": "docs/work/work-20260922-ai-first-dotnet10-template/features/ai-first-template.feature",
+          "sha256": "bbb91bdf552a199a6de6639bdbba06c4cdaaefe2ff0c007def157d3894f2a5ff",
+          "bytes": 2212,
+          "git_status": "?? docs/work/work-20260922-ai-first-dotnet10-template/features/ai-first-template.feature"
+        },
+        {
+          "path": ".agents/skills/megin-code-review/SKILL.md",
+          "sha256": "3679a0f29488e1a1500bbf1cc7c6ab598c202c8ba75a41b63f51ca1c22b235d5",
+          "bytes": 1830,
+          "git_status": "tracked-clean"
+        },
+        {
+          "path": ".agents/skills/megin-test-driven-development/SKILL.md",
+          "sha256": "ce83a06f2011787c87ed84acd675cd1f80dc1cba2b911c16c5e623a2de4d8184",
+          "bytes": 1547,
+          "git_status": "tracked-clean"
+        },
+        {
+          "path": ".agents/skills/megin-behavior-contract/SKILL.md",
+          "sha256": "30d1defb955324b8c88e5a6c6195fac206d30a83417d23ef1519539d4522f0e5",
+          "bytes": 1695,
+          "git_status": "tracked-clean"
+        },
+        {
+          "path": "tests/Api.Tests/Features/Todo/TodoEndpointTests.cs",
+          "sha256": "be85e07d7f9b3cf267758142d365d3d56e88ee2b296cacab452e94a44e383f04",
+          "bytes": 3629,
+          "git_status": "?? tests/Api.Tests/Features/Todo/TodoEndpointTests.cs"
+        },
+        {
+          "path": "docs/features/todo.md",
+          "sha256": "06dcefbefdcd26550dde34fce8e8b8d124fea48990f15dfe0f4d06fd26c7c4b4",
+          "bytes": 866,
+          "git_status": "?? docs/features/todo.md"
+        }
+      ]
+    },
+    {
+      "name": "Test2",
+      "source_root": "C:\\Users\\denni\\OneDrive\\Desktop\\新增資料夾\\Test2",
+      "head": "3f53fbc07ea91a3e71395981129592cbceef333b",
+      "files": [
+        {
+          "path": "docs/work/work-20260922-quartz-service/features/quartz-service.feature",
+          "sha256": "4768d0a4d4177f566721e34f5675969c1414e94438563fdb68d523b413410424",
+          "bytes": 6265,
+          "git_status": "?? docs/work/work-20260922-quartz-service/features/quartz-service.feature"
+        },
+        {
+          "path": "docs/work/work-20260922-quartz-service/plan.md",
+          "sha256": "5e4c042c1f8e7ff922662b0b0231cb4eed3ec7423751e9197eb4434ad4ca1373",
+          "bytes": 28255,
+          "git_status": "?? docs/work/work-20260922-quartz-service/plan.md"
+        },
+        {
+          "path": "docs/work/work-20260922-quartz-service/evidence/verification.md",
+          "sha256": "52503f0424a800d2b44529807677fa2ebbf199205eaf8a8176a0be0b0e9fbcab",
+          "bytes": 4749,
+          "git_status": "?? docs/work/work-20260922-quartz-service/evidence/verification.md"
+        },
+        {
+          "path": "docs/work/work-20260922-quartz-service/evidence/review.md",
+          "sha256": "75426189d91470679825df718c07b707c11005b07eebeb287273c029c2a3296f",
+          "bytes": 4791,
+          "git_status": "?? docs/work/work-20260922-quartz-service/evidence/review.md"
+        },
+        {
+          "path": "tests/QuartzSchedulerService.UnitTests/Scheduling/TriggerFactoryTests.cs",
+          "sha256": "09cdcdc3a686b526a4dae392fdb93c91c921c3fd6caf48b75fb9abae603ae468",
+          "bytes": 2529,
+          "git_status": "?? tests/QuartzSchedulerService.UnitTests/Scheduling/TriggerFactoryTests.cs"
+        },
+        {
+          "path": "src/QuartzSchedulerService/Scheduling/TriggerFactory.cs",
+          "sha256": "8a1eb5bac5b5d45a841eabfc6cb98597e342a5d52dfc99531dcaa5502f9e1607",
+          "bytes": 7237,
+          "git_status": "?? src/QuartzSchedulerService/Scheduling/TriggerFactory.cs"
+        },
+        {
+          "path": "src/QuartzSchedulerService/Configuration/QuartzBootstrap.cs",
+          "sha256": "c440f415e25602354cca0ea56f2d8c46427a8a8206741c353bc30f028e6ba50c",
+          "bytes": 4374,
+          "git_status": "?? src/QuartzSchedulerService/Configuration/QuartzBootstrap.cs"
+        },
+        {
+          "path": "tests/QuartzSchedulerService.IntegrationTests/Containers/QuartzClusterContainerTests.cs",
+          "sha256": "3efe19d5d162d3c328e7408bf828c2f5f786325056b696f6c11194bfc1eea55d",
+          "bytes": 4305,
+          "git_status": "?? tests/QuartzSchedulerService.IntegrationTests/Containers/QuartzClusterContainerTests.cs"
+        },
+        {
+          "path": "tests/QuartzSchedulerService.IntegrationTests/Containers/KafkaContainerTests.cs",
+          "sha256": "9dc18df914afb4e288bc9450d0e96c7e6208a3ebbbfb3a83a2142e9340f04765",
+          "bytes": 2968,
+          "git_status": "?? tests/QuartzSchedulerService.IntegrationTests/Containers/KafkaContainerTests.cs"
+        },
+        {
+          "path": "tests/QuartzSchedulerService.UnitTests/Kafka/KafkaBridgeTests.cs",
+          "sha256": "593fb27c15abfaca638513ff948a1778356d628979f9ed19cc1bb347764066ce",
+          "bytes": 8770,
+          "git_status": "?? tests/QuartzSchedulerService.UnitTests/Kafka/KafkaBridgeTests.cs"
+        },
+        {
+          "path": "tests/QuartzSchedulerService.IntegrationTests/Kafka/KafkaApiTests.cs",
+          "sha256": "420f857f4bcfba552f0ea37ffc26733e1b23be0e08b4e3d156038b18cfcf327c",
+          "bytes": 2146,
+          "git_status": "?? tests/QuartzSchedulerService.IntegrationTests/Kafka/KafkaApiTests.cs"
+        },
+        {
+          "path": "src/QuartzSchedulerService/Kafka/KafkaEventCoordinator.cs",
+          "sha256": "96f4c53836c13fc13feaae361907fe74d4d0c58ddc70331f4244c4e53b87f980",
+          "bytes": 3193,
+          "git_status": "?? src/QuartzSchedulerService/Kafka/KafkaEventCoordinator.cs"
+        },
+        {
+          "path": "src/QuartzSchedulerService/Persistence/Kafka/SqlKafkaStores.cs",
+          "sha256": "f05b269ac18d7da38ad2dd23cd634dcd7462d8ba9d013453db30f99315250947",
+          "bytes": 22514,
+          "git_status": "?? src/QuartzSchedulerService/Persistence/Kafka/SqlKafkaStores.cs"
+        },
+        {
+          "path": "src/QuartzSchedulerService/Jobs/HttpEndpointJob.cs",
+          "sha256": "5a4e62db458f05888ee1b58724aad743e6ed15f2d2c8bb15cd3b849d4b0a423f",
+          "bytes": 10080,
+          "git_status": "?? src/QuartzSchedulerService/Jobs/HttpEndpointJob.cs"
+        }
+      ]
+    }
+  ]
+}

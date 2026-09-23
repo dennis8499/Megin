@@ -20,5 +20,9 @@ Keep tests deterministic and meaningful. A parser success, skipped scenario, or 
 test is not behavior evidence. Run the loop on the recorded feature branch and preserve its base
 commit in the evidence. When a failure reveals a broader contract or scope change, stop and return to
 planning; do not silently add code or tests outside the approved package.
+Read [../megin/references/quality-gates.md](../megin/references/quality-gates.md) before claiming
+Red or Green. A compiler error may explain setup, but new behavior needs a failing assertion that
+would catch the promised behavior being absent. Preserve its preimplementation snapshot separately
+from the final Green snapshot. Reuse valid existing coverage without an artificial Red.
 
 Handoff: focused red/green evidence and a clean package result for implementation and review.

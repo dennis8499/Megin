@@ -16,6 +16,12 @@ knowledge scope, and delivery destination. Inspect status, diff, `base_branch`, 
 focused, related, full, static, build, contract, and scenario command that applies, recording the
 exact command, exit status, output path, and digest where required. Do not stage, commit, or merge
 as part of automated verification.
+Apply [../megin/references/quality-gates.md](../megin/references/quality-gates.md): record the
+actual number of tests executed, failed, and skipped where the command is a test. Do not infer
+success from a zero exit with no matching tests or from a missing environment. Check the read-only
+`acceptance` gate before advancing the workflow status.
+Each saved command output starts with its exact `Command:` and `Exit code:` lines and cites those
+claim locators plus the result/count line in the quality evidence.
 
 Confirm the fresh reviewer approved the same snapshot and that knowledge claims retain source paths,
 digests, certainty, and conflict results. A failed command, base-branch advance, or feature snapshot

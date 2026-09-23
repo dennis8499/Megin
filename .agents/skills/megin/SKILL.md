@@ -32,6 +32,9 @@ exploration semantics are in [requirements-discovery-protocol.md](references/req
 read it before creating or updating any human-readable delivery document. The Git branch, acceptance,
 and local integration rules are in [branch-policy.md](references/branch-policy.md); read it before
 planning or executing a repository change.
+For a new or resumed change, read [quality-gates.md](references/quality-gates.md) before planning
+the evidence or crossing a review, acceptance, or delivery gate. Keep the approved plan as the
+obligation source and `workflow.md` as the status source.
 
 ## Complete delivery path
 
@@ -83,6 +86,10 @@ For a change, route the same Work ID through these phases:
   evidence. Follow [branch-policy.md](references/branch-policy.md) for recovery.
 - Never claim a test, review, acceptance, knowledge promotion, or commit that did not happen.
   If an independent reviewer is unavailable, stop at `awaiting_review`.
+- For new quality evidence, run the read-only `megin/scripts/quality_gate.py` at the relevant
+  handoff. A structural pass does not replace the independent judgment or executed tests.
+- After each work package, record completed work, fresh verification, uncertainty, and the next
+  action.
 - Keep secrets out of records; store paths, summaries, byte counts, and digests where evidence
   must be referenced.
 
