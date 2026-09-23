@@ -18,6 +18,8 @@ Skills only and is not a Megin runtime command.
 
 The canonical source is `.agents/skills/`. `megin/scripts/validate_skills.py` is a static packaging
 check only. It is not a workflow runner and is not part of the user interaction model.
+`megin/scripts/quality_gate.py` is a separate read-only evidence check called by the relevant
+Skills. It neither executes project tests nor changes the workflow state.
 
 ## Work record
 
@@ -60,6 +62,17 @@ Record commands, exit statuses, raw output paths, snapshots, and source referenc
 the result. A skipped, undefined, stale, or parser-only check is not passing evidence. A reviewer
 cannot approve its own changes; if no independent reviewer is available, leave the work at
 `awaiting_review`. A passing automated verification is not user acceptance.
+For new or resumed work, use the single shared
+[quality evidence contract](.agents/skills/megin/references/quality-gates.md). The approved plan
+owns required checks, `workflow.md` owns the phase and status, and `quality_ref` names the execution
+evidence. Capture a snapshot and call the helper's `check --gate review|acceptance|delivery` at the
+corresponding handoff. Structural success does not assert that the behavior or independent review
+was correct. List exact excluded process-record paths in the approved contract; evidence-directory
+files are protected unless listed. Run the delivery gate after staging so it can compare staged Git
+blobs with the accepted product digest. On any nonzero result, keep the current phase and record the
+reason and next action.
+Keep command, reviewer, and acceptance identities and outcomes as nonempty strings, and bind each
+one to an exact line in its hashed raw evidence rather than repeating an unchecked summary.
 
 Knowledge is source-backed and scoped to the approved result. Unsupported or conflicting claims stay
 pending. Knowledge review does not stage or commit. Finishing stages only approved files and creates

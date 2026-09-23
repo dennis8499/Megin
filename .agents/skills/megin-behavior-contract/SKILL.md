@@ -14,6 +14,9 @@ For every external behavior, write one stable scenario ID and one concrete Given
 the Work ID's `features/` directory. Each scenario names its observable result, automatic command,
 and whether user acceptance is required. Reuse existing passing coverage when it already proves the
 behavior; do not manufacture a red test merely to fill a template.
+Use [../megin/references/quality-gates.md](../megin/references/quality-gates.md) to identify the
+observable assertion for each result. A scenario tag or passing configuration check alone does not
+prove recovery, persistence, retries, or other behavior beyond the test's actual assertion.
 
 Keep the feature wording as the shared source for implementation, review, verification, and manual
 acceptance. An undefined, skipped, pending, or environment-error step is not passing evidence.

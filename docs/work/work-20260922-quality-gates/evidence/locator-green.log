@@ -1,0 +1,8 @@
+Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+Exit code: 0
+Snapshot: 58fb2ff7e0682bb05df63239f6efd11384006b7e68103dd10c1a4457631750be
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 13.109s
+
+OK

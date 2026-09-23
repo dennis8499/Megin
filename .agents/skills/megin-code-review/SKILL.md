@@ -15,13 +15,19 @@ ID and plan, inspect the full diff and surrounding code, tests, configuration, d
 generated artifacts, knowledge claims, and current branch/snapshot. Confirm the reviewer is on the
 recorded feature branch, the base branch has not entered the product diff, every changed path is
 allowed, and every acceptance scenario has meaningful coverage.
+Read [../megin/references/quality-gates.md](../megin/references/quality-gates.md) and retain the
+actual fresh reviewer source and raw verdict. Independently trace each consequential promise to
+the assertion that would fail if the behavior were absent; distinguish configuration, mock, and
+partial integration evidence from the promised full path.
+Start the saved raw review with the exact machine-readable `context`, `verdict`, and `snapshot`
+lines defined by that reference. The structured evidence must point to those same hashed lines.
 
 Check behavior, error paths, compatibility, security/privacy, data and permission effects,
 operational failure handling, test quality, evidence freshness, and source-backed knowledge. Record
 findings with severity, path or symbol, evidence, and a concrete correction. Return exactly one
 verdict: `APPROVED`, `CHANGES_REQUIRED`, or `BLOCKED`.
 
-`APPROVED` covers the exact feature-branch snapshot only. Any change after the review, a base-branch
-advance that must be integrated, or a branch identity mismatch invalidates it and requires a fresh
+`APPROVED` covers the exact feature-branch product and approved-contract snapshot only. A protected
+change, a base-branch advance that must be integrated, or a branch identity mismatch requires a fresh
 review. A reviewer is read-only and cannot approve its own work; if independent review is not
 available, record `BLOCKED` and leave the work at `awaiting_review`.

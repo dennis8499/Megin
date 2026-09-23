@@ -15,6 +15,12 @@ workspace, branch, approved paths, reviewed and verified snapshot, knowledge sco
 and final diff. Confirm the current branch is the recorded feature branch, the base branch still
 matches the recorded integration target, and the acceptance response covers this exact snapshot.
 Stop on unrelated files, branch drift, stale evidence, or an unauthorized target.
+For a new or resumed change, first confirm the accepted worktree snapshot, then stage only approved
+paths and run the read-only `delivery` gate in
+[../megin/references/quality-gates.md](../megin/references/quality-gates.md). Preserve its raw output.
+The gate requires every staged product blob to reproduce the accepted product digest and rejects
+remaining unstaged or untracked product paths. Staging does not retroactively turn an unreviewed
+product edit into an accepted change.
 
 Run `megin-project-knowledge` over the approved source-backed scope. Preserve unsupported or
 conflicting claims as pending and leave canonical knowledge unchanged unless the repository's

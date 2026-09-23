@@ -1,0 +1,55 @@
+Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+Exit code: 1
+.F.FF......F.FF
+======================================================================
+FAIL: test_complete_evidence_passes_all_three_gates (__main__.QualityGateTests.test_complete_evidence_passes_all_three_gates)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 125, in test_complete_evidence_passes_all_three_gates
+    self.assertEqual(0, result.returncode, (result.stdout, result.stderr))
+AssertionError: 0 != 1 : ('{"gate": "delivery", "ok": false, "reasons": ["product or approved-contract snapshot changed", "unit: stale snapshot", "independent APPROVED review for current snapshot missing", "human acceptance does not bind current Work ID and snapshot"], "snapshot": "29a9759f8ad04d90676840e7b7f8f6dee7e915701cb7ef062bf3b77a581f5330"}\n', '')
+
+======================================================================
+FAIL: test_delivery_compares_staged_bytes_with_accepted_snapshot (__main__.QualityGateTests.test_delivery_compares_staged_bytes_with_accepted_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 228, in test_delivery_compares_staged_bytes_with_accepted_snapshot
+    self.assertIn("staged product bytes differ", result.stdout)
+AssertionError: 'staged product bytes differ' not found in '{"gate": "delivery", "ok": false, "reasons": ["product or approved-contract snapshot changed", "unit: stale snapshot", "independent APPROVED review for current snapshot missing", "human acceptance does not bind current Work ID and snapshot"], "snapshot": "a2a64ceded7a2f5f97fdcf863ea3b398613a7a2b4240d3a9acc8a7572d229cbd"}\n'
+
+======================================================================
+FAIL: test_dot_segments_cannot_escape_evidence_directory (__main__.QualityGateTests.test_dot_segments_cannot_escape_evidence_directory)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 208, in test_dot_segments_cannot_escape_evidence_directory
+    self.assertEqual(2, self.run_gate("check", "review").returncode)
+AssertionError: 2 != 0
+
+======================================================================
+FAIL: test_review_requires_each_approved_result_and_raw_source (__main__.QualityGateTests.test_review_requires_each_approved_result_and_raw_source)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 201, in test_review_requires_each_approved_result_and_raw_source
+    self.assertEqual(1, self.run_gate("check", "review").returncode)
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_staging_keeps_content_digest_but_is_rejected_before_delivery (__main__.QualityGateTests.test_staging_keeps_content_digest_but_is_rejected_before_delivery)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 153, in test_staging_keeps_content_digest_but_is_rejected_before_delivery
+    self.assertEqual(self.snapshot, json.loads(self.run_gate("snapshot").stdout)["product_sha256"])
+AssertionError: '071dd45e2ab31d92fea24a1c24b59b1fecb1c306bc7756db73eb3c18edaf4c9b' != 'd9df075205461dfd2b90d437eb7fa94cc75f398bd7796eb4c841392004abd22d'
+
+======================================================================
+FAIL: test_unlisted_executable_evidence_changes_product_snapshot (__main__.QualityGateTests.test_unlisted_executable_evidence_changes_product_snapshot)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 166, in test_unlisted_executable_evidence_changes_product_snapshot
+    self.assertNotEqual(
+AssertionError: '071dd45e2ab31d92fea24a1c24b59b1fecb1c306bc7756db73eb3c18edaf4c9b' == '071dd45e2ab31d92fea24a1c24b59b1fecb1c306bc7756db73eb3c18edaf4c9b'
+
+----------------------------------------------------------------------
+Ran 15 tests in 12.891s
+
+FAILED (failures=6)

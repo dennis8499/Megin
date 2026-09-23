@@ -22,6 +22,12 @@ does not delegate. Use `megin-test-driven-development` for each behavior, preser
 full, static, and contract command evidence, and keep changed paths within the approved scope. A
 package reports `completed`, `needs_revision`, `blocked`, or `awaiting_upstream` in the Work ID
 ledger.
+At each package boundary, follow [../megin/references/quality-gates.md](../megin/references/quality-gates.md):
+record completed work, commands actually run, uncertainty, and the next action. Before a formal
+review handoff, run its read-only `review` gate against the exact feature snapshot. A failed gate
+keeps the package in implementation; an optional diagnostic review cannot approve it.
+The cited writer handoff starts with the exact machine-readable `context` and `snapshot` lines
+defined by the shared reference; do not copy different values into structured evidence.
 
 When all packages are complete, save the current snapshot and hand off to a different fresh,
 read-only `megin-code-review` context. Do not stage, commit, update canonical knowledge, or claim

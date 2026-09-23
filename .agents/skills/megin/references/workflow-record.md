@@ -26,6 +26,7 @@
 - plan_version: <version or pending>
 - requirements_revision: <revision or pending>
 - requirements_ref: <requirements.md path or pending>
+- quality_ref: <quality evidence path or pending for a new change>
 - last_updated: YYYY-MM-DD
 ```
 
@@ -33,6 +34,10 @@
 後續恢復時可以偵測漂移。`base_branch` 是用來建立 feature branch 與最終本機整合的主分支；
 `feature_branch` 是核准後唯一可寫入產品的分支；`merge_strategy` 固定為 `--no-ff`。標頭中的 schema、
 鍵、狀態值與識別值維持英文，標題與說明使用繁體中文。
+
+新工作用 `quality_ref` 參照 [quality-gates.md](quality-gates.md) 定義的執行證據；核准計畫仍是
+驗收義務來源，`workflow.md` 仍是唯一流程狀態來源。已完成歷史紀錄不回填；舊工作恢復時在跨越
+下一個品質關卡前補齊該關需要的證據，不沿用失效的舊核准。
 
 ## 區段
 

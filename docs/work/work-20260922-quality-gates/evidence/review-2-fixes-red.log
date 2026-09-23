@@ -1,0 +1,31 @@
+Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+Exit code: 1
+...F..........FF......
+======================================================================
+FAIL: test_contexts_and_acceptance_version_must_be_nonempty_strings (__main__.QualityGateTests.test_contexts_and_acceptance_version_must_be_nonempty_strings)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 324, in test_contexts_and_acceptance_version_must_be_nonempty_strings
+    self.assertEqual(1, self.run_gate("check", "acceptance").returncode)
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_raw_acceptance_must_agree_with_structured_acceptance (__main__.QualityGateTests.test_raw_acceptance_must_agree_with_structured_acceptance)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 345, in test_raw_acceptance_must_agree_with_structured_acceptance
+    self.assertEqual(1, self.run_gate("check", "delivery").returncode)
+AssertionError: 1 != 0
+
+======================================================================
+FAIL: test_raw_review_must_agree_with_structured_approval (__main__.QualityGateTests.test_raw_review_must_agree_with_structured_approval)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\quality-gates\test_quality_gate.py", line 318, in test_raw_review_must_agree_with_structured_approval
+    self.assertEqual(1, self.run_gate("check", "acceptance").returncode)
+AssertionError: 1 != 0
+
+----------------------------------------------------------------------
+Ran 22 tests in 25.269s
+
+FAILED (failures=3)

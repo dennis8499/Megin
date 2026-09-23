@@ -12,6 +12,7 @@ on:
       - ".gitattributes"
       - ".gitignore"
       - "tests/requirements-discovery/**"
+      - "tests/quality-gates/**"
 
 jobs:
   skills:
@@ -32,6 +33,8 @@ jobs:
           python -X utf8 -B tests/requirements-discovery/check_materials.py
           python -X utf8 -B tests/requirements-discovery/test_materials.py
           python -X utf8 -B tests/requirements-discovery/test_rules.py
+      - name: Validate quality gate behavior
+        run: python -X utf8 -B tests/quality-gates/test_quality_gate.py
       - name: Check pull-request whitespace
         shell: bash
         env:

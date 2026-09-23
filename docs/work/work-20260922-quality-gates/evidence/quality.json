@@ -1,0 +1,296 @@
+{
+  "schema": "megin-quality-evidence/v1",
+  "work_id": "work-20260922-quality-gates",
+  "plan_version": "plan-3",
+  "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+  "writer": {
+    "context": "/root",
+    "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+    "source": {
+      "path": "docs/work/work-20260922-quality-gates/evidence/handoff-4.md",
+      "sha256": "40a62de42af3f08cf4d45f47dba2621a6e164b2f6794bfec644251278845b04c",
+      "claims": {
+        "context": {
+          "line": 1,
+          "text": "- context: /root"
+        },
+        "snapshot": {
+          "line": 2,
+          "text": "- snapshot: ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136"
+        }
+      }
+    }
+  },
+  "sources": [
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/locator-red.log",
+      "sha256": "0a9239b694d571fcee8cbd358ad5462afe34d283eb88e08bee54d376fa919d91"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/locator-green.log",
+      "sha256": "015bcd7399c5629a07d03ed9ace07cf00c2c4850efd23c588f2c5e1e91b318c0"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/tdd-locator.md",
+      "sha256": "40ef002d7ff09644e26ef46cf76eff00a96f07f8a62a91870f677d36fb17cf00"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-fixes-red.log",
+      "sha256": "9b4dc232a7cb20176b7d845c854ad2cf09822f70500f36ea8ec1c5dbdc7c1936"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-fixes-green.log",
+      "sha256": "056ea1586185e47dc6af079d5755568e0332ad95d5dbdf1d6caa21ff7c09c0e9"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/tdd-review-fixes.md",
+      "sha256": "be1d8384b0661d5c100772636dc395f3b5c96a94ed4a4ba87cbdf0ca14f75d8d"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-1.md",
+      "sha256": "4ea59449900661795cd770402bde521cfc5c96f2bf528c778b42be457d71547f"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-2.md",
+      "sha256": "ce536f5237a25dad22a3b2f0625457154aaf85b5d5974df2c90843614b4d6e16"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-2-fixes-red.log",
+      "sha256": "d14bd6e74b86c16cb53b92c46b4d5c391b0ca6272a19698f6b5d7e0f1a9268f0"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-2-fixes-green.log",
+      "sha256": "a50f31d4a63e9fffa362a2e6d4f4e268e8e74222b924b62a93cb3318877ea0b3"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/tdd-review-2-fixes.md",
+      "sha256": "6f9d5adf2d008128a3d92354848bafcacba36d2ccb53365d12039c2b7b27ecb5"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/test-independent-review.md",
+      "sha256": "8c21c2ba0a28ad65615f045b000112f993c332150f134314a14d88a0dcdd6a68"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/test-red.md",
+      "sha256": "75253a004e63916895fe8ce3ea08c6e3f2d4ac1edafff8ac776110fe5d513732"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/test2-recovery.md",
+      "sha256": "8bc8ab0f3a3d0661fa70b28a7feee7296e20b94815c2ed3d470d72adc329605e"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/test2-kafka.md",
+      "sha256": "3a22ab7a13a48ef4769ca13a650855795af0fb3f07b3b407d4174d2b563fdf85"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/test-narrow-pass.md",
+      "sha256": "8faa85e52268f0a26d3d150909a85069fcf7f431a9a5ffaad2b0e9f591bfa956"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/existing-coverage.md",
+      "sha256": "162fbc73895cab148160e8600bbf2d563548ffee3e4f9abe84eda18b3ee3de67"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/replay/source-manifest.json",
+      "sha256": "9c54938eb35c62bba4e1ff1c6997b135a4ab2b61f29e4d94f5f16f9f5f2b6d62"
+    },
+    {
+      "path": "docs/work/work-20260922-quality-gates/evidence/verification.md",
+      "sha256": "9562263c448bfd54a37c6b5839a13e471c1793b6ddd590be0cbeaf30172e29cc"
+    }
+  ],
+  "checks": [
+    {
+      "id": "quality-tests",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/quality-tests.log",
+        "sha256": "68ba58f518fb8768d0eaac6692575db1063082d615dddca99c2747d3d14f7259",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 7,
+        "text": "Ran 22 tests in 44.920s"
+      },
+      "executed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "discovery-materials",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/discovery-materials.log",
+        "sha256": "3425889bc0be449f0f3dab2748f4f0bf76436057fbcf83171aafbbd077aff0a5",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/check_materials.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "validated requirements-discovery materials: 11 cases, 6 source snapshots, and fixtures"
+      }
+    },
+    {
+      "id": "discovery-tests",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/discovery-tests.log",
+        "sha256": "38821897e7d1513b2c8b5556021b8934d0faeeb3da0af4f36769dbcc0f56aca0",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_materials.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "material checker regression tests passed: canonical, isolated references, duplicate IDs, bad-reference, and result-template cases"
+      },
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "discovery-rules",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/discovery-rules.log",
+        "sha256": "8324e975bdc7ec9827d3ec316ff85b17da3873faa0a26274e30d0fc359817b7d",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_rules.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "discovery rule regression tests passed: language, routing, protocol, workflow, and scenario contracts"
+      },
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "skills-archive",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/skills-archive.log",
+        "sha256": "4d3a3ed94c8339b6d23a391a82a7070cfd6fb6f9078651a8bf3d12fb91e11d2a",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "validated 12 Megin Skills"
+      }
+    },
+    {
+      "id": "diff-check",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+      "output": {
+        "path": "docs/work/work-20260922-quality-gates/evidence/commands/diff-check.log",
+        "sha256": "0a91fc10d1b53fb0b012b98238d51f2a6065f496791a45c0197e95e62737133f",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: git diff --check"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 2,
+        "text": "Exit code: 0"
+      }
+    }
+  ],
+  "review": {
+    "context": "/root/independent_quality_review_4",
+    "verdict": "APPROVED",
+    "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+    "source": {
+      "path": "docs/work/work-20260922-quality-gates/evidence/review-3.md",
+      "sha256": "aee7b2ca8301e7c998824c94606caf97bd40fee30af26fa12a1833bb2ed5da6c",
+      "claims": {
+        "context": {
+          "line": 1,
+          "text": "- context: /root/independent_quality_review_4"
+        },
+        "verdict": {
+          "line": 2,
+          "text": "- verdict: APPROVED"
+        },
+        "snapshot": {
+          "line": 3,
+          "text": "- snapshot: ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136"
+        }
+      }
+    }
+  },
+  "acceptance": {
+    "work_id": "work-20260922-quality-gates",
+    "version": "acceptance-1",
+    "snapshot": "ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136",
+    "verdict": "ACCEPTED",
+    "source": {
+      "path": "docs/work/work-20260922-quality-gates/evidence/acceptance.md",
+      "sha256": "6a4f57fe857d41a7ca34a26d2d3a58878fb46baac4d34ec6a4d331f89066c7d3",
+      "claims": {
+        "work_id": {
+          "line": 1,
+          "text": "- work_id: work-20260922-quality-gates"
+        },
+        "version": {
+          "line": 2,
+          "text": "- version: acceptance-1"
+        },
+        "snapshot": {
+          "line": 3,
+          "text": "- snapshot: ec39fd004f4d1f46abd48eac96ef003ba13fcb56f62e166ba5062a8b51313136"
+        },
+        "verdict": {
+          "line": 4,
+          "text": "- verdict: ACCEPTED"
+        }
+      }
+    }
+  }
+}
