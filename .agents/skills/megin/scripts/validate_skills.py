@@ -116,6 +116,8 @@ def validate(root: Path) -> list[str]:
             errors.append(f"{entry}: name {declared!r} does not match directory")
         if len(description) < 20:
             errors.append(f"{entry}: description is too short for discovery")
+        if "group-workspace.md" not in entry.read_text(encoding="utf-8"):
+            errors.append(f"{entry}: missing Group workspace contract reference")
         if not metadata.is_file():
             errors.append(f"{name}: missing agents/openai.yaml")
         elif "allow_implicit_invocation: true" not in metadata.read_text(encoding="utf-8"):

@@ -13,6 +13,7 @@ on:
       - ".gitignore"
       - "tests/requirements-discovery/**"
       - "tests/quality-gates/**"
+      - "tests/group-workspace/**"
 
 jobs:
   skills:
@@ -35,6 +36,8 @@ jobs:
           python -X utf8 -B tests/requirements-discovery/test_rules.py
       - name: Validate quality gate behavior
         run: python -X utf8 -B tests/quality-gates/test_quality_gate.py
+      - name: Validate Group workspace behavior
+        run: python -X utf8 -B tests/group-workspace/test_group_workflow.py
       - name: Check pull-request whitespace
         shell: bash
         env:

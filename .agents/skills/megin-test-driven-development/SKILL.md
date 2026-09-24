@@ -6,6 +6,7 @@ description: Run Megin's outside-in behavior red-green-refactor loop for an appr
 # Megin test-driven development
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating test
 evidence. Write scenario summaries and results in Traditional Chinese, and preserve
 test commands, code, identifiers, and raw output in their original technical form.
@@ -16,6 +17,7 @@ green. Follow with inner unit or integration tests for the changed seam, refacto
 rerun the focused command. Preserve raw output, exit status, source snapshot, and scenario ID in
 the Work ID evidence.
 
+Run each command from its contract's exact `cwd` and preserve that directory in the raw evidence.
 Keep tests deterministic and meaningful. A parser success, skipped scenario, or unrelated passing
 test is not behavior evidence. Run the loop on the recorded feature branch and preserve its base
 commit in the evidence. When a failure reveals a broader contract or scope change, stop and return to

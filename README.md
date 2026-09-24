@@ -4,12 +4,16 @@ Megin is a reusable set of Codex Skills for evidence-driven software delivery. I
 once, then work through normal conversation. There is no Megin Plugin, Megin command, hook, MCP
 server, or dedicated workflow controller to install or run.
 
+Start Codex at the GitLab Group root. Every direct-child project folder is an independent Git repo;
+the Group root itself is not a repo. One Work ID may cover several repos and keeps one central
+requirements, plan, review, verification, and acceptance record under `<Group>/docs/work/`.
+
 The bundle keeps a complete delivery path:
 
-`requirements → behavior contract and plan → one plan approval → feature branch → BDD/TDD implementation → fresh review → automated verification → human acceptance → feature commit → local --no-ff merge`
+`requirements → behavior contract and plan → one plan approval → per-repo feature branches → BDD/TDD implementation → fresh review → automated verification → human acceptance → feature commits → local merge (one repo) or manual merge handoff (multiple repos)`
 
-The workflow is driven by Skills and a readable `docs/work/<work-id>/workflow.md` record. Git,
-repository search, project tests, and the project's own tools remain available as ordinary tools.
+The workflow is driven by Skills and a readable `<Group>/docs/work/<work-id>/workflow.md` record. Git,
+repository search, project tests, and each project's own tools remain available as ordinary tools.
 The Skills bundle also includes a small read-only quality gate helper. It checks structural evidence
 at review, acceptance, and delivery handoffs; it does not run a workflow or judge code behavior.
 
@@ -35,26 +39,19 @@ following folders at its top level:
 `megin-test-driven-development`, `megin-code-review`, `megin-verification-before-completion`,
 `megin-human-acceptance`, and `megin-finishing-delivery`.
 
-Extract those folders together into one of Codex's Skills locations:
+Extract the twelve `megin*` folders together into `<Group>/.agents/skills/`. Keep existing `.agents`
+files if the Group already has Skills. The canonical source in this Megin repository is
+`.agents/skills/`; the archive is distributed for installation at the Group root. Codex scans
+repository-local Skills under `$CWD/.agents/skills`; start Codex with `$CWD` set to the Group root so
+the installed Skills are discoverable. If they do not appear in `/skills`, restart Codex to rescan.
+See [Codex Skills documentation](https://learn.chatgpt.com/docs/build-skills).
 
-- user-wide: `$CODEX_HOME/skills/` (defaults to `~/.codex/skills/`, for every repository)
-- repository-local: `<repo>/.agents/skills/` (for a team or one repository)
-
-The repository already contains the same source under `.agents/skills/`. If the Skills do not appear
-after installation, restart Codex so it rescans the Skills directory. Skills are automatically
-discoverable by their descriptions; `agents/openai.yaml` keeps implicit invocation enabled.
-
-You can also invoke `$skill-installer` in a Codex conversation with this repository's GitHub
-repository/path, asking it to install every `megin*` folder. For a local checkout, extract or copy
-the folders directly into one of the two locations above. `$skill-installer` installs Skills only;
-it does not register a Plugin or add a Megin executable.
-
-For a local experiment, copy only the `megin*` folders into a temporary Skills directory. Keep the
-folders together because the stage Skills share the workflow-record reference from `megin`.
+Keep all `megin*` directories together because the stage Skills share references from `megin`.
+Install this bundle at the Group root; it does not create a single-repo workflow.
 
 ## Use it from conversation
 
-Explicit invocation names the Skill:
+Explicit invocation names the Skill while Codex is running at the Group root:
 
 - `$megin 幫我新增登入功能` starts the complete workflow.
 - `$megin-code-review 檢查目前的修改` performs a fresh, read-only review.
@@ -65,29 +62,34 @@ Implicit invocation works when the task matches a Skill description. Say “新�
 appropriate Skill. A description match is a routing hint; it does not bypass approval, review, or
 acceptance gates.
 
-To continue work, say “繼續上次的 Megin 工作”. The Skill reads `docs/work/*/workflow.md`, resumes
+To continue work, say “繼續上次的 Megin 工作”. The Skill reads `<Group>/docs/work/*/workflow.md`, resumes
 the only active Work ID, or lists active IDs when there is more than one. A retained work record is
 the current state surface; completed historical records are available through Git history and are
 never reused as current authorization.
 
 ## Workflow rules
 
-The first pass is read-only. Megin inspects repository instructions, branch and status, relevant
-code and tests, existing work records, and source-backed project knowledge. A request is classified
+The first pass is read-only. Megin selects only Group direct-child Git repos identified by the
+request, then reads each selected Repo's own instructions, branch, status, relevant code, tests, and
+source-backed knowledge. If the Repo is missing or ambiguous, it asks which one. Git commands always
+name the target Repo; paths outside the Group, nested repos, and symlink escapes are rejected.
+Existing central Work ID records are read at the Group root. A request is classified
 as read-only, small, large, or bug. A suspected bug is reproduced and assessed before repair; an
 explanation of a bug ends with evidence and does not silently become a fix.
 
-Changes have one plan approval. The approved plan binds Work ID, behavior scenarios, allowed paths,
-interfaces, tests, knowledge scope, and the local delivery target. After approval, one writer works
-in the recorded feature branch at a time; the base branch remains unchanged until acceptance.
+Changes have one plan approval. The central approved plan binds selected Repo(s), each remote URL,
+exact remote base SHA, `feature/<Work ID>`, allowed paths, command working directories, behavior
+scenarios, tests, knowledge scope, and delivery mode. After approval, one writer works in each
+recorded feature branch; base branches remain unchanged until acceptance.
 BDD/TDD evidence and a different fresh reviewer are required before automated verification.
 Verification runs every approved command against the reviewed snapshot and then pauses at
 `awaiting_user` for the listed manual acceptance scenarios.
 For new change work, [quality evidence rules](.agents/skills/megin/references/quality-gates.md)
 bind observable assertions, raw command output, the approved snapshot, and reviewer provenance.
 A compile error alone is setup evidence, and required tests that fail, are blocked, match zero
-tests, or are skipped do not qualify as passing verification. The read-only helper at
-`.agents/skills/megin/scripts/quality_gate.py` checks these recorded conditions; the independent
+tests, or are skipped do not qualify as passing verification. The read-only helper installed at
+`<Group>/.agents/skills/megin/scripts/quality_gate.py` checks these recorded conditions with
+`--group-root <Group> --work-id <Work ID>`; the independent
 reviewer still judges whether the tests prove the promised behavior.
 The approved quality contract names every excluded process record exactly. At delivery, the helper
 compares the staged Git blobs with the user-accepted product digest and rejects remaining unstaged
@@ -95,24 +97,25 @@ product paths. Structured command, review, and acceptance outcomes also point to
 lines in their hashed raw sources.
 
 After the user names the Work ID and acceptance version, Megin reviews only the approved,
-source-backed knowledge scope, stages only approved paths on the feature branch, and creates one
-feature commit. It then verifies the base branch has not drifted and runs
-`git merge --no-ff <feature_branch>` locally, preserving a merge commit and recording its parent and
-content checks. Push, pull requests, deployment, branch deletion, and worktree cleanup are separate
-actions and are not performed by this workflow.
+source-backed knowledge scope, stages only approved paths in each feature branch, and creates one
+feature commit per Repo. For one Repo, it confirms the remote base SHA, fast-forwards the clean local
+base, and merges with `git merge --no-ff`; for multiple Repos it makes no base merges and provides a
+manual-merge handoff for every feature commit. Push, pull requests, deployment, branch deletion, and
+worktree cleanup are outside this workflow.
 
-The shared Git rules are in `.agents/skills/megin/references/branch-policy.md`. If the base branch
-advances, a reviewed snapshot changes, or a conflict occurs, Megin preserves the state and requires
-fresh review, verification, and human acceptance before integration. The feature branch remains
-available after a successful merge.
+The shared Git rules are in `.agents/skills/megin/references/branch-policy.md`. If any remote base
+advances, a reviewed composite snapshot changes, or a conflict occurs, Megin preserves the state and
+requires the baseline to be reconfirmed before fresh review, verification, and acceptance. In a
+multi-repo task, partial feature commits are retained and remaining Repo commits resume later.
 
 ## Work records
 
-Each work item uses `docs/work/<work-id>/workflow.md` with schema `megin-skills-workflow/v1`.
-Requirements, plan, feature files, test output, review, verification, acceptance, and knowledge
-notes stay beside that file. The record keeps the base branch and commit, feature branch, plan
-version, evidence paths, current status, blockers, feature and merge commit identities, and one next
-action. See [the workflow-record contract](.agents/skills/megin/references/workflow-record.md).
+Each work item uses `<Group>/docs/work/<work-id>/workflow.md` with schema
+`megin-skills-workflow/v2`. Requirements, one shared plan, feature files, evidence, review,
+verification, acceptance, and knowledge notes stay under that Work ID. Its quality contract binds
+each Repo's remote, base commit, feature branch, allowed paths, and check command/`cwd`. One-repo
+delivery records its feature and merge commits; multi-repo delivery records every feature commit and
+manual-merge handoff. See [the workflow-record contract](.agents/skills/megin/references/workflow-record.md).
 
 Do not put secrets in a record. When a repository has a formal knowledge or test evidence contract,
 follow that contract and record the source path, command, result, and digest it requires.
@@ -128,8 +131,7 @@ The release archive is `megin-skills.zip`. It is assembled from the repository's
 
 ## From the old installation
 
-If an older Megin Plugin or command is installed in Codex, remove or disable that installation and
-delete its old repository-local copies before installing this bundle. The repository keeps only the
-current Skills source and active delivery records; completed historical work, bug reports, and
-knowledge notes remain recoverable in Git history but are not migrated or reused. New work starts
-with a new Skills workflow record.
+If an older Megin Plugin or command is installed in Codex, disable that installation before using
+the Skills-only workflow. New product work uses only the Group v2 record format and does not migrate
+or reuse repo-local v1 records. Existing `Test` and `Test2` histories are not changed. Old approvals
+and design references do not authorize new work.

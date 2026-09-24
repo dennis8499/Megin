@@ -1,0 +1,6 @@
+Command: python -X utf8 -B tests/group-workspace/test_group_workflow.py
+Exit code: 0
+...............
+----------------------------------------------------------------------
+Ran 15 tests in 105.535s
+OK

@@ -6,10 +6,12 @@ description: Explore and clarify a repository change before implementation. Use 
 # Megin requirements discovery
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md),
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md),
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md), and
 [../megin/references/requirements-discovery-protocol.md](../megin/references/requirements-discovery-protocol.md)
-before creating or updating a work document. Work read-only. Inspect repository instructions, relevant code, tests,
-project knowledge, current branch, and existing Megin records before asking questions. Resolve facts from evidence
+before creating or updating a Group work document. Resolve the direct-child Repo(s) from the request and ask if
+selection is missing or ambiguous. Work read-only. Inspect each selected Repo's instructions, relevant code, tests,
+project knowledge, current branch, and the Group's active work records before asking questions. Resolve facts from evidence
 and apply the protocol's research trigger, capability coverage, question dependency, and completion rules.
 
 When the protocol identifies a major unknown that could change the product choice, core behavior, important risk,
@@ -19,7 +21,7 @@ capabilities, decisions, blockers, and the unanswered question, and do not claim
 hand off to planning. On resume, re-check the remaining unknowns and absorb every answer already supplied. When the
 information is sufficient, do not ask a formal extra question merely to satisfy a template.
 
-Create or update the current Work ID's `requirements.md` and `workflow.md` using
+Create or update the current Work ID's `<Group>/docs/work/<Work ID>/requirements.md` and `workflow.md` using
 [requirements-template.md](../megin/references/requirements-template.md). Keep `requirements.md` as the sole
 requirements master, use `SRC-*`, `CAP-*`, `Q-*`, and `SCN-*` identifiers, and record the current requirements
 revision in `workflow.md`. Give every externally observable behavior a stable scenario ID and concrete
@@ -32,5 +34,5 @@ request, report evidence without creating a change candidate. Finish this phase 
 can review a bounded candidate and all discoverable facts have source paths or locators. A `ready_for_planning` field
 is only a summary and never replaces the completion check.
 
-Handoff: `phase: planning`, with the exact requirements revision recorded. A changed goal, scope, or
+Handoff: `phase: planning` in the central Group record, with the exact requirements revision and selected Repo(s) recorded. A changed goal, scope, or
 acceptance criterion creates a new revision and requires planning again.

@@ -6,21 +6,23 @@ description: Prove a Megin change is complete with fresh commands, scenarios, re
 # Megin verification
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating
 verification records. Write verification explanations and scenario results in Traditional Chinese
 while preserving commands, status values, paths, digests, and raw output exactly.
 
-Load the exact approved scope, acceptance, commands, latest writer reports, fresh review verdict,
-knowledge scope, and delivery destination. Inspect status, diff, `base_branch`, `base_commit`,
-`feature_branch`, and snapshot; reject scope or branch drift and stale evidence. Run every approved
-focused, related, full, static, build, contract, and scenario command that applies, recording the
-exact command, exit status, output path, and digest where required. Do not stage, commit, or merge
+Load the central Group plan, every Repo's scope and branch identities, acceptance scenarios,
+commands, latest writer reports, fresh review verdict, knowledge scope, and delivery mode. Inspect
+every Repo's status and diff, each `base_branch`, remote `base_commit`, `feature_branch`, and the
+composite snapshot; reject scope, remote, or branch drift and stale evidence. Run every approved
+command from its explicit `cwd`, recording that directory, exact command, exit status, output path,
+and digest. Do not stage, commit, or merge
 as part of automated verification.
 Apply [../megin/references/quality-gates.md](../megin/references/quality-gates.md): record the
 actual number of tests executed, failed, and skipped where the command is a test. Do not infer
-success from a zero exit with no matching tests or from a missing environment. Check the read-only
-`acceptance` gate before advancing the workflow status.
-Each saved command output starts with its exact `Command:` and `Exit code:` lines and cites those
+success from a zero exit with no matching tests or from a missing environment. Check the Group
+read-only `acceptance` gate with `--group-root` and `--work-id` before advancing the workflow status.
+Each saved command output starts with its exact `Working directory:`, `Command:`, and `Exit code:` lines and cites those
 claim locators plus the result/count line in the quality evidence.
 
 Confirm the fresh reviewer approved the same snapshot and that knowledge claims retain source paths,
