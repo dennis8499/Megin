@@ -6,16 +6,17 @@ description: Execute an approved Megin work package in the bound checkout with o
 # Megin implementation execution
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating
 implementation evidence. Write summaries and handoff notes in Traditional Chinese while keeping
 commands, paths, identifiers, and raw output unchanged.
 
-Accept work only when `workflow.md` contains the current Work ID, approved plan version,
-`base_branch`, `base_commit`, `feature_branch`, workspace, allowed paths, interfaces, acceptance
-scenarios, commands, knowledge scope, and delivery destination. After approval, create the named
-feature branch from `base_commit` if it does not already exist, then before each write confirm the
-current branch is exactly that feature branch and preserve unrelated dirty changes. Never write
-product files directly on the base branch.
+Accept work only when the central Group `workflow.md` and plan identify every selected Repo, remote
+name/URL, `base_branch`, exact `base_commit`, `feature_branch`, allowed paths, interfaces, acceptance
+scenarios, commands with explicit `cwd`, knowledge scope, and delivery mode. After approval,
+reconfirm each remote ref, fetch the recorded SHA, then create that Repo's feature branch from the
+exact commit. Before each write, confirm the selected Repo and branch and preserve unrelated dirty
+changes. Never write product files outside a selected Repo or on its base branch.
 
 Keep one authorized writer in the workspace. Work package dependencies are sequential; the writer
 does not delegate. Use `megin-test-driven-development` for each behavior, preserve focused, related,
@@ -23,8 +24,9 @@ full, static, and contract command evidence, and keep changed paths within the a
 package reports `completed`, `needs_revision`, `blocked`, or `awaiting_upstream` in the Work ID
 ledger.
 At each package boundary, follow [../megin/references/quality-gates.md](../megin/references/quality-gates.md):
-record completed work, commands actually run, uncertainty, and the next action. Before a formal
-review handoff, run its read-only `review` gate against the exact feature snapshot. A failed gate
+record completed work, each command's explicit Repo `cwd`, uncertainty, and the next action. Before a formal
+review handoff, run the read-only Group `review` gate with `--group-root` and `--work-id` against the
+exact composite snapshot. A failed gate
 keeps the package in implementation; an optional diagnostic review cannot approve it.
 The cited writer handoff starts with the exact machine-readable `context` and `snapshot` lines
 defined by the shared reference; do not copy different values into structured evidence.

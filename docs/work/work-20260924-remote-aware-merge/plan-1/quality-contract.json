@@ -1,0 +1,50 @@
+{
+  "schema": "megin-quality-contract/v1",
+  "work_id": "work-20260924-remote-aware-merge",
+  "plan_version": "plan-1",
+  "allowed_paths": [
+    ".agents/skills/megin/",
+    ".agents/skills/megin-behavior-contract/",
+    ".agents/skills/megin-bug-diagnosis/",
+    ".agents/skills/megin-code-review/",
+    ".agents/skills/megin-finishing-delivery/",
+    ".agents/skills/megin-human-acceptance/",
+    ".agents/skills/megin-implementation-execution/",
+    ".agents/skills/megin-project-knowledge/",
+    ".agents/skills/megin-requirements-discovery/",
+    ".agents/skills/megin-technical-planning/",
+    ".agents/skills/megin-test-driven-development/",
+    ".agents/skills/megin-verification-before-completion/",
+    "README.md",
+    "OPERATIONS.md",
+    ".github/workflows/knowledge-portability.yml",
+    "megin-skills.zip",
+    "tests/quality-gates/",
+    "tests/group-workspace/",
+    "docs/work/work-20260924-remote-aware-merge/"
+  ],
+  "checks": [
+    {"id": "group-workflow", "kind": "test", "command": "python -X utf8 -B tests/group-workspace/test_group_workflow.py"},
+    {"id": "quality-gates", "kind": "test", "command": "python -X utf8 -B tests/quality-gates/test_quality_gate.py"},
+    {"id": "requirements-rules", "kind": "test", "command": "python -X utf8 -B tests/requirements-discovery/test_rules.py"},
+    {"id": "materials-check", "kind": "command", "command": "python -X utf8 -B tests/requirements-discovery/check_materials.py"},
+    {"id": "materials-tests", "kind": "test", "command": "python -X utf8 -B tests/requirements-discovery/test_materials.py"},
+    {"id": "skills-bundle", "kind": "command", "command": "python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip"},
+    {"id": "whitespace", "kind": "command", "command": "git diff --check"}
+  ],
+  "process_records": [
+    "docs/work/work-20260924-remote-aware-merge/evidence/quality.json",
+    "docs/work/work-20260924-remote-aware-merge/evidence/handoff-writer.md",
+    "docs/work/work-20260924-remote-aware-merge/evidence/group-workflow.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/quality-gates.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/requirements-rules.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/materials-check.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/materials-tests.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/skills-bundle.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/whitespace.log",
+    "docs/work/work-20260924-remote-aware-merge/evidence/review.md",
+    "docs/work/work-20260924-remote-aware-merge/evidence/verification.md",
+    "docs/work/work-20260924-remote-aware-merge/evidence/acceptance.md",
+    "docs/work/work-20260924-remote-aware-merge/evidence/delivery.md"
+  ]
+}

@@ -5,8 +5,11 @@ description: Diagnose a suspected bug with read-only evidence before repair. Use
 
 # Megin bug diagnosis
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
-creating or updating `bug-diagnosis.md`. Write the human-readable diagnosis in Traditional Chinese
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) before creating or updating
+the diagnosis under `<Group>/docs/work/<Work ID>/`. Identify the requested direct-child Repo first,
+inspect only its own instructions and evidence, and keep diagnosis read-only. Write the human-readable
+diagnosis in Traditional Chinese
 and preserve command output, identifiers, paths, and control values as technical source text.
 
 Keep diagnosis read-only. Reproduce the symptom with the smallest safe oracle, inspect relevant
@@ -19,4 +22,4 @@ the behavior is intended, route any desired change through requirements. Only a 
 `likely` diagnosis may enter the normal requirements and planning path for a repair. Never change
 product files, tests, records outside the current Work ID, or canonical knowledge during diagnosis.
 
-Handoff: either a read-only finding, or `phase: requirements` with the diagnosis identity attached.
+Handoff: either a read-only finding, or `phase: requirements` in the central Group record with the diagnosis identity attached.

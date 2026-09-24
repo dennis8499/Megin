@@ -1,0 +1,244 @@
+{
+  "schema": "megin-quality-evidence/v1",
+  "work_id": "work-20260924-remote-aware-merge",
+  "plan_version": "plan-1",
+  "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+  "writer": {
+    "context": "codex-writer-implementation",
+    "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+    "source": {
+      "path": "docs/work/work-20260924-remote-aware-merge/evidence/handoff-writer.md",
+      "sha256": "3b1c29357732d8aa36b512949a05bf8df66780736e1c35112e48877a4442ed70",
+      "claims": {
+        "context": {
+          "line": 1,
+          "text": "- context: codex-writer-implementation"
+        },
+        "snapshot": {
+          "line": 2,
+          "text": "- snapshot: 1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065"
+        }
+      }
+    }
+  },
+  "sources": [],
+  "checks": [
+    {
+      "id": "group-workflow",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/group-workflow.log",
+        "sha256": "48788bef7ae22af6f4f3f45661106e284cdd06525ff90cae2c428deb80566ba2",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/group-workspace/test_group_workflow.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "Ran 15 tests in 105.535s"
+      },
+      "executed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "quality-gates",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/quality-gates.log",
+        "sha256": "2c96178481652dc4d0ae2f6bd15d130745ca1a6dbb8025050a84b758a1964d2b",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 5,
+        "text": "Ran 22 tests in 71.068s"
+      },
+      "executed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "requirements-rules",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/requirements-rules.log",
+        "sha256": "4c2e70c38fd7db04ed4c1539a19b2aac3c36f4fe043cfa851094791bc049c944",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_rules.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 3,
+        "text": "discovery rule regression tests passed: language, routing, protocol, workflow, and scenario contracts"
+      },
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "materials-check",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/materials-check.log",
+        "sha256": "398f7d9f2b0daa29f22241bd16e4a0bced412d69142fd5e15b34f8f0a9ba4e1c",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/check_materials.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 3,
+        "text": "validated requirements-discovery materials: 11 cases, 6 source snapshots, and fixtures"
+      }
+    },
+    {
+      "id": "materials-tests",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/materials-tests.log",
+        "sha256": "ee75bf3af62240c1969fbcd5e7aa22105a1d1c4ca1552cf69496ba997d5fcae1",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_materials.py"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 3,
+        "text": "material checker regression tests passed: canonical, isolated references, duplicate IDs, bad-reference, and result-template cases"
+      },
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "id": "skills-bundle",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/skills-bundle.log",
+        "sha256": "6d83dfebe5e5597b18d8d67a53a782db7d1e66fa99a0844e99bd64fe4cc799f7",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 3,
+        "text": "validated 12 Megin Skills"
+      }
+    },
+    {
+      "id": "whitespace",
+      "status": "passed",
+      "exit_code": 0,
+      "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+      "output": {
+        "path": "docs/work/work-20260924-remote-aware-merge/evidence/whitespace.log",
+        "sha256": "780b95458c88917385913b5afdc3f988d611b20ca03dc52c6d7caef89aa6564a",
+        "claims": {
+          "command": {
+            "line": 1,
+            "text": "Command: git diff --check"
+          },
+          "exit_code": {
+            "line": 2,
+            "text": "Exit code: 0"
+          }
+        },
+        "line": 3,
+        "text": "Result: stdout and stderr were empty; Git reported no whitespace errors."
+      }
+    }
+  ],
+  "acceptance": {
+    "work_id": "work-20260924-remote-aware-merge",
+    "version": "acceptance-2",
+    "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+    "verdict": "ACCEPTED",
+    "source": {
+      "path": "docs/work/work-20260924-remote-aware-merge/evidence/acceptance.md",
+      "sha256": "525a5806d01fe012998c530d2ceba94f418c82cd463284f8de6dfd88a26cbf0c",
+      "claims": {
+        "work_id": {
+          "line": 1,
+          "text": "- work_id: work-20260924-remote-aware-merge"
+        },
+        "version": {
+          "line": 2,
+          "text": "- version: acceptance-2"
+        },
+        "snapshot": {
+          "line": 3,
+          "text": "- snapshot: 1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065"
+        },
+        "verdict": {
+          "line": 4,
+          "text": "- verdict: ACCEPTED"
+        }
+      }
+    }
+  },
+  "review": {
+    "context": "independent-reviewer-group-root-whitespace-fix",
+    "verdict": "APPROVED",
+    "snapshot": "1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065",
+    "source": {
+      "path": "docs/work/work-20260924-remote-aware-merge/evidence/review.md",
+      "sha256": "73f88704670015681d0c8e28ba467b1c175463838bc443ad6d9e7b014415795b",
+      "claims": {
+        "context": {
+          "line": 1,
+          "text": "- context: independent-reviewer-group-root-whitespace-fix"
+        },
+        "verdict": {
+          "line": 2,
+          "text": "- verdict: APPROVED"
+        },
+        "snapshot": {
+          "line": 3,
+          "text": "- snapshot: 1838932d4582a5007f657f86071fe6b1e4f7cadb1a0145812007de4eb660c065"
+        }
+      }
+    }
+  }
+}

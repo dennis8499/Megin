@@ -6,12 +6,13 @@ description: Define executable behavior scenarios shared by Megin planning, test
 # Megin behavior contract
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating or
 updating feature files. Keep Gherkin keywords and control identifiers in English while
 writing feature names, scenario descriptions, and step text in Traditional Chinese.
 
 For every external behavior, write one stable scenario ID and one concrete Given/When/Then path in
-the Work ID's `features/` directory. Each scenario names its observable result, automatic command,
+the central Group Work ID's `features/` directory. Each scenario names its target Repo(s), observable result, automatic command,
 and whether user acceptance is required. Reuse existing passing coverage when it already proves the
 behavior; do not manufacture a red test merely to fill a template.
 Use [../megin/references/quality-gates.md](../megin/references/quality-gates.md) to identify the

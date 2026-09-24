@@ -6,15 +6,15 @@ MCP service, or Megin-specific controller.
 
 ## Installation and discovery
 
-Install all `megin*` folders from `megin-skills.zip` into `$CODEX_HOME/skills/` for user-wide use
-(`~/.codex/skills/` by default) or `<repo>/.agents/skills/` for repository-local use. Keep the
-folders together. Codex discovers the `SKILL.md` frontmatter and may select a Skill implicitly when
-its description matches the task; users may explicitly mention `$megin` or any stage Skill. Restart
-Codex if a newly installed Skill does not appear.
+Start Codex from the GitLab Group root. The Group root is not a Git repository; each project folder
+directly below it is an independent Git Repo. Extract the twelve `megin*` folders from
+`megin-skills.zip` into `<Group>/.agents/skills/`, keeping the folders together. Codex reads
+repository-local Skills from `$CWD/.agents/skills`; use the Group root as `$CWD`. If a new Skill
+does not appear under `/skills`, restart Codex so it rescans. See the
+[Codex Skills documentation](https://learn.chatgpt.com/docs/build-skills).
 
-The conversational `$skill-installer` can install the same `megin*` folders from this repository's
-GitHub repository/path. For a local checkout, extract or copy the folders directly. It installs
-Skills only and is not a Megin runtime command.
+This installation is for Group-root work only. New product workflows do not run from a child Repo
+or use a user-wide Megin installation.
 
 The canonical source is `.agents/skills/`. `megin/scripts/validate_skills.py` is a static packaging
 check only. It is not a workflow runner and is not part of the user interaction model.
@@ -23,18 +23,17 @@ Skills. It neither executes project tests nor changes the workflow state.
 
 ## Work record
 
-Create `docs/work/<work-id>/workflow.md` using schema `megin-skills-workflow/v1`. The record binds:
+Create one central `<Group>/docs/work/<Work ID>/workflow.md` with schema
+`megin-skills-workflow/v2`. One Work ID can cover one or several selected direct-child Repos. The
+record binds Group root, Repo paths, route, phase, status, plan version, requirements revision,
+acceptance scenarios and the quality evidence path. The approved plan and its quality contract bind
+each Repo's remote name/URL, base branch and exact remote commit, `feature/<Work ID>`, allowed paths,
+check commands with explicit `cwd`, and the delivery mode.
 
-- repository, base branch, base commit, feature branch, merge strategy, branch, and Work ID;
-- route, phase, status, and plan version;
-- intent, scope, assumptions, risks, and acceptance scenarios;
-- approved paths, interfaces, dependencies, commands, evidence, and knowledge scope;
-- task ownership, fresh review, verification, user acceptance, feature commit, local merge, delivery,
-  blockers, and next action.
-
-Append dated events. Do not overwrite an old approval or review; create a new plan/review version
-when scope or the source snapshot changes. Preserve unrelated dirty changes and stop on branch,
-scope, or evidence drift.
+Keep requirements, plan, feature files, evidence, review, verification, acceptance and knowledge
+notes under that Work ID. Append dated events. Do not overwrite an old approval or review; create a
+new plan/review version when scope or the composite snapshot changes. Preserve unrelated dirty
+changes and stop on path, remote, branch, scope, or evidence drift.
 
 ## Delivery sequence
 
@@ -43,14 +42,17 @@ Use `megin` for the complete route:
 1. Explore requirements and source-backed project knowledge without mutation.
 2. Define stable behavior scenarios and a dependency-ordered technical plan.
 3. Present one exact plan approval for the current Work ID and version.
-4. Create the named feature branch from the recorded base commit; implement with one writer and
-   outside-in BDD/TDD evidence on that branch.
+4. Recheck and fetch each exact remote base SHA, then create the named feature branch in each Repo;
+   implement with one writer and outside-in BDD/TDD evidence on those branches.
 5. Obtain a fresh, read-only review from a different context.
 6. Rerun every approved command and scenario against the reviewed snapshot.
 7. Pause for the user's listed manual acceptance response.
-8. Review the approved knowledge scope, stage approved paths, and create one feature commit.
-9. Confirm the base branch has not advanced and merge the feature branch locally with
-   `git merge --no-ff`; verify both parents and content equivalence.
+8. Review the approved knowledge scope and stage only approved paths in each Repo.
+9. Create a feature commit in every Repo. For one Repo, confirm the remote base, fast-forward the
+   clean local base with `git merge --ff-only <confirmed-base-commit>`, then merge locally with
+   `git merge --no-ff` and verify both parents and content. For multiple Repos, do not merge base
+   branches; record per-Repo commits and provide manual-merge handoff. Preserve partial commits and
+   resume the remaining Repo commits.
 
 Pure explanations, reviews, and bug diagnosis can end without a delivery record or product
 mutation. A bug repair requires a read-only diagnosis first. A changed requirement, interface,
@@ -62,29 +64,31 @@ Record commands, exit statuses, raw output paths, snapshots, and source referenc
 the result. A skipped, undefined, stale, or parser-only check is not passing evidence. A reviewer
 cannot approve its own changes; if no independent reviewer is available, leave the work at
 `awaiting_review`. A passing automated verification is not user acceptance.
-For new or resumed work, use the single shared
-[quality evidence contract](.agents/skills/megin/references/quality-gates.md). The approved plan
-owns required checks, `workflow.md` owns the phase and status, and `quality_ref` names the execution
-evidence. Capture a snapshot and call the helper's `check --gate review|acceptance|delivery` at the
-corresponding handoff. Structural success does not assert that the behavior or independent review
-was correct. List exact excluded process-record paths in the approved contract; evidence-directory
-files are protected unless listed. Run the delivery gate after staging so it can compare staged Git
-blobs with the accepted product digest. On any nonzero result, keep the current phase and record the
+For new work, use the [Group v2 quality contract](.agents/skills/megin/references/quality-gates.md).
+The approved plan owns required checks, `workflow.md` owns phase and status, and `quality_ref` names
+the execution evidence. Capture a composite snapshot and call the helper at
+`<Group>/.agents/skills/megin/scripts/quality_gate.py` with `--group-root <Group> --work-id <Work ID>`
+and `check --gate review|acceptance|delivery` at the corresponding handoff. Structural success does
+not assert that behavior or independent review was correct. List exact Group-relative excluded
+process-record paths; all other central work files and every Repo snapshot are protected. Run the
+delivery gate after staging so it can compare staged blobs in every Repo with the accepted composite
+snapshot and recheck every remote base. On any nonzero result, keep the current phase and record the
 reason and next action.
 Keep command, reviewer, and acceptance identities and outcomes as nonempty strings, and bind each
 one to an exact line in its hashed raw evidence rather than repeating an unchecked summary.
 
-Knowledge is source-backed and scoped to the approved result. Unsupported or conflicting claims stay
-pending. Knowledge review does not stage or commit. Finishing stages only approved files and creates
-one feature commit after acceptance, then performs the local `--no-ff` merge. A base-branch advance,
-branch mismatch, conflict, or reviewed-snapshot change stops delivery and requires fresh review,
-verification, and acceptance. External publication and cleanup are separate authorization.
+Knowledge is read from each selected Repo and source-backed within that Repo's path space.
+Unsupported or conflicting claims stay pending. Knowledge review does not stage or commit. Finishing
+stages approved files and creates per-Repo feature commits after acceptance; it performs a local
+fast-forward and `--no-ff` merge only when exactly one Repo is selected. Any remote advancement,
+branch mismatch, conflict, or reviewed composite-snapshot change stops delivery and invalidates old
+acceptance. Push, merge requests, deployment and cleanup are outside the workflow.
 
 ## Historical material
 
-The working tree keeps only the current Skills source and active delivery records. Completed work,
-bug, and knowledge history is recoverable from Git commits; old approvals and design references are
-never current authorization. New work must use the Skills-only record and current source snapshot.
+New product work uses Group v2 central records and does not migrate or reuse repo-local v1 work
+records. Completed historical records in individual Repos are left untouched and never authorize
+new work. The Megin source Repo retains its own source and maintenance history.
 
 ## 需求探索材料
 

@@ -6,34 +6,38 @@ description: Finish a verified and human-accepted Megin change with source-backe
 # Megin finishing delivery
 
 Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md) before creating
 delivery notes. Write human-readable delivery summaries in Traditional Chinese while preserving
 commit IDs, staged paths, commands, and status values exactly.
 
 Use only after `megin-human-acceptance` records the exact Work ID and acceptance version. Confirm
-workspace, branch, approved paths, reviewed and verified snapshot, knowledge scope, destination,
-and final diff. Confirm the current branch is the recorded feature branch, the base branch still
-matches the recorded integration target, and the acceptance response covers this exact snapshot.
-Stop on unrelated files, branch drift, stale evidence, or an unauthorized target.
-For a new or resumed change, first confirm the accepted worktree snapshot, then stage only approved
-paths and run the read-only `delivery` gate in
-[../megin/references/quality-gates.md](../megin/references/quality-gates.md). Preserve its raw output.
-The gate requires every staged product blob to reproduce the accepted product digest and rejects
-remaining unstaged or untracked product paths. Staging does not retroactively turn an unreviewed
-product edit into an accepted change.
+Group root, all selected Repo paths and feature branches, per-Repo approved paths, reviewed and
+verified composite snapshot, knowledge scope, delivery mode, and final diffs. Confirm each remote
+and base still matches its approved target and acceptance covers this exact snapshot. Stop on
+unrelated files, remote or branch drift, stale evidence, or an unauthorized target.
+For a new or resumed change, confirm the accepted Group snapshot, then stage only approved paths in
+each Repo and run the Group read-only `delivery` gate with `--group-root` and `--work-id` from
+[../megin/references/quality-gates.md](../megin/references/quality-gates.md). Preserve its raw
+output. The gate checks every remote tip and staged per-Repo digest and rejects remaining unstaged
+or untracked product paths. Staging does not retroactively turn an unreviewed edit into an accepted change.
 
 Run `megin-project-knowledge` over the approved source-backed scope. Preserve unsupported or
 conflicting claims as pending and leave canonical knowledge unchanged unless the repository's
 promotion contract and the approved scope permit the update.
 
-Stage only approved product, test, documentation, and authorized knowledge paths on the feature
-branch; create one focused feature commit and record its identity, staged paths, final status,
-evidence, and unresolved pending items. Then switch to the recorded base branch and verify it has
-not advanced. Use `git merge --no-ff <feature_branch>` to create the local merge commit, verify its
-two parents and content equivalence, and record the integration evidence. If the base branch
-advanced or merge conflicts occur, preserve the state and return to branch-policy recovery; do not
-force the merge. Push, pull requests, deployment, branch deletion, and worktree cleanup require a
-separate explicit request and are outside this Skill.
+Stage only approved product, test, documentation, and authorized knowledge paths in each feature
+branch. For one Repo, create its feature commit; verify the remote still points to the approved base
+SHA; switch to a clean local base; fast-forward it with `git merge --ff-only <confirmed-base-commit>`;
+then use `git merge --no-ff <feature_branch>` and verify both parents and content equivalence.
 
-Handoff: `status: complete` only when the knowledge result, feature commit, merge commit, integration
-checks, and final status are recorded; otherwise leave the exact pending action in `workflow.md`.
+For two or more Repos, create one feature commit in each feature branch and do not merge any base
+branch. Record each Repo's path, remote/base, feature branch, feature commit, and user-facing manual
+merge handoff. If only some commits finish, preserve them and resume the remaining commits without
+rebuilding completed ones. Remote drift or divergence invalidates acceptance and stops delivery.
+Push, pull requests, deployment, branch deletion, and worktree cleanup remain outside this Skill.
+
+Handoff: set `status: complete` after recording the knowledge result and every Repo's feature commit.
+For one Repo also record the `--no-ff` merge and integration checks; for multiple Repos record the
+manual-merge details and no base merge. Otherwise leave the exact pending Repo/action in the central
+`workflow.md`.

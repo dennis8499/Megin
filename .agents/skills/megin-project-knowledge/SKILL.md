@@ -5,11 +5,13 @@ description: Search, validate, and update source-backed repository knowledge dur
 
 # Megin project knowledge
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) before
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
+[../megin/references/group-workspace.md](../megin/references/group-workspace.md) before
 creating or updating knowledge notes. Write human-readable provenance, decisions, and event text in
 Traditional Chinese while preserving source paths, identifiers, commands, and digests verbatim.
 
-Use the repository's documented knowledge layout and source references. Search before requirements,
+Use each selected Repo's own documented knowledge layout and source references. Keep every provenance
+path rooted at its identified Repo. Search before requirements,
 planning, implementation, diagnosis, or an ad-hoc engineering answer. Re-read every selected source
 at its recorded path and locator; exclude stale, contested, superseded, hash-drifted, or self-
 referential material.
@@ -21,5 +23,6 @@ outside the product diff until human acceptance. If the repository has a formal 
 contract, follow it; otherwise create a reviewable candidate in the Work ID directory and record
 the exact source and postimage paths.
 
-This Skill does not stage, commit, push, merge, or publish. Handoff is a knowledge result of
+Keep Group work records under `<Group>/docs/work/<Work ID>/`; do not write project knowledge into an
+unselected Repo. This Skill does not stage, commit, push, merge, or publish. Handoff is a knowledge result of
 `promoted`, `pending`, or `no-change`, with evidence and one next action.

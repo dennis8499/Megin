@@ -1,96 +1,68 @@
-# Megin 工作流程紀錄
+# Megin Group 工作流程紀錄
 
-每個工作項目使用一個目錄：`docs/work/<work-id>/`。必要的控制紀錄是 `workflow.md`；需求、計畫、
-行為 feature、實作證據、審查、驗證、驗收與知識筆記放在同一目錄。這是人類可讀的紀錄，不是
-隱藏的執行期資料庫，也不是歷史 delivery-run 紀錄的相容層。請先讀取
-[language-policy.md](language-policy.md) 與 [branch-policy.md](branch-policy.md)，以繁體中文撰寫
-可讀內容並保留技術控制值。
+新工作只從 Group 根目錄啟動，紀錄集中於 `<Group>/docs/work/<Work ID>/`。每個 Work ID 可對應多個 Group 直屬 Git Repo，共用一份需求、計畫、行為契約、審查、驗證和人工驗收。這是本機人類可讀紀錄，不屬於任一產品 Repo，也不是執行期資料庫。Repo 選擇與安全路徑規則依 [group-workspace.md](group-workspace.md)，分支與交付規則依 [branch-policy.md](branch-policy.md)。
 
 ## 必要標頭
 
 ```markdown
 # Megin 工作流程：<short title>
 
-- schema: megin-skills-workflow/v1
+- schema: megin-skills-workflow/v2
 - work_id: work-YYYYMMDD-<lowercase-slug>
-- repository: <repository root>
-- base_commit: <full SHA>
-- branch: <current branch or `pending-approval`>
-- base_branch: <primary branch used for integration>
-- feature_branch: <feature branch or `pending-approval`>
-- merge_strategy: --no-ff
-- delivery_target: base_branch
+- group_root: <Group root>
+- repositories: <comma-separated direct-child repo paths>
+- delivery_mode: local_merge | feature_handoff
 - route: read_only | small | large | bug
 - phase: requirements | planning | approval | implementation | review | verification | acceptance | delivery
 - status: active | awaiting_user | awaiting_review | blocked | complete
 - plan_version: <version or pending>
 - requirements_revision: <revision or pending>
-- requirements_ref: <requirements.md path or pending>
-- quality_ref: <quality evidence path or pending for a new change>
+- requirements_ref: docs/work/<Work ID>/requirements.md
+- quality_ref: docs/work/<Work ID>/evidence/quality.json
 - last_updated: YYYY-MM-DD
 ```
 
-使用穩定的小寫 Work ID。不得重用舊 Work ID 或舊核准。保留主分支、基線提交與 feature branch，讓
-後續恢復時可以偵測漂移。`base_branch` 是用來建立 feature branch 與最終本機整合的主分支；
-`feature_branch` 是核准後唯一可寫入產品的分支；`merge_strategy` 固定為 `--no-ff`。標頭中的 schema、
-鍵、狀態值與識別值維持英文，標題與說明使用繁體中文。
+Work ID 固定為 `work-YYYYMMDD-<lowercase-slug>`；不得重用舊 Work ID 或舊核准。Repo branch 和 SHA 不放在單一全域欄位，逐 Repo 保存於核准的 `plan-<version>/plan.md` 與 `quality-contract.json`，其內容至少包含 `repo_path`、`remote`、`remote_url`、`base_branch`、`base_commit`、`feature_branch`、`allowed_paths` 及帶明確 `cwd` 的檢查命令。`delivery_mode` 為一個 Repo 的 `local_merge` 或多個 Repo 的 `feature_handoff`。標頭鍵與控制值維持英文，說明使用繁體中文。
 
-新工作用 `quality_ref` 參照 [quality-gates.md](quality-gates.md) 定義的執行證據；核准計畫仍是
-驗收義務來源，`workflow.md` 仍是唯一流程狀態來源。已完成歷史紀錄不回填；舊工作恢復時在跨越
-下一個品質關卡前補齊該關需要的證據，不沿用失效的舊核准。
+`workflow.md` 是唯一流程狀態來源；核准計畫是行為、路徑、命令和交付義務來源；`quality_ref` 指向執行證據。已完成的舊 v1 紀錄保持原樣，不回填、不遷移、不作為新工作的授權。新工作不讀取或續用 repo-local `docs/work` 紀錄。
 
 ## 區段
 
-每份紀錄都保留以下區段，並在原處更新內容、追加有日期的事件：
+每份紀錄都保留以下區段，在原處更新現況並追加有日期的事件：
 
 ```markdown
 ## 目的與邊界
-目標、受眾、納入範圍的行為與路徑、排除範圍、假設及風險。
+目標、選定 Repo、納入及排除的行為／路徑、假設與風險。
 
 ## 驗收
-穩定的情境 ID、可觀察的預期結果、自動命令及使用者可見的人工步驟。
+穩定情境 ID、可觀察結果、自動命令及使用者可見步驟；人工驗收綁定組合快照。
 
 ## 計畫與核准
-計畫版本、允許路徑、介面、依賴、測試命令、知識範圍、交付目的地、核准文字、核准回應及核准日期。
+計畫版本、逐 Repo 基線與 feature branch、允許路徑、介面、依賴、命令／cwd、知識範圍、交付模式、核准文字與回覆。
 
 ## 任務清單
-| 任務 | 依賴 | 負責人 | 狀態 | 證據 |
-| --- | --- | --- | --- | --- |
+| 任務 | Repo | 依賴 | 負責人 | 狀態 | 證據 |
+| --- | --- | --- | --- | --- | --- |
 
 ## 證據
-原始命令輸出、審查報告、快照、feature 檔案及來源參考的路徑。專案契約要求時，記錄命令、結束
-狀態、時間戳記及摘要。
+命令輸出、逐 Repo／組合快照、審查報告、feature 檔案及來源參考。保留命令、cwd、結束狀態、時間戳記及摘要。
 
 ## 阻礙與下一步
-一個附有證據的具體阻礙，或最早的下一步及其負責人。
-
-需求階段另記錄 `requirements_revision`、`requirements_ref`、研究摘要、能力覆蓋摘要、未解 `Q-*` 與下一個
-問題的參照。完整需求只保存在 `requirements.md`；`workflow.md` 不複製需求表格。來源較多時，
-`requirements.md` 可引用同一 Work ID 下的 `research.md`。
+有證據的阻礙，或最早下一步與負責人。部分提交時，逐 Repo 記錄已完成提交和待完成狀態。
 
 ## 交付
-驗收版本、知識結果、feature branch 的已暫存路徑與提交識別碼、merge commit 識別碼、兩個父提交、
-內容一致性檢查及最終狀態。Merge SHA 可以由 Git merge 輸出與最終交付回報保存；不要為了填入自身
-SHA 反覆 amend merge commit。
+驗收版本、知識結果、逐 Repo feature commit、交接資訊，或單 Repo merge commit、兩個父提交及整合檢查。
 
 ## 事件紀錄
-追加 `YYYY-MM-DD HH:MM — phase — action — result — next action` 項目。不得改寫舊核准或裁決；以新的
-計畫／審查版本取代，並說明原因。
+追加 `YYYY-MM-DD HH:MM — phase — action — result — next action`。不得改寫舊核准或裁決；範圍變更建立新 plan/review 版本並說明原因。
 ```
 
 ## 狀態轉移
 
 `requirements → planning → approval → implementation → review → verification → acceptance → delivery`
 
-在 `approval → implementation` 之間建立 `feature_branch`。在 `acceptance → delivery` 之間先在
-feature branch 建立 feature commit，再在未漂移的 `base_branch` 使用 `git merge --no-ff`；整合前的
-任何主分支漂移、衝突或快照變更都回到實作、審查、驗證與人工驗收。
+核准後重新確認每個遠端 base SHA，取得該提交並在每個 Repo 建立 `feature/<Work ID>`。審查、驗證和人工驗收都綁定同一組合快照。驗收後若有任何遠端 base 漂移、Repo 分歧或產品快照變更，舊審查、驗證和驗收失效，先重新確認基線，再建立新計畫版本並重新核准。
 
-`read_only` 與 `bug` 診斷可以不進入實作而結束。審查或驗證失敗時回到受影響的實作任務，並需要
-新的審查及新的驗證。範圍或驗收條件改變時建立新的計畫版本並重新核准。知識只在驗收後，且僅對
-核准的來源範圍進行提升。
+一個 Repo 完成交付時，先建立 feature commit，將乾淨的本機 base 快轉到已確認遠端 SHA，再以 `--no-ff` 本機合併並核對結果。多 Repo 逐一建立 feature commit，不做本機 base merge；待所有提交和人工交接資訊齊備後標記 `complete`。部分提交不回滾；保留逐 Repo 狀態，續作其餘提交。
 
-需求探索若發現用途、受眾、邊界、排除項目或驗收仍有重大未知，保持
-`phase: requirements` 與 `status: awaiting_user`，以繁體中文提出一個問題並等待回答；未完成前
-不得交接到 `planning`。需求與規劃階段不得直接在主分支修改產品；feature branch 的建立只在
-核准的 plan 交接至實作時進行。
+需求未知時保持 `phase: requirements`、`status: awaiting_user`；審查或驗證失敗返回受影響的實作任務。知識檢視只在人工驗收後進行，且限核准來源範圍。Push、Pull Request、部署和分支清理不屬於本流程。
