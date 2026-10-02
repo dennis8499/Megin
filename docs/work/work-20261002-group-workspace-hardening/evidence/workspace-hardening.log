@@ -1,0 +1,303 @@
+Preimplementation source snapshot: 10716d90c367cc00c0c23815c017390783c84f85
+Test source SHA-256: 0bf43fd06f0450b6097bcafe1a88a523f2d2a619
+
+Working directory: C:\Users\denni\AppData\Local\Temp\megin-red-lv4aftco\base
+Command: C:\Python314\python.exe -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k group_settings_apply
+Exit code: 1
+F
+======================================================================
+FAIL: test_group_settings_apply_explicit_repo_default_discovery_precedence_without_allowlisting (__main__.WorkspaceHardeningTests.test_group_settings_apply_explicit_repo_default_discovery_precedence_without_allowlisting)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\AppData\Local\Temp\megin-red-lv4aftco\base\tests\group-workspace\test_workspace_hardening.py", line 355, in test_group_settings_apply_explicit_repo_default_discovery_precedence_without_allowlisting
+    self.assertEqual(0, configured.returncode, configured.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 2 : C:\Python314\python.exe: can't open file 'C:\\Users\\denni\\AppData\\Local\\Temp\\megin-red-lv4aftco\\base\\.agents\\skills\\megin\\scripts\\group_workspace.py': [Errno 2] No such file or directory
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.963s
+
+FAILED (failures=1)
+
+
+Working directory: C:\Users\denni\AppData\Local\Temp\megin-red-lv4aftco\base
+Command: C:\Python314\python.exe -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k v3_record
+Exit code: 1
+F
+======================================================================
+FAIL: test_v3_record_validates_and_rejects_duplicate_missing_or_inconsistent_headers (__main__.WorkspaceHardeningTests.test_v3_record_validates_and_rejects_duplicate_missing_or_inconsistent_headers)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\AppData\Local\Temp\megin-red-lv4aftco\base\tests\group-workspace\test_workspace_hardening.py", line 582, in test_v3_record_validates_and_rejects_duplicate_missing_or_inconsistent_headers
+    self.assertEqual(0, valid.returncode, valid.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 != 2 : usage: quality_gate.py [-h] [--repo REPO] [--group-root GROUP_ROOT]
+                       --work-id WORK_ID [--gate {review,acceptance,delivery}]
+                       {snapshot,check}
+quality_gate.py: error: argument action: invalid choice: 'validate-record' (choose from 'snapshot', 'check')
+
+
+----------------------------------------------------------------------
+Ran 1 test in 1.591s
+
+FAILED (failures=1)
+
+
+
+=== GREEN RUN ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+Exit code: 1
+Elapsed seconds: 60.751
+--- stdout ---
+--- stderr ---
+.........F...........
+======================================================================
+FAIL: test_group_snapshot_distinguishes_lf_and_crlf_bytes (__main__.WorkspaceHardeningTests.test_group_snapshot_distinguishes_lf_and_crlf_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 407, in test_group_snapshot_distinguishes_lf_and_crlf_bytes
+    self.assertNotEqual(json.loads(before.stdout)["product_sha256"],
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        json.loads(after.stdout)["product_sha256"])
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '5aba4c031b84b6ab535914621ca9ba60ddc27f1b0a0119d7d9171836d45cb9ca' == '5aba4c031b84b6ab535914621ca9ba60ddc27f1b0a0119d7d9171836d45cb9ca'
+
+----------------------------------------------------------------------
+Ran 21 tests in 60.633s
+
+FAILED (failures=1)
+
+
+=== GREEN RUN AFTER WINDOWS FIXTURE CORRECTION ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+Exit code: 0
+Elapsed seconds: 60.767
+--- stdout ---
+--- stderr ---
+.....................
+----------------------------------------------------------------------
+Ran 21 tests in 60.650s
+
+OK
+
+
+=== RED RUN: completion status gates before implementation ===
+Source state: before enforcing complete workflow status and completion-gate validation.
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_workflow_cannot_mark_complete_before_completion_gate_passes
+Exit code: 1
+--- stdout ---
+--- stderr ---
+F
+======================================================================
+FAIL: test_workflow_cannot_mark_complete_before_completion_gate_passes (__main__.WorkspaceHardeningTests.test_workflow_cannot_mark_complete_before_completion_gate_passes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 600, in test_workflow_cannot_mark_complete_before_completion_gate_passes
+    self.assertNotEqual(0, result.returncode)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+----------------------------------------------------------------------
+Ran 1 test in 1.575s
+
+FAILED (failures=1)
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_completion_release_requires_complete_workflow_status
+Exit code: 1
+--- stdout ---
+--- stderr ---
+F
+======================================================================
+FAIL: test_completion_release_requires_complete_workflow_status (__main__.WorkspaceHardeningTests.test_completion_release_requires_complete_workflow_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 594, in test_completion_release_requires_complete_workflow_status
+    self.assertIn("workflow status must be complete", result.stderr.lower())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'workflow status must be complete' not found in 'could not recheck the completion gate before lock release\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 2.158s
+
+FAILED (failures=1)
+
+
+=== GREEN RUN: completion status gates ===
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_workflow_cannot_mark_complete_before_completion_gate_passes
+Exit code: 1
+--- stdout ---
+--- stderr ---
+F
+======================================================================
+FAIL: test_workflow_cannot_mark_complete_before_completion_gate_passes (__main__.WorkspaceHardeningTests.test_workflow_cannot_mark_complete_before_completion_gate_passes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 601, in test_workflow_cannot_mark_complete_before_completion_gate_passes
+    self.assertIn("completion gate", result.stderr.lower())
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'completion gate' not found in '{"error": "group v3 quality evidence identity mismatch"}\n'
+
+----------------------------------------------------------------------
+Ran 1 test in 1.672s
+
+FAILED (failures=1)
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_completion_release_requires_complete_workflow_status
+Exit code: 0
+--- stdout ---
+--- stderr ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 1.986s
+
+OK
+
+
+=== GREEN RUN: completion status gates (contextual validation) ===
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_workflow_cannot_mark_complete_before_completion_gate_passes
+Exit code: 0
+--- stdout ---
+--- stderr ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 2.320s
+
+OK
+
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_completion_release_requires_complete_workflow_status
+Exit code: 0
+--- stdout ---
+--- stderr ---
+.
+----------------------------------------------------------------------
+Ran 1 test in 1.890s
+
+OK
+
+
+=== RED RUN: Git branch syntax in Group configuration ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_group_settings_reject_invalid_git_branch_components
+Exit code: 1
+--- stdout ---
+--- stderr ---
+F
+======================================================================
+FAIL: test_group_settings_reject_invalid_git_branch_components (__main__.WorkspaceHardeningTests.test_group_settings_reject_invalid_git_branch_components)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 453, in test_group_settings_reject_invalid_git_branch_components
+    self.assertNotEqual(0, result.returncode, branch)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0 : release.lock
+
+----------------------------------------------------------------------
+Ran 1 test in 1.567s
+
+FAILED (failures=1)
+
+
+=== RED RUN: Windows-invalid Git ref characters ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py WorkspaceHardeningTests.test_group_settings_reject_invalid_git_branch_components
+Exit code: 1
+--- stdout ---
+--- stderr ---
+F
+======================================================================
+FAIL: test_group_settings_reject_invalid_git_branch_components (__main__.WorkspaceHardeningTests.test_group_settings_reject_invalid_git_branch_components)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\denni\OneDrive\Desktop\新增資料夾\Megin\tests\group-workspace\test_workspace_hardening.py", line 456, in test_group_settings_reject_invalid_git_branch_components
+    self.assertNotEqual(0, result.returncode, branch)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0 : branch<name
+
+----------------------------------------------------------------------
+Ran 1 test in 1.784s
+
+FAILED (failures=1)
+
+
+=== FINAL APPROVED CHECK ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+Exit code: 0
+Elapsed seconds: 70.506
+--- stdout ---
+--- stderr ---
+...........................
+----------------------------------------------------------------------
+Ran 27 tests in 70.386s
+
+OK
+
+## Follow-up TDD red: independent review P2 fixes (2026-10-02)
+
+Command: `python -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k dangling_group_config -k interrupted_lock_write -k bundle_builder_rejects -k review_skill_documents`
+Exit code: 1
+Expected red evidence before implementation: 3 failures and 1 error across four focused cases.
+- `test_dangling_group_config_symlink_is_not_treated_as_missing`: `_validate_config` returned defaults instead of rejecting a symlink.
+- `test_interrupted_lock_write_never_publishes_a_partial_lock`: simulated partial `json.dump` raised `OSError` after publishing directly to the public lock path.
+- `test_bundle_builder_rejects_skill_file_symlinks`: `package_files` read the Skill tree without rejecting symlink entries.
+- `test_review_skill_documents_the_source_maintenance_v1_exception`: review instructions had no source-maintenance exception.
+
+
+TDD green after the four review corrections:
+Command: `python -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k dangling_group_config -k interrupted_lock_write -k bundle_builder_rejects -k review_skill_documents`
+Exit code: 0
+Ran 4 tests in 5.469s
+OK
+
+
+=== REVIEW P2 FIXES FULL CHECK ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+Exit code: 0
+Elapsed seconds: 83.261
+--- stdout ---
+--- stderr ---
+...............................
+----------------------------------------------------------------------
+Ran 31 tests in 83.018s
+
+OK
+
+## Follow-up TDD red: bind completion to delivery-gate evidence (2026-10-02)
+
+Command: `python -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k forged_delivery_gate_receipt`
+Exit code: 1
+Expected red evidence: `test_completion_rejects_a_forged_delivery_gate_receipt_with_real_commits` failed because completion returned exit code 0 for a delivery record containing only `status: passed` and the accepted snapshot, despite valid feature commits.
+
+
+TDD green after binding completion to delivery-gate evidence:
+Command: `python -X utf8 -B tests/group-workspace/test_workspace_hardening.py -k forged_delivery_gate_receipt -k multi_repo_completion -k single_repo_completion`
+Exit code: 0
+Ran 3 tests in 29.134s
+OK
+
+
+=== DELIVERY RECEIPT FIX FULL CHECK ===
+Working directory: .
+Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+Exit code: 0
+Elapsed seconds: 119.225
+--- stdout ---
+--- stderr ---
+................................
+----------------------------------------------------------------------
+Ran 32 tests in 118.861s
+
+OK

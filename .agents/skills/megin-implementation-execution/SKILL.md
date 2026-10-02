@@ -13,10 +13,13 @@ commands, paths, identifiers, and raw output unchanged.
 
 Accept work only when the central Group `workflow.md` and plan identify every selected Repo, remote
 name/URL, `base_branch`, exact `base_commit`, `feature_branch`, allowed paths, interfaces, acceptance
-scenarios, commands with explicit `cwd`, knowledge scope, and delivery mode. After approval,
-reconfirm each remote ref, fetch the recorded SHA, then create that Repo's feature branch from the
-exact commit. Before each write, confirm the selected Repo and branch and preserve unrelated dirty
-changes. Never write product files outside a selected Repo or on its base branch.
+scenarios, commands with explicit `cwd`, knowledge scope, resolved settings and their sources,
+Skills fingerprint, handoff order, and delivery mode. After approval, recompute `skills_sha256` and
+stop on drift. Claim the whole Group with `group_workspace.py claim`, then reconfirm each remote
+ref, fetch the recorded SHA, and create that Repo's feature branch from the exact commit. Before every product
+write, run `group_workspace.py check` with the exact Work ID and writer identity, confirm the selected
+Repo and branch, and preserve unrelated dirty changes. Never write product files outside a selected
+Repo or on its base branch. Do not reread changed Group defaults into the approved plan.
 
 Keep one authorized writer in the workspace. Work package dependencies are sequential; the writer
 does not delegate. Use `megin-test-driven-development` for each behavior, preserve focused, related,
@@ -32,7 +35,10 @@ The cited writer handoff starts with the exact machine-readable `context` and `s
 defined by the shared reference; do not copy different values into structured evidence.
 
 When all packages are complete, save the current snapshot and hand off to a different fresh,
-read-only `megin-code-review` context. Do not stage, commit, update canonical knowledge, or claim
-completion before verification and human acceptance. A base-branch advance, feature-branch drift,
+read-only `megin-code-review` context while retaining the Group lock. Do not stage, commit, update
+canonical knowledge, or claim completion before verification and human acceptance. Keep the lock
+while awaiting review, verification, acceptance, or blocked recovery; never release by timeout.
+A changed installed Skills fingerprint requires plan reapproval and fresh review, verification, and
+acceptance; older evidence is not reused. A base-branch advance, feature-branch drift,
 or any change after review invalidates the handoff and requires the recovery path in
 [branch-policy.md](../megin/references/branch-policy.md).

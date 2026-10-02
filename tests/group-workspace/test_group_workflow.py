@@ -228,6 +228,13 @@ class GroupWorkflowTests(unittest.TestCase):
         self.assertEqual(0, third.returncode, third.stderr)
         self.assertNotEqual(after_repo_change, json.loads(third.stdout)["product_sha256"])
 
+    def test_new_record_validator_requires_v3_without_changing_v2_snapshot_support(self) -> None:
+        historical = self.run_gate("snapshot")
+        self.assertEqual(0, historical.returncode, historical.stderr)
+        result = self.run_gate("validate-record")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Group v3", result.stderr)
+
     def test_group_snapshot_and_delivery_digest_include_file_mode(self) -> None:
         repo = self.group / self.repositories[0]["repo_path"]
         self.git(repo, "config", "core.filemode", "false" if os.name == "nt" else "true")

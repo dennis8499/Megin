@@ -1,0 +1,7 @@
+Working directory: .
+Command: python -X utf8 -B tests/requirements-discovery/test_rules.py
+Exit code: 0
+Elapsed seconds: 0.049
+--- stdout ---
+discovery rule regression tests passed: language, routing, protocol, workflow, and scenario contracts
+--- stderr ---

@@ -1,0 +1,7 @@
+Working directory: .
+Command: python -X utf8 -B tests/requirements-discovery/test_materials.py
+Exit code: 0
+Elapsed seconds: 0.453
+--- stdout ---
+material checker regression tests passed: canonical, isolated references, duplicate IDs, bad-reference, and result-template cases
+--- stderr ---
