@@ -1,0 +1,7 @@
+Working directory: .
+Command: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
+Exit code: 0
+Elapsed seconds: 0.125
+--- stdout ---
+validated 12 Megin Skills
+--- stderr ---

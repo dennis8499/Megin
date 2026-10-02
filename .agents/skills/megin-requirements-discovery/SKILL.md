@@ -12,7 +12,9 @@ Read [../megin/references/language-policy.md](../megin/references/language-polic
 before creating or updating a Group work document. Resolve the direct-child Repo(s) from the request and ask if
 selection is missing or ambiguous. Work read-only. Inspect each selected Repo's instructions, relevant code, tests,
 project knowledge, current branch, and the Group's active work records before asking questions. Resolve facts from evidence
-and apply the protocol's research trigger, capability coverage, question dependency, and completion rules.
+and apply the protocol's research trigger, capability coverage, question dependency, and completion rules. An optional
+Group settings file is not a Repo allowlist; config precedence is resolved during planning. Requirements work does not
+claim the Group write lock.
 
 When the protocol identifies a major unknown that could change the product choice, core behavior, important risk,
 interface, or acceptance, ask exactly one prerequisite-ready highest-impact question in Traditional Chinese and wait

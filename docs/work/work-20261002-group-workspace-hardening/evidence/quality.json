@@ -1,0 +1,310 @@
+{
+  "schema": "megin-quality-evidence/v1",
+  "work_id": "work-20261002-group-workspace-hardening",
+  "plan_version": "plan-1",
+  "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+  "writer": {
+    "context": "Codex implementation writer on feature/work-20261002-group-workspace-hardening",
+    "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+    "source": {
+      "path": "docs/work/work-20261002-group-workspace-hardening/evidence/handoff.md",
+      "sha256": "92515647f15e6a8c7d3de1165cc9d19904a1b83feed96d010043b077c39f7313",
+      "claims": {
+        "context": {
+          "line": 3,
+          "text": "- context: Codex implementation writer on feature/work-20261002-group-workspace-hardening"
+        },
+        "snapshot": {
+          "line": 4,
+          "text": "- snapshot: ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695"
+        }
+      }
+    }
+  },
+  "sources": [],
+  "checks": [
+    {
+      "id": "workspace-hardening",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/workspace-hardening.log",
+        "sha256": "8477054ae72ccde9c65361a8fe3283ba30ac6655f1bacc527efcd4b46838f86b",
+        "line": 301,
+        "text": "Ran 32 tests in 118.861s",
+        "claims": {
+          "cwd": {
+            "line": 293,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 294,
+            "text": "Command: python -X utf8 -B tests/group-workspace/test_workspace_hardening.py"
+          },
+          "exit_code": {
+            "line": 295,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "group-workspace-regression",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/group-workspace-regression.log",
+        "sha256": "7368e10b836e107083e7085cb8cfa106c8d6bc840e9db1ada8037deb592a483e",
+        "line": 9,
+        "text": "Ran 16 tests in 64.132s",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B tests/group-workspace/test_group_workflow.py"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "quality-gate-regression",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 22,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/quality-gate-regression.log",
+        "sha256": "e6054f8768351cf20a6d34a914219a8c501248e9c558244c7f9b94d3fad9de48",
+        "line": 9,
+        "text": "Ran 22 tests in 45.390s",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B tests/quality-gates/test_quality_gate.py"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "requirements-material-check",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-material-check.log",
+        "sha256": "5a3fa8c3e798337fb0409ced2fec3e45927fa5ede6684af235853d212b5e74ca",
+        "line": 6,
+        "text": "validated requirements-discovery materials: 11 cases, 6 source snapshots, and fixtures",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/check_materials.py"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "requirements-material-tests",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-material-tests.log",
+        "sha256": "b0292233e32cbefaf2ba663d5feba9a6c1591d8502fc11f1f5c50727f270459a",
+        "line": 6,
+        "text": "material checker regression tests passed: canonical, isolated references, duplicate IDs, bad-reference, and result-template cases",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_materials.py"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "requirements-rule-tests",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-rule-tests.log",
+        "sha256": "1d9c78c90260f8f926f5b6a3001dd532d8f35a170011870e0a907fa765446728",
+        "line": 6,
+        "text": "discovery rule regression tests passed: language, routing, protocol, workflow, and scenario contracts",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B tests/requirements-discovery/test_rules.py"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "skills-archive",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/skills-archive.log",
+        "sha256": "ab8aa8103e33583db3f2b38ea6017a82bf31cf3a8a41d2b75f2288d8e98347b2",
+        "line": 6,
+        "text": "validated 12 Megin Skills",
+        "claims": {
+          "cwd": {
+            "line": 1,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 2,
+            "text": "Command: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip"
+          },
+          "exit_code": {
+            "line": 3,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    },
+    {
+      "id": "whitespace",
+      "status": "passed",
+      "exit_code": 0,
+      "executed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+      "output": {
+        "path": "docs/work/work-20261002-group-workspace-hardening/evidence/whitespace.log",
+        "sha256": "3daedbea31de4b0d4bae144c920dfdb1a2cc8d21c57533de0a9999b80b4115e7",
+        "line": 11,
+        "text": "Exit code: 0",
+        "claims": {
+          "cwd": {
+            "line": 9,
+            "text": "Working directory: ."
+          },
+          "command": {
+            "line": 10,
+            "text": "Command: git diff --check"
+          },
+          "exit_code": {
+            "line": 11,
+            "text": "Exit code: 0"
+          }
+        }
+      }
+    }
+  ],
+  "review": {
+    "context": "fresh independent read-only review; branch=feature/work-20261002-group-workspace-hardening; head/base=10716d90c367cc00c0c23815c017390783c84f85; repo-v1 --repo review",
+    "verdict": "APPROVED",
+    "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+    "source": {
+      "path": "docs/work/work-20261002-group-workspace-hardening/evidence/review.md",
+      "sha256": "ae78a2b5da37e34b576a75569cd7f2141c0f56fa3aea34c8358f816ae68367a1",
+      "claims": {
+        "context": {
+          "line": 28,
+          "text": "- context: fresh independent read-only review; branch=feature/work-20261002-group-workspace-hardening; head/base=10716d90c367cc00c0c23815c017390783c84f85; repo-v1 --repo review"
+        },
+        "verdict": {
+          "line": 29,
+          "text": "- verdict: APPROVED"
+        },
+        "snapshot": {
+          "line": 30,
+          "text": "- snapshot: ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695"
+        }
+      }
+    }
+  },
+  "acceptance": {
+    "work_id": "work-20261002-group-workspace-hardening",
+    "version": "acceptance-1",
+    "snapshot": "ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695",
+    "verdict": "ACCEPTED",
+    "source": {
+      "path": "docs/work/work-20261002-group-workspace-hardening/evidence/acceptance.md",
+      "sha256": "32cc9e7f2ab552aa36568c33789c4fb87efd8a6e0bcd556886aa1984100bc0fa",
+      "claims": {
+        "work_id": {
+          "line": 1,
+          "text": "- work_id: work-20261002-group-workspace-hardening"
+        },
+        "version": {
+          "line": 2,
+          "text": "- version: acceptance-1"
+        },
+        "snapshot": {
+          "line": 3,
+          "text": "- snapshot: ab1e89a71b87391888982c78c54ace0f94df28a46bd1b828762d3a430c981695"
+        },
+        "verdict": {
+          "line": 4,
+          "text": "- verdict: ACCEPTED"
+        }
+      }
+    }
+  }
+}

@@ -19,7 +19,9 @@ Group files. Every remote base must still match its recorded target before deliv
 tests or reviewer checks into extra manual work.
 For a new or resumed change, require the Group `acceptance` gate with `--group-root` and `--work-id`
 from [../megin/references/quality-gates.md](../megin/references/quality-gates.md) to pass first. A
-structural pass is not the user's acceptance response.
+structural pass is not the user's acceptance response. Validate the v3 record and confirm the Group
+lock remains with this Work ID/writer. Keep it while waiting; do not release or expire it because the
+user response is pending.
 
 Wait for a response that identifies the displayed Work ID and acceptance version and confirms the
 listed scenarios. Record the response, timestamp, and accepted composite snapshot in the central

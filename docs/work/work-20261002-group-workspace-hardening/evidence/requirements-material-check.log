@@ -1,0 +1,7 @@
+Working directory: .
+Command: python -X utf8 -B tests/requirements-discovery/check_materials.py
+Exit code: 0
+Elapsed seconds: 0.106
+--- stdout ---
+validated requirements-discovery materials: 11 cases, 6 source snapshots, and fixtures
+--- stderr ---

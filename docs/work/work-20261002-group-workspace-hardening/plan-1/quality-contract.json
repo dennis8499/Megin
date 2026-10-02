@@ -1,0 +1,73 @@
+{
+  "schema": "megin-quality-contract/v1",
+  "work_id": "work-20261002-group-workspace-hardening",
+  "plan_version": "plan-1",
+  "allowed_paths": [
+    ".agents/skills/",
+    ".github/workflows/knowledge-portability.yml",
+    "README.md",
+    "OPERATIONS.md",
+    "megin-skills.zip",
+    "tests/group-workspace/",
+    "docs/work/work-20261002-group-workspace-hardening/"
+  ],
+  "checks": [
+    {
+      "id": "workspace-hardening",
+      "kind": "test",
+      "command": "python -X utf8 -B tests/group-workspace/test_workspace_hardening.py"
+    },
+    {
+      "id": "group-workspace-regression",
+      "kind": "test",
+      "command": "python -X utf8 -B tests/group-workspace/test_group_workflow.py"
+    },
+    {
+      "id": "quality-gate-regression",
+      "kind": "test",
+      "command": "python -X utf8 -B tests/quality-gates/test_quality_gate.py"
+    },
+    {
+      "id": "requirements-material-check",
+      "kind": "command",
+      "command": "python -X utf8 -B tests/requirements-discovery/check_materials.py"
+    },
+    {
+      "id": "requirements-material-tests",
+      "kind": "test",
+      "command": "python -X utf8 -B tests/requirements-discovery/test_materials.py"
+    },
+    {
+      "id": "requirements-rule-tests",
+      "kind": "test",
+      "command": "python -X utf8 -B tests/requirements-discovery/test_rules.py"
+    },
+    {
+      "id": "skills-archive",
+      "kind": "command",
+      "command": "python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip"
+    },
+    {
+      "id": "whitespace",
+      "kind": "command",
+      "command": "git diff --check"
+    }
+  ],
+  "process_records": [
+    "docs/work/work-20261002-group-workspace-hardening/evidence/quality.json",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/workspace-hardening.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/group-workspace-regression.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/quality-gate-regression.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-material-check.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-material-tests.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/requirements-rule-tests.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/skills-archive.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/whitespace.log",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/handoff.md",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/review.md",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/verification.md",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/acceptance.md",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/delivery.md",
+    "docs/work/work-20261002-group-workspace-hardening/evidence/delivery.json"
+  ]
+}

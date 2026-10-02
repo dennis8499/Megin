@@ -17,16 +17,25 @@ important risk, core behavior, or acceptance, return to requirements discovery a
 document existence as proof of completion.
 Read each selected Repo's own code, tests, project knowledge, remote configuration, base branch, and available validation commands. During planning query each exact remote ref with `git ls-remote --exit-code`; do not substitute a local tracking ref. Keep the smallest
 safe design; classify the work as small or large by impact and uncertainty rather than line count.
+Resolve each Repo's remote and base branch field from explicit user input, an exact Repo override in
+optional `<Group>/.megin/group.json`, Group defaults, then existing project discovery. The config is
+not a Repo allowlist. Use `group_workspace.py resolve` to record each value's source and the config
+SHA-256; if a setting remains unknown, ask before presenting the plan. Later config edits do not
+change this plan. Compute and save the sorted twelve-Skill fingerprint with
+`group_workspace.py fingerprint`. For multi-Repo work, declare every Repo's merge prerequisites,
+complete topological order, compatibility check IDs, and partial-delivery recovery instructions;
+record a reason when the Repos are independent.
 Read [../megin/references/quality-gates.md](../megin/references/quality-gates.md) for the shared
 obligation and snapshot contract. Map each observable result to a meaningful assertion, exact
 command, and required environment; split independently failing promises. Include failure paths
 only when the change makes them relevant. The plan remains the sole source of approved obligations.
 
-Write `plan.md` in the central Group Work ID record. It must bind each selected Repo path, remote
-name/URL, exact remote base SHA, `feature/<Work ID>`, Repo-relative allowed paths, and every check's
+Write `plan.md` in the central Group Work ID record. It must bind the canonical Group root, each
+selected Repo path, remote name/URL, exact remote base SHA, `feature/<Work ID>`, Repo-relative allowed paths, and every check's
 explicit command and `cwd`, as well as the requirements revision, interfaces, dependency-ordered
 work packages, forbidden paths, acceptance scenarios, evidence locations, knowledge scope, and
-delivery mode. For one Repo, specify the fast-forward-to-confirmed-base then `--no-ff` local merge;
+delivery mode, frozen settings resolution and sources, Skills fingerprint, and cross-Repo handoff
+graph. For one Repo, specify the fast-forward-to-confirmed-base then `--no-ff` local merge;
 for several, specify feature commits and per-Repo manual handoff without base merges. Each package has
 one writer handoff and one fresh-review handoff. Include migration and failure
 handling when the change affects data, permissions, dependencies, compatibility, or operational

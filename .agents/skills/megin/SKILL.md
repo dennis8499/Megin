@@ -17,7 +17,9 @@ before selecting repositories or running commands.
 1. Confirm the current directory is the Group root and identify the requested direct-child Repo or
    Repos. Ask which Repo when the name/path is missing, ambiguous, nested, or outside the Group.
    Inspect each selected Repo's instructions, branch, status, relevant files and tests, plus the
-   central `<Group>/docs/work/*/workflow.md` records without changing product files.
+    central `<Group>/docs/work/*/workflow.md` records and `.megin/workspace.lock.json` without
+    changing product files. Requirement and planning reads may proceed while another Work ID holds
+    the lock; implementation and delivery writes require its matching Work ID and writer.
 2. Use `megin-project-knowledge` to retrieve source-backed knowledge from each selected Repo.
    Treat repository-local contracts as evidence, not as permission to mutate.
 3. Classify the request as `read_only`, `small`, `large`, or `bug` before creating a new record.
@@ -47,21 +49,26 @@ For a change, route the same Work ID through these phases:
    acceptance, risks, and stable behavior scenarios.
 2. `planning`: use `megin-behavior-contract` and `megin-technical-planning` to create the
    executable behavior contract, dependency-ordered work packages, allowed paths, commands,
-   knowledge scope, and delivery destination.
+    knowledge scope, and delivery destination. Resolve optional Group defaults and Repo overrides,
+    fingerprint the twelve Skills, and freeze those summaries with the complete Repo dependency/order
+    graph, compatibility checks, and partial-delivery instructions.
 3. `approval`: present the exact current plan and wait for the user to name the Work ID and
    plan version. This is the one plan gate for small and large work. A changed scope,
-   interface, scenario, or acceptance criterion creates a new plan version.
-4. `implementation`: after approval, recheck and fetch each recorded remote base SHA, then create
-   one `feature/<Work ID>` branch per Repo from that exact commit. Use
+    interface, scenario, or acceptance criterion creates a new plan version.
+4. `implementation`: after approval and a matching Skills fingerprint, claim the Group lock before
+   creating any feature branch. Recheck and fetch each recorded remote base SHA, then create one
+   `feature/<Work ID>` branch per Repo from that exact commit. Check the same Work ID and writer
+   before every product write. Use
    `megin-implementation-execution` and `megin-test-driven-development` only on those branches.
    Keep one authorized writer in the workspace, follow outside-in behavior red → inner test red →
    minimal green → refactor, and save command evidence centrally with its explicit Repo `cwd`.
-5. `review`: start a fresh read-only `megin-code-review` context. It must inspect the current
+5. `review`: retain the Group lock and start a fresh read-only `megin-code-review` context. It must inspect the current
    snapshot, approved scope, tests, compatibility, and knowledge claims. A writer cannot
    approve its own work.
 6. `verification`: use `megin-verification-before-completion` to rerun every approved command
    and scenario against the reviewed snapshot. A passing automated verification stops at
-   `phase: acceptance` and `status: awaiting_user`.
+   `phase: acceptance` and `status: awaiting_user`. Keep the Group lock through review, verification,
+   human acceptance, and blocked states; never expire it by time or interruption.
 7. `acceptance`: use `megin-human-acceptance` to show only the approved user-visible scenarios
    and wait for a response identifying the Work ID and acceptance version. Do not stage or
    commit before this response.
@@ -69,8 +76,12 @@ For a change, route the same Work ID through these phases:
    `megin-finishing-delivery` to stage approved paths and create a feature commit in every Repo.
    For one Repo, fast-forward its clean local base to the still-confirmed remote SHA, then integrate
    locally with `git merge --no-ff`. For multiple Repos, create feature commits only and provide a
-   per-Repo manual-merge handoff. Push, pull requests, deployment, branch deletion, and worktree
-   cleanup remain outside this workflow.
+    per-Repo manual-merge handoff. Complete commits in the approved merge order and require every
+    compatibility check. Save the gate receipt and commit SHAs to the predeclared delivery record,
+    run `completion` against actual commit trees and merge parents, then mark `complete` and release
+    the lock using that record. Writer transfer or abort first confirms the old writer stopped and
+    records a reason. Push, pull requests, deployment, branch deletion, and worktree cleanup remain
+    outside this workflow.
 
 ## Conversation and safety rules
 
@@ -92,15 +103,17 @@ For a change, route the same Work ID through these phases:
 - Never claim a test, review, acceptance, knowledge promotion, or commit that did not happen.
   If an independent reviewer is unavailable, stop at `awaiting_review`.
 - For new Group quality evidence, run `megin/scripts/quality_gate.py` with `--group-root` and
-  `--work-id` at each relevant handoff. A structural pass does not replace independent judgment or
-  executed tests.
+  `--work-id`, starting with `validate-record`. A structural pass does not replace independent
+  judgment or executed tests. If the Skills fingerprint changes, keep evidence and require plan
+  reapproval plus fresh review, verification, and acceptance.
 - After each work package, record completed work, fresh verification, uncertainty, and the next
   action.
 - Keep secrets out of records; store paths, summaries, byte counts, and digests where evidence
   must be referenced.
 
 Completion means the central record contains the final review, fresh verification, acceptance
-response, knowledge result, approved paths, and one clear next state. A single Repo also records
+response, knowledge result, approved paths, a passed `completion` result, and one clear next state.
+A single Repo also records
 the feature and `--no-ff` merge commits plus integration checks. Multiple Repos record every feature
 commit and the manual-merge handoff; Megin does not merge their base branches. The workflow is
-governed by these Skills and Markdown records; there is no Megin-specific executable to invoke.
+governed by these Skills and Markdown records; there is no workflow controller to invoke.

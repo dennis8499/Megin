@@ -1,8 +1,9 @@
 # Megin Skills-only workflow
 
 Megin is a reusable set of Codex Skills for evidence-driven software delivery. Install the Skills
-once, then work through normal conversation. There is no Megin Plugin, Megin command, hook, MCP
-server, or dedicated workflow controller to install or run.
+once, then work through normal conversation. There is no Megin Plugin, workflow command, hook, MCP
+server, or lifecycle controller to install or run; the small helper scripts validate records and
+workspace ownership.
 
 Start Codex at the GitLab Group root. Every direct-child project folder is an independent Git repo;
 the Group root itself is not a repo. One Work ID may cover several repos and keeps one central
@@ -14,8 +15,9 @@ The bundle keeps a complete delivery path:
 
 The workflow is driven by Skills and a readable `<Group>/docs/work/<work-id>/workflow.md` record. Git,
 repository search, project tests, and each project's own tools remain available as ordinary tools.
-The Skills bundle also includes a small read-only quality gate helper. It checks structural evidence
-at review, acceptance, and delivery handoffs; it does not run a workflow or judge code behavior.
+The Skills bundle also includes small helpers for frozen Group settings, Skills fingerprints,
+exclusive Group ownership, and read-only quality gates. They validate records and review, acceptance,
+delivery, and completion evidence; they do not run product commands or advance workflow state.
 
 ## 需求探索
 
@@ -79,8 +81,12 @@ explanation of a bug ends with evidence and does not silently become a fix.
 
 Changes have one plan approval. The central approved plan binds selected Repo(s), each remote URL,
 exact remote base SHA, `feature/<Work ID>`, allowed paths, command working directories, behavior
-scenarios, tests, knowledge scope, and delivery mode. After approval, one writer works in each
-recorded feature branch; base branches remain unchanged until acceptance.
+scenarios, tests, knowledge scope, and delivery mode. After approval, one Group writer works
+sequentially across the selected feature branches; base branches remain unchanged until acceptance.
+An optional `<Group>/.megin/group.json` provides remote/base defaults and per-Repo overrides without
+limiting Repo selection. Freeze each resolved value and its source in the approved plan. Before
+creating feature branches, Megin claims an exclusive Group lock and checks the Work ID and writer
+before every product write; the lock remains through review, verification, acceptance, and blocked states.
 BDD/TDD evidence and a different fresh reviewer are required before automated verification.
 Verification runs every approved command against the reviewed snapshot and then pauses at
 `awaiting_user` for the listed manual acceptance scenarios.
@@ -96,6 +102,12 @@ compares the staged Git blobs with the user-accepted product digest and rejects 
 product paths. Structured command, review, and acceptance outcomes also point to the exact matching
 lines in their hashed raw sources.
 
+Every new plan binds a reproducible SHA-256 over the twelve installed Skills. A changed fingerprint
+stops resumption and requires a new approved plan plus fresh review, verification, and acceptance.
+The multi-Repo plan records dependency order, required compatibility checks, and partial-delivery
+instructions. `completion` verifies actual feature commit trees and, for one Repo, the local merge
+parents and content before the workflow can become complete and release its Group lock.
+
 After the user names the Work ID and acceptance version, Megin reviews only the approved,
 source-backed knowledge scope, stages only approved paths in each feature branch, and creates one
 feature commit per Repo. For one Repo, it confirms the remote base SHA, fast-forwards the clean local
@@ -110,12 +122,14 @@ multi-repo task, partial feature commits are retained and remaining Repo commits
 
 ## Work records
 
-Each work item uses `<Group>/docs/work/<work-id>/workflow.md` with schema
-`megin-skills-workflow/v2`. Requirements, one shared plan, feature files, evidence, review,
+Each new work item uses `<Group>/docs/work/<work-id>/workflow.md` with schema
+`megin-skills-workflow/v3`. Requirements, one shared plan, feature files, evidence, review,
 verification, acceptance, and knowledge notes stay under that Work ID. Its quality contract binds
-each Repo's remote, base commit, feature branch, allowed paths, and check command/`cwd`. One-repo
-delivery records its feature and merge commits; multi-repo delivery records every feature commit and
-manual-merge handoff. See [the workflow-record contract](.agents/skills/megin/references/workflow-record.md).
+each Repo's remote, base commit, feature branch, allowed paths, resolved settings, Skills fingerprint,
+and check command/`cwd`. One-repo delivery records its feature and merge commits; multi-repo delivery
+records every feature commit and ordered manual-merge handoff. Completed v1/v2 history stays unchanged;
+unfinished v1/v2 Group work requires an explicitly approved v3 plan. See [the workflow-record
+contract](.agents/skills/megin/references/workflow-record.md).
 
 Do not put secrets in a record. When a repository has a formal knowledge or test evidence contract,
 follow that contract and record the source path, command, result, and digest it requires.
@@ -125,6 +139,11 @@ follow that contract and record the source path, command, result, and digest it 
 The repository's CI checks Skill frontmatter, implicit invocation metadata, package completeness,
 archive contents, and removal of legacy Megin runtime references. The local development validator is
 `.agents/skills/megin/scripts/validate_skills.py`; it checks the bundle but does not run a workflow.
+Rebuild the distributable with `python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py
+--build-archive megin-skills.zip`, then validate it with `--archive megin-skills.zip`. The builder
+uses sorted entries, a fixed timestamp, normalized `100644` modes, and excludes Python caches.
+It rejects symlinks in the package README and Skill trees so external file contents cannot enter
+the distributable.
 
 The release archive is `megin-skills.zip`. It is assembled from the repository's canonical
 `.agents/skills/megin*` folders, so the archive and source share one maintenance path.
@@ -132,6 +151,6 @@ The release archive is `megin-skills.zip`. It is assembled from the repository's
 ## From the old installation
 
 If an older Megin Plugin or command is installed in Codex, disable that installation before using
-the Skills-only workflow. New product work uses only the Group v2 record format and does not migrate
+  the Skills-only workflow. New product work uses only the Group v3 record format and does not migrate
 or reuse repo-local v1 records. Existing `Test` and `Test2` histories are not changed. Old approvals
 and design references do not authorize new work.
