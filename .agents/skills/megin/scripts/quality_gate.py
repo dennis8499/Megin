@@ -696,6 +696,33 @@ def validate_v3_group_record(
     validate_handoff_contract(contract, expected_repositories, check_ids)
 
 
+def validate_gitlab_identity(contract: dict) -> dict:
+    value = contract.get("gitlab")
+    if not isinstance(value, dict):
+        raise InvalidEvidence("gitlab_mr plan needs frozen GitLab and Issue identity")
+    origin = value.get("origin")
+    url = urlsplit(origin) if isinstance(origin, str) else None
+    if (not url or url.scheme not in ("https", "http") or not url.netloc or url.username
+            or url.password or url.query or url.fragment or origin.endswith("/")):
+        raise InvalidEvidence("GitLab origin must be a canonical HTTP(S) URL without credentials")
+    if any(type(value.get(key)) is not int or value[key] <= 0
+           for key in ("issue_project_id", "issue_iid")):
+        raise InvalidEvidence("GitLab Issue project ID and IID must be positive integers")
+    ids = []
+    for repo in contract["repositories"]:
+        if not isinstance(repo, dict):
+            raise InvalidEvidence("invalid GitLab repository identity")
+        project_id, namespace = repo.get("gitlab_project_id"), repo.get("gitlab_namespace")
+        if (type(project_id) is not int or project_id <= 0 or not isinstance(namespace, str)
+                or not namespace.strip() or any(c.isspace() for c in namespace)):
+            raise InvalidEvidence("every approved Repo needs its GitLab project ID and namespace")
+        ids.append(project_id)
+    if len(set(ids)) != len(ids):
+        raise InvalidEvidence("duplicate GitLab project IDs")
+    return value
+
+
+
 def load_group_contract(
     group_root: Path, work_id: str,
 ) -> tuple[dict[str, str], dict, list[dict], set[str]]:
@@ -732,8 +759,12 @@ def load_group_contract(
             or not isinstance(checks, list) or not checks
             or not isinstance(process_records, list) or not process_records):
         raise InvalidEvidence("Group contract needs repositories, checks, and process_records")
-    if delivery_mode not in ("local_merge", "feature_handoff"):
+    if delivery_mode not in ("local_merge", "feature_handoff", "gitlab_mr"):
         raise InvalidEvidence("invalid Group delivery_mode")
+    if delivery_mode == "gitlab_mr" and workflow_schema != "megin-skills-workflow/v3":
+        raise InvalidEvidence("gitlab_mr requires a Group v3 contract")
+    if delivery_mode == "gitlab_mr":
+        validate_gitlab_identity(contract)
     if (delivery_mode == "local_merge" and len(repositories) != 1
             or delivery_mode == "feature_handoff" and len(repositories) < 2):
         raise InvalidEvidence("delivery_mode does not match repository count")
@@ -819,6 +850,8 @@ def load_group_contract(
         records.add(canonical)
     if len(records) != len(process_records) or reference not in records:
         raise InvalidEvidence("quality_ref must be a unique approved process record")
+    if delivery_mode == "gitlab_mr" and f"docs/work/{work_id}/evidence/handoff.json" not in records:
+        raise InvalidEvidence("gitlab_mr handoff.json must be predeclared in process_records")
     if workflow_schema == "megin-skills-workflow/v3":
         validate_v3_group_record(
             group_root, work_id, fields, contract, validated, records, check_ids,
@@ -1321,7 +1354,7 @@ def check_completion_group(
                 continue
             verified_item["merge_commit"] = merge_commit
         elif merge_commit not in (None, ""):
-            reasons.append(f"{repo_path}: multi-Repo feature handoff must not contain a base merge commit")
+            reasons.append(f"{repo_path}: feature handoff must not contain a base merge commit")
             continue
         verified.append(verified_item)
 

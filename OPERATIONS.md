@@ -2,7 +2,8 @@
 
 This repository distributes a folder of Codex Skills. The Skills are the product and the Markdown
 workflow record is the state surface. There is no Plugin manifest, workflow command-line entry
-point, hook, MCP service, or Megin-specific controller; small scripts validate records and locks.
+point, hook, or MCP service. Native helpers validate evidence, manage locks, and record the
+workspace-owned local delivery; the user workflow remains governed by Skills.
 
 ## Installation and discovery
 
@@ -64,11 +65,17 @@ Use `megin` for the complete route:
 6. Rerun every approved command and scenario against the reviewed snapshot.
 7. Pause for the user's listed manual acceptance response.
 8. Review the approved knowledge scope and stage only approved paths in each Repo.
-9. Run the `delivery` gate, then create feature commits in the approved merge order. For one Repo, confirm the remote base, fast-forward the
+9. For `gitlab_mr`, run the native delivery gate and `gitlab_delivery.py prepare` to save
+   `evidence/handoff.json`, then stop at 已驗收，待工作台交付. GitlabWorkSpace uses the native
+   helper to atomically take the same Work ID's lock and commit only accepted index contents.
+   It verifies all local commits and saves completion before releasing the lock. Push and MR
+   use those immutable commits and retry independently. See
+   [.agents/skills/megin/references/gitlab-delivery.md](.agents/skills/megin/references/gitlab-delivery.md).
+   For the existing modes, run the `delivery` gate, then create feature commits in the approved merge order. For `local_merge`, confirm the remote base, fast-forward the
    clean local base with `git merge --ff-only <confirmed-base-commit>`, then merge locally with
    `git merge --no-ff`. Record the feature/merge commit SHAs in the predeclared delivery record and
    run `completion` to verify commit objects, trees, merge parents, compatibility checks, and order.
-   Only then mark the workflow complete and release the Group lock. For multiple Repos, do not merge
+   Only then mark the workflow complete and release the Group lock. For `feature_handoff`, do not merge
    base branches; record each commit and provide ordered manual-merge handoff. Preserve partial commits
    and resume only missing Repo commits.
 

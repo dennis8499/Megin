@@ -55,6 +55,9 @@ def package_files(root: Path) -> dict[str, bytes]:
     skills_root = root.resolve()
 
     files = {"README.md": readme.read_bytes()}
+    version = repository / "VERSION"
+    if version.is_file():
+        files["VERSION"] = version.read_bytes()
     for name in EXPECTED:
         skill = root / name
         if skill.is_symlink():

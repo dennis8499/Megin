@@ -1,6 +1,6 @@
 ---
 name: megin-finishing-delivery
-description: Finish a verified and human-accepted Megin change with source-backed knowledge review and one local commit. Use for final delivery, commit preparation, 交付收尾、建立本機 commit; do not run before acceptance or publish externally.
+description: Finish a verified and human-accepted Megin change with source-backed knowledge review and the approved local delivery or GitLab workspace handoff mode. Use for final delivery, commit preparation, 交付收尾、建立本機 commit、驗收交接; do not run before acceptance or publish externally.
 ---
 
 # Megin finishing delivery
@@ -27,6 +27,8 @@ or untracked product paths. Staging does not retroactively turn an unreviewed ed
 Run `megin-project-knowledge` over the approved source-backed scope. Preserve unsupported or
 conflicting claims as pending and leave canonical knowledge unchanged unless the repository's
 promotion contract and the approved scope permit the update.
+
+For `delivery_mode: gitlab_mr`, load [../megin/references/gitlab-delivery.md](../megin/references/gitlab-delivery.md), prepare the accepted staged handoff with the native helper, and stop at delivery/awaiting_user. The workspace owns commits, completion and remote operations. Do not continue into the legacy commit/merge instructions below.
 
 Stage only approved product, test, documentation, and authorized knowledge paths in each feature
 branch. Require every compatibility check to pass. Follow the approved dependency order when

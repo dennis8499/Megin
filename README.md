@@ -154,3 +154,7 @@ If an older Megin Plugin or command is installed in Codex, disable that installa
   the Skills-only workflow. New product work uses only the Group v3 record format and does not migrate
 or reuse repo-local v1 records. Existing `Test` and `Test2` histories are not changed. Old approvals
 and design references do not authorize new work.
+
+## GitlabWorkSpace delivery (0.2.0)
+
+Workspace tasks use `delivery_mode: gitlab_mr`. Megin completes the normal approved development, independent review, verification and human acceptance, stages only accepted paths, then prepares the native handoff and stops. GitlabWorkSpace verifies evidence, commits in approved order, saves completion and releases the Group lock. Push and MR can retry from fixed commit IDs after local completion. See `.agents/skills/megin/references/gitlab-delivery.md`.

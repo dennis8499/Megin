@@ -73,9 +73,11 @@ For a change, route the same Work ID through these phases:
    and wait for a response identifying the Work ID and acceptance version. Do not stage or
    commit before this response.
 8. `delivery`: after the exact acceptance response, use `megin-project-knowledge` and
-   `megin-finishing-delivery` to stage approved paths and create a feature commit in every Repo.
-   For one Repo, fast-forward its clean local base to the still-confirmed remote SHA, then integrate
-   locally with `git merge --no-ff`. For multiple Repos, create feature commits only and provide a
+   `megin-finishing-delivery` to stage approved paths. For `gitlab_mr`, prepare the native
+   [GitLab handoff](references/gitlab-delivery.md) and stop at 已驗收，待工作台交付;
+   the workspace takes the lock and completes local commits, then Push/MR separately.
+   For `local_merge`, create its feature commit, fast-forward its clean local base to the still-confirmed remote SHA, then integrate
+   locally with `git merge --no-ff`. For `feature_handoff`, create feature commits only and provide a
     per-Repo manual-merge handoff. Complete commits in the approved merge order and require every
     compatibility check. Save the gate receipt and commit SHAs to the predeclared delivery record,
     run `completion` against actual commit trees and merge parents, then mark `complete` and release
@@ -113,7 +115,10 @@ For a change, route the same Work ID through these phases:
 
 Completion means the central record contains the final review, fresh verification, acceptance
 response, knowledge result, approved paths, a passed `completion` result, and one clear next state.
-A single Repo also records
-the feature and `--no-ff` merge commits plus integration checks. Multiple Repos record every feature
+`local_merge` also records
+the feature and `--no-ff` merge commits plus integration checks. `feature_handoff` records every feature
 commit and the manual-merge handoff; Megin does not merge their base branches. The workflow is
-governed by these Skills and Markdown records; there is no workflow controller to invoke.
+governed by these Skills and Markdown records. For `gitlab_mr`, Megin stops before local completion;
+GitlabWorkSpace uses the native helper and records every verified feature commit without base merges.
+
+For tasks supplied by GitlabWorkSpace, use `gitlab_mr` and load [references/gitlab-delivery.md](references/gitlab-delivery.md) during planning and finishing. Existing standalone delivery modes remain available.

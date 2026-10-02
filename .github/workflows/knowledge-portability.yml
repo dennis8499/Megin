@@ -7,6 +7,7 @@ on:
       - ".agents/skills/**"
       - "README.md"
       - "OPERATIONS.md"
+      - "VERSION"
       - "megin-skills.zip"
       - ".github/workflows/knowledge-portability.yml"
       - ".gitattributes"
@@ -76,3 +77,4 @@ jobs:
           python -X utf8 -B tests/quality-gates/test_quality_gate.py
           python -X utf8 -B tests/group-workspace/test_group_workflow.py
           python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
+          python -X utf8 -B tests/group-workspace/test_gitlab_delivery.py

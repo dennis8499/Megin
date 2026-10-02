@@ -18,13 +18,13 @@
 
 只有使用者明確接受目前組合快照後，才可依核准路徑逐 Repo 暫存並建立 feature commit。執行 `delivery` gate 前，所有目標 Repo 都須保有已驗收內容，所有核准產品路徑均已暫存，且不得有未暫存或未追蹤產品檔案。交付 gate 亦須以 `git ls-remote` 確認所有遠端 base 仍指向計畫 SHA；任何一個 Repo 漂移都會阻止整批交付並要求重新確認基線。
 
-核准計畫須包含覆蓋所有 Repo 的合併相依圖、無循環的拓樸順序、相容性檢查 ID，以及部分交付的續作說明。執行 delivery gate 時所有必要相容性檢查都須通過。照核准的 merge order 建立 feature commit，並把每個 SHA 與交付 gate receipt 記錄在預先列入 process record 的 `delivery_ref`。完成後執行 `completion` gate；它以 Git commit tree 檢查 feature commit 內容及順序，並於單 Repo 驗證 no-ff merge 的兩個父提交和內容。只有通過後才標記 `complete`，再用 completion record 釋放 Group lock。
+核准計畫須包含覆蓋所有 Repo 的合併相依圖、無循環的拓樸順序、相容性檢查 ID，以及部分交付的續作說明。執行 delivery gate 時所有必要相容性檢查都須通過。照核准的 merge order 建立 feature commit，並把每個 SHA 與交付 gate receipt 記錄在預先列入 process record 的 `delivery_ref`。完成後執行 `completion` gate；它以 Git commit tree 檢查 feature commit 內容及順序，並於 local_merge 驗證 no-ff merge 的兩個父提交和內容。只有通過後才標記 `complete`，再用 completion record 釋放 Group lock。
 
-### 單一 Repo：本機整合
+### local_merge：單一 Repo 本機整合
 
 一個 Repo 通過同一輪驗收後，在 feature branch 建立 feature commit。確認工作樹乾淨、遠端 base 仍為計畫 SHA，切回 base branch，使用 `git merge --ff-only <confirmed-base-commit>` 將乾淨的本機 base 快轉到已確認提交，再使用 `git merge --no-ff <feature-branch>` 建立本機整合提交。檢查 merge commit 有兩個預期父提交、feature commit 是其第二父提交、base branch 包含已驗收內容，並記錄提交與內容檢查結果。若 base 分歧、遠端改變或合併衝突，停止並重新規劃，不使用舊驗收。
 
-### 多個 Repo：feature handoff
+### feature_handoff：多個 Repo 交接
 
 所有 Repo 在同一輪驗收通過後，各自在自己的 feature branch 建立一個 feature commit。Megin 不切換或合併任何 Repo 的 base branch；工作紀錄逐一交代 Repo 路徑、remote/base、feature branch、feature commit 及人工合併所需資訊，由使用者手動合併。所有 Repo 的提交和交接資訊齊備後才標記 Work ID `complete`。如果只完成部分 Repo 的提交，保留已完成提交和其餘 Repo 狀態，續作缺少的提交；不得重建、重設或合併已完成 Repo。
 
@@ -43,10 +43,12 @@ base_commit: <full remote SHA>
 feature_branch: feature/<work-id>
 allowed_paths: [<repo-relative paths>]
 checks: [{ id, kind, command, cwd }]
-delivery_mode: local_merge | feature_handoff
+delivery_mode: local_merge | feature_handoff | gitlab_mr
 group_config: { source, source_sha256, resolved }
 skills_sha256: <installed twelve-skill fingerprint>
 handoff: { dependencies, merge_order, compatibility_check_ids, partial_delivery }
 ```
 
-`local_merge` 僅適用一個目標 Repo；`feature_handoff` 至少適用兩個 Repo。品質快照以 Work ID 組合各 Repo 的 Git blob 與受保護的 Group 文件；細節見 [quality-gates.md](quality-gates.md)。
+`local_merge` 僅適用一個目標 Repo；`feature_handoff` 至少適用兩個 Repo；`gitlab_mr` 適用一個或多個 Repo，Megin 驗收暫存後只產生交接證據，由工作台提交與完成紀錄。品質快照以 Work ID 組合各 Repo 的 Git blob 與受保護的 Group 文件；細節見 [quality-gates.md](quality-gates.md)。
+
+`gitlab_mr` supports one or more Repos and hands accepted staged content to GitlabWorkSpace. Read [gitlab-delivery.md](gitlab-delivery.md) for frozen GitLab identity, handoff evidence, lock transfer and completion. Legacy local_merge/feature_handoff rules apply only to those modes.

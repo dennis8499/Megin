@@ -35,8 +35,10 @@ selected Repo path, remote name/URL, exact remote base SHA, `feature/<Work ID>`,
 explicit command and `cwd`, as well as the requirements revision, interfaces, dependency-ordered
 work packages, forbidden paths, acceptance scenarios, evidence locations, knowledge scope, and
 delivery mode, frozen settings resolution and sources, Skills fingerprint, and cross-Repo handoff
-graph. For one Repo, specify the fast-forward-to-confirmed-base then `--no-ff` local merge;
-for several, specify feature commits and per-Repo manual handoff without base merges. Each package has
+graph. For `local_merge`, specify the fast-forward-to-confirmed-base then `--no-ff` local merge;
+for `feature_handoff`, specify feature commits and per-Repo manual handoff without base merges.
+For `gitlab_mr`, specify accepted staged handoff, native lock transfer and workspace-owned local
+commits/Push/MR without base merges, for one or more Repos. Each package has
 one writer handoff and one fresh-review handoff. Include migration and failure
 handling when the change affects data, permissions, dependencies, compatibility, or operational
 behavior.
@@ -50,3 +52,5 @@ ID and plan version. Any changed scope, interface, scenario, command, or destina
 plan and returns the work here.
 
 Handoff: `phase: approval` with a reviewable, complete plan; approval is not implied by producing it.
+
+For a GitlabWorkSpace task, freeze `delivery_mode: gitlab_mr` and the GitLab/Issue/Repo identities described in [../megin/references/gitlab-delivery.md](../megin/references/gitlab-delivery.md); predeclare handoff.json before any quality snapshot.
