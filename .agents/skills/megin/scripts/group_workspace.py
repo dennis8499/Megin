@@ -81,6 +81,7 @@ def canonical_child(value: object) -> str:
 
 
 def validate_repo(group_root: Path, repo_path: object) -> tuple[str, Path]:
+    group_root = group_root.resolve()
     name = canonical_child(repo_path)
     lexical = group_root / name
     if lexical.is_symlink():

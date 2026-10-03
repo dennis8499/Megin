@@ -21,6 +21,17 @@ class GitLabDeliveryTests(WorkspaceHardeningTests):
         with self.assertRaises(quality.InvalidEvidence):
             quality.within_group(alias, "../outside/evidence.json")
 
+    def test_group_root_alias_supports_contract_snapshot_and_completed_delivery(self):
+        alias = self.group / ".." / self.group.name
+        _, _, repositories, _ = quality.load_group_contract(alias, WORK_ID)
+        for item in repositories:
+            self.assertEqual((self.group / item["repo_path"]).resolve(), item["repo"])
+        self.assertEqual(quality.group_snapshot(self.group, WORK_ID), quality.group_snapshot(alias, WORK_ID))
+        value = self.setup_handoff(single=True)
+        self.assertEqual("gitlab_mr", delivery.load(alias, WORK_ID)[1]["delivery_mode"])
+        result = delivery.commit(alias, WORK_ID, "workspace-1", value["handoff_sha256"], "feature")
+        self.assertEqual(result["delivery"], delivery.completed(alias, WORK_ID)["delivery"])
+
     def test_native_planning_validation_requires_frozen_ids_and_predeclared_handoff(self):
         contract = self.contract()
         contract["delivery_mode"] = "gitlab_mr"

@@ -727,6 +727,7 @@ def validate_gitlab_identity(contract: dict) -> dict:
 def load_group_contract(
     group_root: Path, work_id: str,
 ) -> tuple[dict[str, str], dict, list[dict], set[str]]:
+    group_root = group_root.resolve()
     if not WORK_ID_PATTERN.fullmatch(work_id):
         raise InvalidEvidence("invalid Group Work ID")
     within_group(group_root, f"docs/work/{work_id}")
@@ -955,6 +956,7 @@ def group_repo_entries(repo: Path) -> list[dict[str, str]]:
 def group_record_entries(
     group_root: Path, work_id: str, records: set[str],
 ) -> list[dict[str, str]]:
+    group_root = group_root.resolve()
     work = group_root / "docs" / "work" / work_id
     workflow_relative = f"docs/work/{work_id}/workflow.md"
     entries: list[dict[str, str]] = []
