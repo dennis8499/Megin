@@ -14,6 +14,13 @@ import quality_gate as quality
 
 
 class GitLabDeliveryTests(WorkspaceHardeningTests):
+    def test_group_root_alias_is_resolved_before_evidence_containment(self):
+        alias = self.group / ".." / self.group.name
+        relative = f"docs/work/{WORK_ID}"
+        self.assertEqual((self.group / relative).resolve(), quality.within_group(alias, relative))
+        with self.assertRaises(quality.InvalidEvidence):
+            quality.within_group(alias, "../outside/evidence.json")
+
     def test_native_planning_validation_requires_frozen_ids_and_predeclared_handoff(self):
         contract = self.contract()
         contract["delivery_mode"] = "gitlab_mr"

@@ -472,6 +472,7 @@ GROUP_SHA_PATTERN = re.compile(r"[0-9a-f]{40,64}\Z")
 
 
 def within_group(group_root: Path, relative: object) -> Path:
+    group_root = group_root.resolve()
     canonical = canonical_relative(relative)
     path = (group_root / canonical).resolve()
     if not path.is_relative_to(group_root) or path == group_root:

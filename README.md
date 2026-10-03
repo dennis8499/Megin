@@ -157,4 +157,7 @@ and design references do not authorize new work.
 
 ## GitlabWorkSpace delivery (0.2.0)
 
+Group evidence paths are checked against the resolved Group root so Windows temporary-directory
+aliases and other equivalent root paths remain valid without allowing paths outside the Group.
+
 Workspace tasks use `delivery_mode: gitlab_mr`. Megin completes the normal approved development, independent review, verification and human acceptance, stages only accepted paths, then prepares the native handoff and stops. GitlabWorkSpace verifies evidence, commits in approved order, saves completion and releases the Group lock. Push and MR can retry from fixed commit IDs after local completion. See `.agents/skills/megin/references/gitlab-delivery.md`.
