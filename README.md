@@ -11,7 +11,19 @@ requirements, plan, review, verification, and acceptance record under `<Group>/d
 
 The bundle keeps a complete delivery path:
 
-`requirements → behavior contract and plan → one plan approval → per-repo feature branches → BDD/TDD implementation → fresh review → automated verification → human acceptance → feature commits → local merge (one repo) or manual merge handoff (multiple repos)`
+`requirements → behavior contract and plan → one plan approval → per-repo feature branches → BDD/TDD implementation → fresh review → automated verification → human acceptance → mode-specific delivery`
+
+## Delivery modes
+
+The approved plan fixes one delivery mode before implementation. Each mode retains the same review, verification, human acceptance, and accepted-snapshot requirements.
+
+| Mode | Repo scope | Local commit and merge owner | Completion |
+| --- | --- | --- | --- |
+| `local_merge` | One Repo | Megin commits the accepted feature, fast-forwards the clean local base to the approved remote base SHA, then integrates the feature with `git merge --no-ff`. | Megin passes the completion gate, records the result, and releases the Group lock. |
+| `feature_handoff` | Two or more Repos | Megin commits each accepted feature in the approved dependency order; it leaves base branches unmerged and records the ordered manual-merge handoff. | Megin verifies every feature commit, records the completion result, and releases the Group lock. |
+| `gitlab_mr` | One or more Repos | After acceptance Megin prepares the native staged-content handoff and stops. GitlabWorkSpace takes the same Work ID lock and commits only the accepted index contents. | GitlabWorkSpace validates every commit and saves local completion before releasing the lock. Push and MR are separate follow-up actions using those saved commits. |
+
+For an uncertain remote result in `gitlab_mr`, reconcile GitLab before retrying; do not push a different commit or create another MR for the same handoff. See [the native delivery contract](.agents/skills/megin/references/gitlab-delivery.md).
 
 The workflow is driven by Skills and a readable `<Group>/docs/work/<work-id>/workflow.md` record. Git,
 repository search, project tests, and each project's own tools remain available as ordinary tools.
@@ -160,4 +172,4 @@ and design references do not authorize new work.
 Group evidence, repository, and work-record paths are checked against the resolved Group root so Windows temporary-directory
 aliases and other equivalent root paths remain valid without allowing paths outside the Group.
 
-Workspace tasks use `delivery_mode: gitlab_mr`. Megin completes the normal approved development, independent review, verification and human acceptance, stages only accepted paths, then prepares the native handoff and stops. GitlabWorkSpace verifies evidence, commits in approved order, saves completion and releases the Group lock. Push and MR can retry from fixed commit IDs after local completion. See `.agents/skills/megin/references/gitlab-delivery.md`.
+Workspace tasks use `delivery_mode: gitlab_mr`. Megin completes the normal approved development, independent review, verification and human acceptance, stages only accepted paths, then prepares the native handoff and stops. GitlabWorkSpace verifies evidence, commits in approved order, saves completion and releases the Group lock. Push and MR can retry from fixed commit IDs after local completion. The [v0.2.0 Release](https://github.com/dennis8499/Megin/releases/tag/v0.2.0) includes this handoff and validates Windows Group-path aliases against the resolved Group root; its published `megin-skills.zip` SHA-256 is `7d0323f0f8d97a90adee8eca980c3b929c4d22130e2422cf729b35a4673347a4`. See `.agents/skills/megin/references/gitlab-delivery.md`.
