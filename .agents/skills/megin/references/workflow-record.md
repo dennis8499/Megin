@@ -35,7 +35,7 @@ Work ID 固定為 `work-YYYYMMDD-<lowercase-slug>`；不得重用舊 Work ID 或
 
 ```markdown
 ## 目的與邊界
-目標、選定 Repo、納入及排除的行為／路徑、假設與風險。
+目標、全 Repo Scope 的需求主檔參照、納入及排除的行為／路徑、假設與風險。`workflow.repositories` 與核准契約只列需要變更／交付的 Repo；完整 Group Repo 清單及逐 Repo 判定保留於 `requirements.md`。
 
 ## 驗收
 穩定情境 ID、可觀察結果、自動命令及使用者可見步驟；人工驗收綁定組合快照。

@@ -8,19 +8,23 @@ description: Run the Megin Skills-only delivery workflow for repository changes.
 This is the conversation entry point for repository work. It is a Skills workflow, not a
 plugin, command-line product, hook, or state controller. Use the repository's normal Git,
 search, editor, and test tools directly. New product work starts from a non-Git Group root,
-selects one or more direct-child Git repositories, and records the workflow in
+assesses every valid local direct-child Git Repo, and records the workflow in
 `<Group>/docs/work/<work-id>/workflow.md`. Read [group-workspace.md](references/group-workspace.md)
-before selecting repositories or running commands.
+before inventorying repositories or running commands.
 
 ## Start and resume
 
-1. Confirm the current directory is the Group root and identify the requested direct-child Repo or
-   Repos. Ask which Repo when the name/path is missing, ambiguous, nested, or outside the Group.
-   Inspect each selected Repo's instructions, branch, status, relevant files and tests, plus the
-    central `<Group>/docs/work/*/workflow.md` records and `.megin/workspace.lock.json` without
-    changing product files. Requirement and planning reads may proceed while another Work ID holds
-    the lock; implementation and delivery writes require its matching Work ID and writer.
-2. Use `megin-project-knowledge` to retrieve source-backed knowledge from each selected Repo.
+1. Confirm the current directory is the Group root. Inventory every valid local direct-child Git
+   Repo, regardless of which Repo the request names or whether it has a GitLab mapping. Inspect each
+   Repo's own instructions, purpose, branch, HEAD, status, relevant code, tests and source-backed
+   knowledge, plus the central `<Group>/docs/work/*/workflow.md` records and
+   `.megin/workspace.lock.json`, without changing product files. A named Repo is a feature clue,
+   not a discovery filter. Ask about unresolved product decisions, not which Repo to inspect.
+   Requirement and planning reads may proceed while another Work ID holds the lock; implementation
+   and delivery writes require its matching Work ID and writer.
+2. Use `megin-project-knowledge` to assess source-backed knowledge from every local Repo. Record the
+   complete inventory, each Repo's purpose and evidence, and a `needs change`, `no change`, or
+   `needs research` result in the requirements master.
    Treat repository-local contracts as evidence, not as permission to mutate.
 3. Classify the request as `read_only`, `small`, `large`, or `bug` before creating a new record.
    A pure explanation or review is `read_only` and ends after evidence without a delivery record. A
@@ -96,11 +100,10 @@ For a change, route the same Work ID through these phases:
 - Natural-language approval is bound to the exact Work ID, plan version, scope, scenarios,
   tests, knowledge scope, and local delivery target shown in the current record. Do not infer
   approval from a skill mention, a test result, or “continue” without an exact current target.
-- Keep the Group root, selected Repo paths, each branch identity, and each command `cwd` visible in
-  the central record. Product writes after approval require the corresponding recorded feature
-  branch. Preserve unrelated dirty changes. Scope drift, remote/base drift, stale evidence, missing
-  context, or repeated no-progress findings return the work to planning or mark it blocked with
-  evidence. Follow [group-workspace.md](references/group-workspace.md) and
+- Keep the full local Repo inventory in the requirements master. `workflow.repositories` and the
+  approved quality contract and handoff contain only Repos requiring actual changes.
+  Unchanged Repos stay in the requirements master without a feature branch, commit, or handoff entry.
+  Record each delivery Repo path, branch identity, and command `cwd`. Product writes after approval require the corresponding recorded feature branch. Preserve unrelated dirty changes. Scope drift, remote/base drift, stale evidence, missing context, or repeated no-progress findings return the work to planning or mark it blocked with evidence. Follow [group-workspace.md](references/group-workspace.md) and
   [branch-policy.md](references/branch-policy.md) for recovery.
 - Never claim a test, review, acceptance, knowledge promotion, or commit that did not happen.
   If an independent reviewer is unavailable, stop at `awaiting_review`.

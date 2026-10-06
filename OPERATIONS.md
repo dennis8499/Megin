@@ -26,8 +26,12 @@ Skills. It neither executes project tests nor changes the workflow state.
 ## Work record
 
 Create one central `<Group>/docs/work/<Work ID>/workflow.md` with schema
-`megin-skills-workflow/v3`. One Work ID can cover one or several selected direct-child Repos. The
-record binds Group root, Repo paths, route, phase, status, plan version, requirements revision,
+`megin-skills-workflow/v3`. Every requirements master inventories all valid direct-child local Git
+Repos in the Group and records an evidence-backed purpose, current branch/HEAD/worktree state, and
+`needs change`, `no change`, or `needs research` disposition for each. A named Repo is a feature
+clue, not a discovery filter. `workflow.repositories`, the approved quality contract and handoff
+contain only Repos requiring actual changes. Unchanged Repos stay in the requirements inventory without a feature branch, commit or handoff item; compatibility checks are recorded as obligations of that change set. The record binds Group root, Repo
+paths, route, phase, status, plan version, requirements revision,
 acceptance scenarios, settings summary, Skills fingerprint, quality evidence, and delivery result refs. The approved plan and its quality contract bind
 each Repo's remote name/URL, base branch and exact remote commit, `feature/<Work ID>`, allowed paths,
 check commands with explicit `cwd`, a complete cross-Repo dependency/order graph, compatibility
@@ -56,7 +60,8 @@ changes and stop on path, remote, branch, scope, or evidence drift.
 
 Use `megin` for the complete route:
 
-1. Explore requirements and source-backed project knowledge without mutation.
+1. Inventory every local Group Repo, explore cross-Repo requirements and source-backed project
+   knowledge without mutation, and record each Repo's disposition in the requirements master.
 2. Define stable behavior scenarios and a dependency-ordered technical plan.
 3. Present one exact plan approval for the current Work ID and version.
 4. Recheck and fetch each exact remote base SHA, then create the named feature branch in each Repo;
@@ -102,7 +107,8 @@ reason and next action.
 Keep command, reviewer, and acceptance identities and outcomes as nonempty strings, and bind each
 one to an exact line in its hashed raw evidence rather than repeating an unchecked summary.
 
-Knowledge is read from each selected Repo and source-backed within that Repo's path space.
+Requirements discovery assesses every local Group Repo. Source-backed knowledge stays within each
+Repo's own path space; later knowledge scope and delivery are limited to the approved change set.
 Unsupported or conflicting claims stay pending. Knowledge review does not stage or commit. Finishing
 stages approved files and creates per-Repo feature commits after acceptance; it performs a local
 fast-forward and `--no-ff` merge only when exactly one Repo is selected. Any remote advancement,

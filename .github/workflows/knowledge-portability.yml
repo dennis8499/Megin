@@ -72,6 +72,7 @@ jobs:
           python -X utf8 -B tests/requirements-discovery/check_materials.py
           python -X utf8 -B tests/requirements-discovery/test_materials.py
           python -X utf8 -B tests/requirements-discovery/test_rules.py
+          python -X utf8 -B tests/requirements-discovery/test_all_repo_group.py
       - name: Validate quality gates and Group workspace behavior
         run: |
           python -X utf8 -B tests/quality-gates/test_quality_gate.py

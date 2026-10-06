@@ -15,8 +15,13 @@ against the protocol's completion conditions. If any major unknown could change 
 important risk, core behavior, or acceptance, return to requirements discovery and keep `phase: requirements` with
 `status: awaiting_user`; do not write or present a plan. Never treat a `ready_for_planning` flag, question count, or
 document existence as proof of completion.
-Read each selected Repo's own code, tests, project knowledge, remote configuration, base branch, and available validation commands. During planning query each exact remote ref with `git ls-remote --exit-code`; do not substitute a local tracking ref. Keep the smallest
-safe design; classify the work as small or large by impact and uncertainty rather than line count.
+Reconcile the requirements master against the current full local Group Repo inventory. Confirm every
+valid Repo has an evidence-backed change, no-change or research-needed disposition; never silently
+drop a Repo. Recheck unresolved evidence across the inventory, then inspect the code, tests, project
+knowledge, remote configuration, base branch and validation commands for every Repo that needs a
+change or compatibility check. Query each exact remote ref with `git ls-remote --exit-code`; do not
+substitute a local tracking ref. Keep the smallest safe design; classify the work as small or large
+by impact and uncertainty rather than line count.
 Resolve each Repo's remote and base branch field from explicit user input, an exact Repo override in
 optional `<Group>/.megin/group.json`, Group defaults, then existing project discovery. The config is
 not a Repo allowlist. Use `group_workspace.py resolve` to record each value's source and the config
@@ -30,8 +35,10 @@ obligation and snapshot contract. Map each observable result to a meaningful ass
 command, and required environment; split independently failing promises. Include failure paths
 only when the change makes them relevant. The plan remains the sole source of approved obligations.
 
-Write `plan.md` in the central Group Work ID record. It must bind the canonical Group root, each
-selected Repo path, remote name/URL, exact remote base SHA, `feature/<Work ID>`, Repo-relative allowed paths, and every check's
+Write `plan.md` in the central Group Work ID record. The requirements master remains the full local
+Group Scope; the plan and delivery list include only Repos with approved changes or compatibility
+checks. It must bind the canonical Group root, each change Repo path, remote name/URL, exact remote
+base SHA, `feature/<Work ID>`, Repo-relative allowed paths, and every check's
 explicit command and `cwd`, as well as the requirements revision, interfaces, dependency-ordered
 work packages, forbidden paths, acceptance scenarios, evidence locations, knowledge scope, and
 delivery mode, frozen settings resolution and sources, Skills fingerprint, and cross-Repo handoff

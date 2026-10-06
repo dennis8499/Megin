@@ -13,6 +13,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from check_repo_scope_materials import validate as validate_repo_scope_materials
+
 
 ROOT = Path(__file__).resolve().parents[2]
 MATERIALS = ROOT / "tests" / "requirements-discovery"
@@ -249,6 +251,7 @@ def validate(root: Path = ROOT) -> list[str]:
         for marker in ("PASS", "FAIL", "N/A", "來源捏造"):
             if marker not in rubric_text:
                 errors.append(f"scoring rubric is missing: {marker}")
+    errors.extend(validate_repo_scope_materials(root))
     return errors
 
 
@@ -260,7 +263,9 @@ def main() -> int:
     if errors:
         print("\n".join(errors))
         return 1
-    print("validated requirements-discovery materials: 11 cases, 6 source snapshots, and fixtures")
+    scope_manifest = json.loads((args.root / "tests" / "requirements-discovery" / "cases" / "all-local-repos.json").read_text(encoding="utf-8"))
+    scope_case_count = len(scope_manifest["cases"])
+    print(f"validated requirements-discovery materials: 11 research cases, {scope_case_count} all-local-Repo cases, 6 source snapshots, and fixtures")
     return 0
 
 

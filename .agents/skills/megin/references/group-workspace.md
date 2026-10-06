@@ -6,14 +6,15 @@
 
 使用者從 GitLab Group 根目錄啟動 Codex。該位置不是 Git repository；其中 `.agents/skills/` 放置整組 `megin*` Skills。Codex 會從目前工作目錄的 `.agents/skills/` 掃描 repository-local Skills；若 Skills 清單未更新，重新載入或啟動 Codex。不要把新工作的記錄放進個別 Repo。
 
-## Repo 選擇與路徑邊界
+## 全 Repo Scope 與路徑邊界
 
-1. 只列舉 Group 根目錄的直屬子目錄，再用每個候選目錄的 `git -C <path> rev-parse --show-toplevel` 確認它本身就是一個 Git Repo root。忽略一般資料夾、巢狀 Repo 和 Group 根目錄本身。
-2. 依使用者請求中的 Repo 名稱或 Group 相對路徑選定目標。若沒有指定、找不到 Repo 或名稱／路徑對應多個 Repo，先詢問並等待選擇，不猜測目標。
-3. 對每個選定 Repo，解析真實路徑，確認它是 Group 的直接子目錄、其 parent 正好是 Group root，且 Git top-level 正好等於該 Repo。拒絕 `..`、絕對路徑、穿越符號連結的路徑、巢狀 Repo 或任何逸出 Group 的路徑。
-4. 每個 Git 命令都明確使用 `git -C <selected-repo>`；每個專案測試或建置命令記錄明確的 `cwd`。從 Repo 讀取該 Repo 自己的 `AGENTS.md`、README、知識文件、測試規則與工具設定。不同 Repo 的文件或知識不可互相套用。
+1. 盤點 Group 根目錄的直屬項目；只將非 symlink／junction（reparse point）目錄納入候選。解析 Group root 與候選的 canonical real path，要求候選 real parent 等於 Group root，且 `git -C <candidate> rev-parse --show-toplevel` 回傳的 canonical Git top-level 正好等於該候選；不列入 Group root 本身、一般資料夾與巢狀 Repo。任何路徑無法安全解析、Git 身分不一致或檢查失敗時，記錄為待查證並停止讀取該路徑；不可跟隨越界連結。
+2. 需求探索涵蓋每個有效 Repo，不因使用者指定的 Repo、Group 設定或 GitLab 對應而縮小 Scope。Repo 名稱是功能線索。若名稱不存在或有歧義，先盤點全 Group，再詢問產品方向，不詢問要選哪個 Repo。
+3. 每次需求探索都記錄每個 Repo 的用途、相關程式／契約／測試與知識來源、跨 Repo 關係、分支、HEAD、工作樹狀態，及 `需要改動`、`無需改動` 或 `待查證` 判定和理由。已證明無需改動的 Repo 留在需求清單，但不加入 `workflow.repositories`、核准計畫的交付 Repo 清單或 handoff。
+4. 全 Repo 盤點沿用以上實體路徑檢查；對需要改動並要建立 feature branch 的 Repo，在規劃及每次產品寫入前再次解析真實路徑，確認其 parent 正好是 Group root 且 Git top-level 正好等於該 Repo。拒絕 `..`、絕對路徑、穿越符號連結的路徑、巢狀 Repo 或任何逸出 Group 的路徑。會阻礙全 Repo 盤點的邊界或讀取問題必須記錄。
+5. 每個 Git 命令都明確使用 `git -C <repo>`；每個專案測試或建置命令記錄明確的 `cwd`。從每個 Repo 讀取其自身的 `AGENTS.md`、README、知識文件、測試規則與工具設定。不同 Repo 的文件或知識不可互相套用。
 
-Group 工作可包含一個或多個已選 Repo，但只用一個 Work ID、一份需求、計畫、行為契約、審查、驗證和驗收紀錄。紀錄集中於 Group root 的 `docs/work/<Work ID>/`，不屬於任何產品 Repo，也不隨 feature commit 放進產品分支。
+需求探索 Scope 是目前 Group 中所有有效 Repo；每個 Work ID 的 `workflow.repositories`、核准品質契約與 handoff 只列需要實際變更並交付的 Repo。無需改動的 Repo 保留在 requirements 全 Repo 清單，不建立 feature branch、提交或 handoff 項目；相容性影響與必要驗收檢查記錄在需求與計畫中，交付義務依核准的變更集合建立。全 Repo 現況、證據和逐 Repo 判定記在同一份需求主檔；紀錄集中於 Group root 的 `docs/work/<Work ID>/`，不屬於任何產品 Repo，也不隨 feature commit 放進產品分支。
 
 ## Group 工作目錄
 

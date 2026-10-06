@@ -153,7 +153,41 @@ def main() -> int:
     finally:
         temporary.cleanup()
 
-    print("material checker regression tests passed: canonical, isolated references, duplicate IDs, bad-reference, and result-template cases")
+    temporary, root = isolated_copy()
+    try:
+        require_clean(root)
+        fixture_readme = (
+            root / "tests" / "requirements-discovery" / "fixtures" / "all-local-repos"
+            / "repos" / "orders-api" / "README.md"
+        )
+        fixture_readme.unlink()
+        require_failure(root, "Repo fixture is missing orders-api/README.md")
+    finally:
+        temporary.cleanup()
+
+    temporary, root = isolated_copy()
+    try:
+        require_clean(root)
+        scope_cases = root / "tests" / "requirements-discovery" / "cases" / "all-local-repos.json"
+        document = json.loads(scope_cases.read_text(encoding="utf-8"))
+        document["cases"][0]["id"] = document["cases"][1]["id"]
+        scope_cases.write_text(json.dumps(document), encoding="utf-8")
+        require_failure(root, "duplicate all-local-Repo case IDs")
+    finally:
+        temporary.cleanup()
+
+    temporary, root = isolated_copy()
+    try:
+        require_clean(root)
+        scope_cases = root / "tests" / "requirements-discovery" / "cases" / "all-local-repos.json"
+        document = json.loads(scope_cases.read_text(encoding="utf-8"))
+        document["cases"][0]["id"] = {"invalid": ["id"]}
+        scope_cases.write_text(json.dumps(document), encoding="utf-8")
+        require_failure(root, "all-local-Repo case IDs must use REPO-SCOPE-NNN")
+    finally:
+        temporary.cleanup()
+
+    print("material checker regression tests passed: source snapshots, historical cases, Repo fixture references, and duplicate IDs")
     return 0
 
 

@@ -33,11 +33,15 @@ delivery, and completion evidence; they do not run product commands or advance w
 
 ## 需求探索
 
+Megin 的需求探索 Scope 固定涵蓋目前 Group 根目錄下所有有效的直屬本地 Git Repo，包括尚未對應 GitLab 的 Repo。Repo 名稱只是功能線索，未指定 Repo 時不會先詢問要分析哪個 Repo；每個 Repo 都會在需求主檔中列出用途、來源、跨 Repo 關係及「需要改動／無需改動／待查證」判定。
+
 面對陌生外部框架、版本差異或「完整支援」等廣泛需求時，需求探索會先依
 `.agents/skills/megin/references/requirements-discovery-protocol.md` 查證必要來源，建立
 `SRC-*`、`CAP-*`、`Q-*` 與 `SCN-*` 的能力和決策覆蓋，再一次提出一個前提已具備且影響最高的問題。
 上游能力、整合能力與應用層需求分開記錄；重大未知、矛盾或會改變驗收的延後事項會留在
 `phase: requirements`，不會因題數或 `ready_for_planning` 欄位而提前交接。
+
+需求探索包含每個 Repo，交付集合只包含確實需要實際改動的 Repo；無需改動的 Repo 留在需求 Scope，不建立 feature branch、提交或 handoff 項目。相容性影響與必要檢查記在需求及計畫，並依核准的改動集合安排。選填的 `.megin/group.json` 可設定 remote 與 base branch，但不會限縮需求探索的 Repo 清單。
 
 `tests/requirements-discovery/` 提供官方來源摘要、最小 fixtures、案例、評分規準與結構檢查器。
 檢查器只驗證材料參照與雜湊，不代表模型對話行為已完成評測；後續新舊模型比較需另行保存對話、工具
@@ -83,11 +87,14 @@ never reused as current authorization.
 
 ## Workflow rules
 
-The first pass is read-only. Megin selects only Group direct-child Git repos identified by the
-request, then reads each selected Repo's own instructions, branch, status, relevant code, tests, and
-source-backed knowledge. If the Repo is missing or ambiguous, it asks which one. Git commands always
+The first pass is read-only. Megin inventories every valid Group direct-child Git Repo, then reads
+each Repo's own instructions, purpose, branch, HEAD, status, relevant code, tests, and source-backed
+knowledge. A named Repo is a feature clue, not a scope filter; if a name is missing or ambiguous,
+Megin asks about the product behavior after assessing the complete inventory. Git commands always
 name the target Repo; paths outside the Group, nested repos, and symlink escapes are rejected.
-Existing central Work ID records are read at the Group root. A request is classified
+The requirements master records the full Repo inventory and a sourced change/no-change/research
+disposition. `workflow.repositories`, the approved quality contract and handoff contain only Repos requiring actual changes.
+Unchanged Repos stay in the requirements inventory without a feature branch, commit or handoff item; compatibility checks are recorded as obligations of the approved change set. Existing central Work ID records are read at the Group root. A request is classified
 as read-only, small, large, or bug. A suspected bug is reproduced and assessed before repair; an
 explanation of a bug ends with evidence and does not silently become a fix.
 

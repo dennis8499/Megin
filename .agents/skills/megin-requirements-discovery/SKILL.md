@@ -9,16 +9,18 @@ Read [../megin/references/language-policy.md](../megin/references/language-polic
 [../megin/references/group-workspace.md](../megin/references/group-workspace.md),
 [../megin/references/branch-policy.md](../megin/references/branch-policy.md), and
 [../megin/references/requirements-discovery-protocol.md](../megin/references/requirements-discovery-protocol.md)
-before creating or updating a Group work document. Resolve the direct-child Repo(s) from the request and ask if
-selection is missing or ambiguous. Work read-only. Inspect each selected Repo's instructions, relevant code, tests,
-project knowledge, current branch, and the Group's active work records before asking questions. Resolve facts from evidence
-and apply the protocol's research trigger, capability coverage, question dependency, and completion rules. An optional
-Group settings file is not a Repo allowlist; config precedence is resolved during planning. Requirements work does not
-claim the Group write lock.
+before creating or updating a Group work document. Work read-only and inventory every valid local
+direct-child Git Repo in the Group, even when the request names one Repo or none. Inspect each Repo's
+own instructions, README/project purpose, branch, HEAD, status, relevant code, tests and
+source-backed project knowledge before asking a question. Do not ask the user to select a Repo.
+Record each Repo's purpose, evidence, cross-Repo relationship and `需要改動`、`無需改動` or
+`待查證` disposition in the requirements master. A Group settings file is not a Repo allowlist;
+resolve delivery settings only for Repos that need changes during planning. Requirements work does
+not claim the Group write lock.
 
 When the protocol identifies a major unknown that could change the product choice, core behavior, important risk,
-interface, or acceptance, ask exactly one prerequisite-ready highest-impact question in Traditional Chinese and wait
-for the user's answer. Keep the Work ID at `phase: requirements` and `status: awaiting_user`, record sources,
+interface, or acceptance, ask exactly one prerequisite-ready highest-impact product question in Traditional Chinese
+and wait for the user's answer. Keep the Work ID at `phase: requirements` and `status: awaiting_user`, record sources,
 capabilities, decisions, blockers, and the unanswered question, and do not claim that requirements are complete or
 hand off to planning. On resume, re-check the remaining unknowns and absorb every answer already supplied. When the
 information is sufficient, do not ask a formal extra question merely to satisfy a template.
@@ -36,5 +38,5 @@ request, report evidence without creating a change candidate. Finish this phase 
 can review a bounded candidate and all discoverable facts have source paths or locators. A `ready_for_planning` field
 is only a summary and never replaces the completion check.
 
-Handoff: `phase: planning` in the central Group record, with the exact requirements revision and selected Repo(s) recorded. A changed goal, scope, or
+Handoff: `phase: planning` in the central Group record, with the exact requirements revision and full local Group Repo inventory recorded. A changed goal, per-Repo disposition, or
 acceptance criterion creates a new revision and requires planning again.
