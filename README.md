@@ -13,6 +13,12 @@ The bundle keeps a complete delivery path:
 
 `requirements → behavior contract and plan → one plan approval → per-repo feature branches → BDD/TDD implementation → fresh review → automated verification → human acceptance → mode-specific delivery`
 
+## Megin 0.3.0
+
+Requirements discovery inventories every valid direct-child Repo in the Group, records an evidence-backed disposition for each, and treats a named Repo as a feature clue. Only Repos that need changes enter the approved implementation plan and handoff; unchanged Repos remain in the requirements inventory without a feature branch or commit.
+
+The release adds permanent multi-Repo discovery fixtures and static contract checks. These checks validate the materials and fixture behavior; model evaluation has not been run.
+
 ## Delivery modes
 
 The approved plan fixes one delivery mode before implementation. Each mode retains the same review, verification, human acceptance, and accepted-snapshot requirements.
