@@ -167,8 +167,14 @@ def validate(root: Path) -> list[str]:
             errors.append(f"{entry}: name {declared!r} does not match directory")
         if len(description) < 20:
             errors.append(f"{entry}: description is too short for discovery")
-        if "group-workspace.md" not in entry.read_text(encoding="utf-8"):
-            errors.append(f"{entry}: missing Group workspace contract reference")
+        entry_text = entry.read_text(encoding="utf-8")
+        has_repo_contract = "repository-workflow.md" in entry_text
+        has_workspace_overlay_contract = (
+            "group-workspace.md" in entry_text
+            and (root / "megin" / "references" / "group-workspace.md").is_file()
+        )
+        if not (has_repo_contract or has_workspace_overlay_contract):
+            errors.append(f"{entry}: missing single-repository workflow contract reference")
         if not metadata.is_file():
             errors.append(f"{name}: missing agents/openai.yaml")
         elif "allow_implicit_invocation: true" not in metadata.read_text(encoding="utf-8"):

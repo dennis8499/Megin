@@ -12,9 +12,7 @@ on:
       - ".github/workflows/knowledge-portability.yml"
       - ".gitattributes"
       - ".gitignore"
-      - "tests/requirements-discovery/**"
       - "tests/quality-gates/**"
-      - "tests/group-workspace/**"
 
 jobs:
   skills:
@@ -67,15 +65,7 @@ jobs:
           git --version
       - name: Validate Skills source and distributable archive
         run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
-      - name: Validate requirements-discovery materials and behavior
-        run: |
-          python -X utf8 -B tests/requirements-discovery/check_materials.py
-          python -X utf8 -B tests/requirements-discovery/test_materials.py
-          python -X utf8 -B tests/requirements-discovery/test_rules.py
-          python -X utf8 -B tests/requirements-discovery/test_all_repo_group.py
-      - name: Validate quality gates and Group workspace behavior
+      - name: Validate single-Repo quality gates and delivery
         run: |
           python -X utf8 -B tests/quality-gates/test_quality_gate.py
-          python -X utf8 -B tests/group-workspace/test_group_workflow.py
-          python -X utf8 -B tests/group-workspace/test_workspace_hardening.py
-          python -X utf8 -B tests/group-workspace/test_gitlab_delivery.py
+          python -X utf8 -B tests/quality-gates/test_repo_workflow.py

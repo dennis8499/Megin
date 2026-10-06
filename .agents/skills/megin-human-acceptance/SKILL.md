@@ -3,35 +3,11 @@ name: megin-human-acceptance
 description: Guide the Megin human acceptance gate using only approved user-visible scenarios. Use after automated verification, 人工驗收、使用者驗測、驗收確認; do not stage, commit, or promote knowledge before acceptance.
 ---
 
+
 # Megin human acceptance
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and
-[../megin/references/group-workspace.md](../megin/references/group-workspace.md) and
-[../megin/references/branch-policy.md](../megin/references/branch-policy.md) before presenting or
-recording acceptance. Show user operations and expected results in Traditional Chinese, preserving
-Work IDs, versions, paths, commands, and other control values verbatim.
+Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md). Use this stage only after independent review and automated verification pass for the same snapshot.
 
-Use only after a fresh review and automated verification pass. Present the Work ID, acceptance
-version, Group root, all selected Repo paths, each Repo's remote, `base_branch`, `base_commit`,
-`feature_branch`, delivery mode, environment, each approved user operation, and its expected
-observable result. The user accepts the exact composite snapshot across all Repos and protected
-Group files. Every remote base must still match its recorded target before delivery. Do not turn internal
-tests or reviewer checks into extra manual work.
-For a new or resumed change, require the Group `acceptance` gate with `--group-root` and `--work-id`
-from [../megin/references/quality-gates.md](../megin/references/quality-gates.md) to pass first. A
-structural pass is not the user's acceptance response. Validate the v3 record and confirm the Group
-lock remains with this Work ID/writer. Keep it while waiting; do not release or expire it because the
-user response is pending.
+Present the Work ID, plan and acceptance versions, selected Repo, approved user operations, and expected observable results in the user's language. Run the read-only `acceptance` gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate acceptance`. Automated checks are not the user's acceptance.
 
-Wait for a response that identifies the displayed Work ID and acceptance version and confirms the
-listed scenarios. Record the response, timestamp, and accepted composite snapshot in the central
-`workflow.md`. If a scenario fails, any remote base drifts, or the Group snapshot changes, record the observed result
-and return to the affected implementation task for a new review and verification cycle. Before this
-response, do not update formal knowledge, stage paths, create a feature commit, or merge into the
-base branch.
-The cited raw acceptance record starts with the exact machine-readable `work_id`, `version`,
-`snapshot`, and `verdict: ACCEPTED` lines from the shared reference, followed by the user's response.
-
-Handoff: `phase: delivery` and an exact acceptance record, or a named failed scenario with the next
-repair action. Delivery creates feature commits for all selected Repos; only a single-Repo Work ID
-performs a local `--no-ff` integration. Acceptance itself never creates commits or merges.
+Wait for a response that clearly accepts or rejects the displayed scenarios and version. Record the user's words, timestamp, and snapshot in the predeclared evidence. A failure or changed snapshot returns the work to repair, review, and verification. Do not stage, commit, merge, or promote project knowledge before acceptance. Handoff: explicit acceptance of the exact Work ID/version or a named failed scenario.
