@@ -10,4 +10,6 @@ Read [../megin/references/repository-workflow.md](../megin/references/repository
 
 Inspect the approved plan, changed paths, implementation, tests, and relevant Repo documentation. Trace each promised behavior to code and meaningful assertions. Look for correctness defects, regressions, unsafe input handling, missing failure cases, and stale or unsupported claims. Cite exact file and line locations. Do not modify files or stage changes.
 
+For contracts with [verification extensions](../megin/references/verification-extensions.md), verify every scenario's observable assertion, implementation paths and check mapping. Confirm tests consume the pinned input bytes and that raw output binds their digest; structural completeness alone does not prove behavior.
+
 Run the read-only review gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate review`. A passing structural gate does not substitute for reasoning about behavior. Record the reviewer context, `APPROVED` or `NEEDS_REVISION`, snapshot, findings, and raw evidence. Handoff only when the review is complete; any repair requires a new snapshot and independent review.

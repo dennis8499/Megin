@@ -12,6 +12,12 @@ The JSON contract records:
 - `allowed_paths`, the approved check list, and exact `process_records`;
 - `quality_ref`, `delivery_ref`, and the approved `skills_sha256`.
 
+Optional `verification_inputs`, `scenario_ids`, `behavior_trace` and
+`runner_preflight` follow [verification-extensions.md](verification-extensions.md).
+Omitted fields preserve legacy snapshot behavior. Fixed inputs participate in
+review, staged delivery and committed tree digests, and require raw digest proof.
+Completed delivery can export a separate [historical receipt](delivery-receipts.md).
+
 Each check has a unique `id`, `kind` (`test` or `command`), exact command, and exact Repo-relative `cwd`. Every source and raw output cited by evidence must be a declared process record under this Work ID's `evidence/` directory. Plans, tests, fixtures, and project docs stay in the product snapshot unless their exact path is declared as a process record.
 
 ## Snapshot and check commands

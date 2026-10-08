@@ -29,7 +29,8 @@ class RepoWorkflowTests(unittest.TestCase):
         self.temp = Path(self.temporary.name)
         self.repo = self.temp / "repo"
         self.repo.mkdir()
-        shutil.copytree(SKILL_ROOT, self.repo / ".agents" / "skills")
+        shutil.copytree(SKILL_ROOT, self.repo / ".agents" / "skills",
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         self.git("init", "-b", "main")
         self.git("config", "user.name", "Repo Workflow Test")
         self.git("config", "user.email", "repo-workflow@example.invalid")

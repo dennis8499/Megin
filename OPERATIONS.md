@@ -12,6 +12,8 @@ New work records use `<Repo>/docs/work/<Work ID>/workflow.md` with `megin-repo-w
 
 Use `quality_gate.py snapshot|check --repo <Repo> --work-id <Work ID>`; `check` accepts `--gate review|acceptance|delivery|completion`. Use `repo_workspace.py fingerprint|claim|check|release --repo <Repo>` for the Skills fingerprint and per-Repo writer lock. The helper checks structures and evidence; it does not run project tests or claim that review was independent.
 
+Optional [verification extensions](.agents/skills/megin/references/verification-extensions.md) use `verification_inputs.py --repo <Repo> --work-id <Work ID> --destination <empty-system-temp-directory>` and `behavior_trace.py --repo <Repo> --work-id <Work ID>`. Export a completed Work with `delivery_receipt.py --repo <Repo> --work-id <Work ID>`; see [receipt ownership and historical validation](.agents/skills/megin/references/delivery-receipts.md) before archiving with `--output`.
+
 ## Validate and package
 
 From the repository root, run:
@@ -20,6 +22,7 @@ From the repository root, run:
 python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py
 python -X utf8 -B tests/quality-gates/test_quality_gate.py
 python -X utf8 -B tests/quality-gates/test_repo_workflow.py
+python -X utf8 -B tests/quality-gates/test_delivery_evidence.py
 python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --build-archive megin-skills.zip --archive megin-skills.zip
 ```
 

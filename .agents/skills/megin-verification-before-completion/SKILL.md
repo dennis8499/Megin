@@ -10,4 +10,6 @@ Read [../megin/references/repository-workflow.md](../megin/references/repository
 
 Run every approved check from its recorded working directory and preserve raw output, exit code, and test counts. Include relevant static, contract, regression, and full-suite checks already named by the plan. Do not substitute a convenient passing check for an approved obligation. Compare the snapshot before and after; any change requires a fresh review and verification.
 
+When declared, run the [runner preflight and fixed-input helpers](../megin/references/verification-extensions.md) before checks. Use the materialized committed bytes, bind their digest in both structured results and raw output, and preserve each SCN's observable assertion. Resolve runner failures before proceeding.
+
 Run the read-only `acceptance` gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate acceptance`. This gate checks current evidence and independent review; it does not represent user acceptance. Report failures with exact evidence and keep the workflow out of delivery until all checks pass.

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 
+sys.dont_write_bytecode = True
 
 
 WORK_ID_PATTERN = re.compile(r"work-[0-9]{8}-[a-z0-9-]+\Z")
@@ -171,6 +172,10 @@ def load_contract(repo: Path, work_id: str) -> tuple[dict[str, str], dict, set[s
             or fields.get("delivery_ref") != delivery_ref
         ):
             raise InvalidEvidence("workflow and contract evidence references differ")
+    from behavior_trace import validate_trace
+    from verification_inputs import validate_inputs
+    validate_trace(contract)
+    validate_inputs(repo, contract.get("verification_inputs"), set(ids))
     return fields, contract, record_set
 
 
@@ -217,10 +222,37 @@ def index_entries(repo: Path, work_id: str, records: set[str]) -> list[dict[str,
     return sorted(entries, key=lambda item: item["path"])
 
 
+def fixed_inputs(repo: Path, contract: dict) -> list[dict]:
+    from verification_inputs import validate_inputs
+    return validate_inputs(repo, contract.get("verification_inputs"), {c["id"] for c in contract["checks"]})
+
+
+def with_inputs(entries: list[dict], inputs: list[dict]) -> list[dict]:
+    from verification_inputs import snapshot_entries
+    return entries + snapshot_entries(inputs)
+
+
+def validate_input_evidence(repo, work_id, records, contract, evidence, reasons) -> None:
+    if contract.get("verification_inputs") is None:
+        return
+    from verification_inputs import canonical_digest
+    inputs = fixed_inputs(repo, contract)
+    digest = canonical_digest(inputs)
+    ids = {identifier for item in inputs for identifier in item["check_ids"]}
+    for result in evidence.get("checks", []):
+        if not isinstance(result, dict) or result.get("id") not in ids:
+            continue
+        if result.get("verification_inputs_sha256") != digest:
+            reasons.append(f"{result['id']}: fixed input digest missing or changed")
+        cited_claims(repo, work_id, records, result.get("output"), result["id"], reasons,
+                     {"verification_inputs": f"Verification inputs SHA-256: {digest}"})
+
+
 def snapshot(repo: Path, work_id: str) -> dict[str, object]:
     _fields, contract, records = load_contract(repo, work_id)
-    entries = worktree_entries(repo, work_id, records)
-    return {
+    inputs = fixed_inputs(repo, contract)
+    entries = with_inputs(worktree_entries(repo, work_id, records), inputs)
+    result = {
         "schema": ("megin-repo-quality-snapshot/v1"
                    if contract.get("schema") == "megin-repo-quality-contract/v1"
                    else "megin-quality-snapshot/v1"),
@@ -229,6 +261,10 @@ def snapshot(repo: Path, work_id: str) -> dict[str, object]:
         "product_sha256": digest_entries(entries),
         "path_count": len(entries),
     }
+    if contract.get("verification_inputs") is not None:
+        from verification_inputs import canonical_digest
+        result.update(verification_inputs=inputs, verification_inputs_sha256=canonical_digest(inputs))
+    return result
 
 
 def cited_file(
@@ -425,6 +461,7 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
         repo, work_id, records, checks, evidence, digest, reasons,
         require_pass=gate in ("acceptance", "delivery"),
     )
+    validate_input_evidence(repo, work_id, records, contract, evidence, reasons)
 
     if gate in ("review", "acceptance"):
         staged = product_paths(
@@ -486,7 +523,8 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
                         "verdict": f"- verdict: {acceptance_verdict}",
                     },
                 )
-            if (not valid_acceptance_fields or accepted_work != work_id
+            if (acceptance.get("actor_kind", "human") != "human"
+                    or not valid_acceptance_fields or accepted_work != work_id
                     or acceptance_verdict != "ACCEPTED"
                     or accepted_snapshot != digest):
                 reasons.append("human acceptance does not bind current Work ID and snapshot")
@@ -498,7 +536,7 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
         )
         if unstaged:
             reasons.append("unstaged or untracked product paths remain before delivery")
-        staged_digest = digest_entries(index_entries(repo, work_id, records))
+        staged_digest = digest_entries(with_inputs(index_entries(repo, work_id, records), fixed_inputs(repo, contract)))
         staged_paths = sorted(product_paths(
             path_set(repo, "diff", "--cached", "--name-only", base_commit),
             work_id, records,
@@ -533,7 +571,7 @@ def _check_remote_base(repo: Path, contract: dict, reasons: list[str]) -> None:
         reasons.append(f"remote base check failed: {exc}")
 
 
-def _tree_digest(repo: Path, commit: str, records: set[str], work_id: str) -> str:
+def tree_entries(repo: Path, commit: str, records: set[str], work_id: str) -> list[dict]:
     entries: list[dict[str, str]] = []
     raw = git(repo, "ls-tree", "-r", "-z", "--full-tree", commit)
     for record in raw.split(b"\0"):
@@ -544,10 +582,14 @@ def _tree_digest(repo: Path, commit: str, records: set[str], work_id: str) -> st
         relative = raw_path.decode("utf-8")
         if not process_record(relative, work_id, records):
             entries.append({"path": relative, "content": object_id})
-    return digest_entries(sorted(entries, key=lambda item: item["path"]))
+    return sorted(entries, key=lambda item: item["path"])
 
 
-def check_completion(repo: Path, work_id: str) -> dict[str, object]:
+def _tree_digest(repo: Path, commit: str, records: set[str], work_id: str, inputs=None) -> str:
+    return digest_entries(with_inputs(tree_entries(repo, commit, records, work_id), inputs or []))
+
+
+def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> dict[str, object]:
     """Verify the accepted feature commit and its local --no-ff integration."""
     fields, contract, records = load_contract(repo, work_id)
     if contract.get("schema") != "megin-repo-quality-contract/v1":
@@ -556,6 +598,8 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
         raise InvalidEvidence("workflow is not the matching megin-repo-workflow/v1 record")
     if fields.get("phase") != "delivery" or fields.get("status") not in ("active", "complete"):
         raise InvalidEvidence("completion requires the delivery phase")
+    if historical and fields.get("status") != "complete":
+        raise InvalidEvidence("historical receipt requires completed local delivery")
     reference = canonical_relative(fields.get("quality_ref", ""))
     if reference not in records:
         raise InvalidEvidence("workflow quality_ref is not an approved process record")
@@ -568,7 +612,7 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
     ):
         raise InvalidEvidence("quality evidence identity mismatch")
     accepted_snapshot = evidence.get("snapshot")
-    if snapshot(repo, work_id).get("product_sha256") != accepted_snapshot:
+    if not historical and snapshot(repo, work_id).get("product_sha256") != accepted_snapshot:
         reasons.append("product snapshot differs from accepted evidence")
     if (delivery.get("schema"), delivery.get("work_id"), delivery.get("plan_version")) != (
         "megin-repo-delivery-result/v1", work_id, fields.get("plan_version"),
@@ -599,6 +643,7 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
         accepted_snapshot if isinstance(accepted_snapshot, str) else "", reasons,
         require_pass=True,
     )
+    validate_input_evidence(repo, work_id, records, contract, evidence, reasons)
     writer = evidence.get("writer")
     writer_context = writer.get("context") if isinstance(writer, dict) else None
     writer_snapshot = writer.get("snapshot") if isinstance(writer, dict) else None
@@ -649,7 +694,8 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
         version = acceptance.get("version")
         acceptance_snapshot = acceptance.get("snapshot")
         verdict = acceptance.get("verdict")
-        if (accepted_work != work_id or not isinstance(version, str) or not version
+        if (acceptance.get("actor_kind", "human") != "human"
+                or accepted_work != work_id or not isinstance(version, str) or not version
                 or acceptance_snapshot != accepted_snapshot or verdict != "ACCEPTED"):
             reasons.append("human acceptance does not bind the accepted snapshot")
         cited_claims(
@@ -671,9 +717,15 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
             parents = line(repo, "show", "-s", "--format=%P", feature_commit).split()
             if parents != [base_commit]:
                 reasons.append("feature commit must directly descend from approved base_commit")
-            if _tree_digest(repo, feature_commit, records, work_id) != accepted_snapshot:
+            if _tree_digest(repo, feature_commit, records, work_id, fixed_inputs(repo, contract)) != accepted_snapshot:
                 reasons.append("feature commit tree differs from accepted product snapshot")
-            if line(repo, "rev-parse", contract["feature_branch"]) != feature_commit:
+            if historical:
+                prefix = f"docs/work/{work_id}/"
+                protected = [e for e in tree_entries(repo, feature_commit, records, work_id) if e["path"].startswith(prefix)]
+                current_protected = [e for e in worktree_entries(repo, work_id, records) if e["path"].startswith(prefix)]
+                if protected != current_protected:
+                    reasons.append("protected historical work records changed")
+            elif line(repo, "rev-parse", contract["feature_branch"]) != feature_commit:
                 reasons.append("approved feature branch no longer points to feature_commit")
         except InvalidEvidence as exc:
             reasons.append(f"feature commit cannot be verified: {exc}")
@@ -682,13 +734,13 @@ def check_completion(repo: Path, work_id: str) -> dict[str, object]:
             parents = line(repo, "show", "-s", "--format=%P", merge_commit).split()
             if parents != [base_commit, feature_commit]:
                 reasons.append("local merge must be a --no-ff merge of approved base and feature commits")
-            if line(repo, "rev-parse", f"refs/heads/{contract['base_branch']}") != merge_commit:
+            if not historical and line(repo, "rev-parse", f"refs/heads/{contract['base_branch']}") != merge_commit:
                 reasons.append("local base branch does not point to merge_commit")
             if line(repo, "rev-parse", f"{merge_commit}^{{tree}}") != line(repo, "rev-parse", f"{feature_commit}^{{tree}}"):
                 reasons.append("local merge tree differs from accepted feature tree")
         except InvalidEvidence as exc:
             reasons.append(f"local merge cannot be verified: {exc}")
-    if contract.get("remote_name") is not None:
+    if not historical and contract.get("remote_name") is not None:
         _check_remote_base(repo, contract, reasons)
     return {
         "gate": "completion", "ok": not reasons, "snapshot": accepted_snapshot,

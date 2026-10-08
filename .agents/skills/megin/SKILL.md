@@ -31,6 +31,8 @@ Use `$megin-requirements-discovery`, `$megin-technical-planning`, `$megin-behavi
 
 The approved contract binds one Repo, a pinned base, feature branch, allowed paths, exact checks, declared evidence records, and the Skills fingerprint. Use `quality_gate.py snapshot|check --repo <Repo> --work-id <Work ID>`; `check` also takes `--gate review|acceptance|delivery|completion`. The helper is read-only. It does not prove that a test covers the intended behavior or that review was independent.
 
+When the approved plan uses fixed committed inputs, scenario tracing or runner probes, read [verification-extensions.md](references/verification-extensions.md). For a completed Work's historical delivery export, read [delivery-receipts.md](references/delivery-receipts.md).
+
 Stop on missing approval, unknown requirements that change behavior, a changed Skills fingerprint, base or remote drift, scope violations, stale evidence, failed checks, or a lock owned by another writer. Preserve evidence and describe the next action. Do not force-unlock a Repo or write outside the selected Repo.
 
 Native Megin does not scan or coordinate other Repos and does not prepare GitLab issues, merge requests, or workspace handoffs. If work spans multiple repositories, create separately approved single-Repo workflows or use the GitlabWorkSpace distribution that provides its own Group workflow.

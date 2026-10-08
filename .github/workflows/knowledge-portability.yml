@@ -69,3 +69,4 @@ jobs:
         run: |
           python -X utf8 -B tests/quality-gates/test_quality_gate.py
           python -X utf8 -B tests/quality-gates/test_repo_workflow.py
+          python -X utf8 -B tests/quality-gates/test_delivery_evidence.py

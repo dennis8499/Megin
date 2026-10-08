@@ -22,4 +22,6 @@ Product changes begin only after approval of the exact plan. Megin uses a per-Re
 
 New records use `megin-repo-workflow/v1`, `megin-repo-quality-contract/v1`, and `megin-repo-quality-evidence/v1`. Historical records remain in place. Read [the single-Repo workflow](.agents/skills/megin/references/repository-workflow.md) and [quality gates](.agents/skills/megin/references/quality-gates.md) for the complete contract.
 
+The v1 contracts optionally support [fixed committed inputs, scenario tracing and runner preflight](.agents/skills/megin/references/verification-extensions.md). Completed work can export a [historical delivery receipt](.agents/skills/megin/references/delivery-receipts.md) for a fixed MergeReviewer review. These tools use `--repo` and `--work-id` and keep human acceptance in the native workflow. This local sync preserves version 0.4.0.
+
 GitlabWorkSpace carries a separate overlay for Group scanning, cross-Repo work, centralized records, locks, GitLab issues, and merge requests. Those capabilities are not part of this native Megin package.

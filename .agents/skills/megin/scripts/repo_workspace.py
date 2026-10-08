@@ -12,6 +12,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 import quality_gate
 
 
