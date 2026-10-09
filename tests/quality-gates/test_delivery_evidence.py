@@ -25,7 +25,7 @@ class DeliveryEvidenceTests(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.fixture.prepare_work()
-        self.repo = self.fixture.repo
+        self.repo = self.fixture.repo.resolve()
         self.work = workflow.REPO_WORK_ID
         self.folder = self.repo / "docs/work" / self.work
         self.contract_path = self.folder / "plan-1/quality-contract.json"
