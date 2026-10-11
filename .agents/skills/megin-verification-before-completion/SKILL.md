@@ -13,3 +13,5 @@ Run every approved check from its recorded working directory and preserve raw ou
 When declared, run the [runner preflight and fixed-input helpers](../megin/references/verification-extensions.md) before checks. Use the materialized committed bytes, bind their digest in both structured results and raw output, and preserve each SCN's observable assertion. Resolve runner failures before proceeding.
 
 Run the read-only `acceptance` gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate acceptance`. This gate checks current evidence and independent review; it does not represent user acceptance. Report failures with exact evidence and keep the workflow out of delivery until all checks pass.
+
+New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.

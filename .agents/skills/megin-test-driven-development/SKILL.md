@@ -11,3 +11,5 @@ Read [../megin/references/language-policy.md](../megin/references/language-polic
 For each behavior, identify an assertion that would fail before the implementation, run it and preserve its output, then make the smallest implementation change and rerun it. A syntax/import/setup failure is not evidence that the behavior test is red. Add relevant boundary and failure cases. Run focused and approved broader checks, recording exact commands, working directories, exit codes, and test counts.
 
 Before each file write, verify the Repo lock with `repo_workspace.py check --repo <Repo> --work-id <Work ID> --writer <identity>`. Keep tests and code within approved paths. Do not stage or commit. Handoff: red/green evidence tied to the same approved scenario and current snapshot.
+
+For native v2, [new-work-evidence.md](../megin/references/new-work-evidence.md) requires one valid raw red/green cycle per BDD scenario. A red must execute a test and fail its intended assertion; import, setup, environment, zero-test and skipped-test failures do not count. Keep exact command, cwd, counts, sequence and unchanged test digest in both raw outputs.

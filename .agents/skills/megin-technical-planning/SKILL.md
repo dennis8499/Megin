@@ -10,6 +10,8 @@ Read [../megin/references/repository-workflow.md](../megin/references/repository
 
 Turn approved requirements and BDD scenarios into an executable plan with ordered tasks, Repo-relative allowed paths, interfaces, test assertions, exact commands and working directories, knowledge updates, independent review, user acceptance, and local delivery. Record the current base branch and full SHA. The remote is optional; include exact remote name/URL and base SHA only when the user explicitly selects it.
 
-Compute the installed Skills fingerprint and include it in `megin-repo-quality-contract/v1`. Predeclare every process record, including quality evidence and delivery result, before capturing a snapshot. The plan and contract must agree on Work ID, version, branch, paths, checks, and acceptance. Present risks, assumptions, and user-visible delivery behavior for explicit approval. Do not write product files before approval.
+Compute the installed Skills fingerprint and include it in `megin-repo-quality-contract/v2`. Predeclare every process record, including quality evidence and delivery result, before capturing a snapshot. The plan and contract must agree on Work ID, version, branch, paths, checks, and acceptance. Present risks, assumptions, and user-visible delivery behavior for explicit approval. Do not write product files before approval.
 
 For reproducible verification, use the optional fields in [verification-extensions.md](../megin/references/verification-extensions.md): pin input bytes to commits in this Repo, map every SCN to observable assertions and checks, and declare exact read-only runner probes. Predeclare `evidence/receipt.json` when a historical delivery receipt is requested.
+
+New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.

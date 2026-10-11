@@ -11,3 +11,5 @@ Read [language-policy.md](../megin/references/language-policy.md), [repository-w
 Write observable Given/When/Then scenarios for one selected Repo. Keep Gherkin keywords, Work IDs, paths, and control identifiers in English; write scenario descriptions in the user's language. Derive every scenario from approved requirements. Include relevant normal, boundary, failure, retry, and recovery behavior. Do not invent behavior or turn implementation details into user outcomes.
 
 Store feature files and their step definitions within the approved Repo paths. Map each scenario to an assertion and an approved quality command. Preserve existing project conventions and avoid duplicating coverage without a reason. Handoff: reviewed scenarios with traceability to requirements, implementation paths, test commands, and human acceptance operations.
+
+New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.

@@ -13,3 +13,5 @@ Confirm the Work ID, approved feature branch, accepted snapshot, allowed paths, 
 Commit the accepted feature snapshot on the approved feature branch. Switch to the approved local base branch and integrate with `git merge --no-ff <feature-branch>`. Record full feature and merge SHAs. Run the `completion` gate; it checks the accepted tree, feature parent, exact two merge parents, merge tree, base pointer, and optional remote. Only after it passes, set `phase: delivery`, `status: complete`, then release the lock with `repo_workspace.py release`. Keep the lock on any failure. Native delivery is local; do not push or create a pull/merge request.
 
 When requested, export the [historical delivery receipt](../megin/references/delivery-receipts.md) after completion. Archive only at the predeclared `evidence/receipt.json`; preserve a different existing receipt and report its mismatch.
+
+New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.

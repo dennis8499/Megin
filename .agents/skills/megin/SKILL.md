@@ -11,7 +11,7 @@ Megin operates on exactly one Git repository: the current repository root or one
 
 1. Confirm the selected path is the Git root with `git rev-parse --show-toplevel`. Do not scan sibling folders or infer a larger workspace.
 2. Read the Repo's source files, tests, documentation, and relevant `docs/` knowledge. Search for an existing matching Work ID under `docs/work/`; resume its earliest incomplete approved action. Do not reuse a completed or unrelated record.
-3. For a new request, create a unique Work ID and a `megin-repo-workflow/v1` record in `docs/work/<Work ID>/workflow.md`. The first pass is read-only. Ask focused questions only for missing product decisions.
+3. For a new request, create a unique Work ID and a `megin-repo-workflow/v2` record in `docs/work/<Work ID>/workflow.md`. The first pass is read-only. Explore the problem, audience, desired outcome and acceptance without prescribing a solution. Inventory the entire selected Repo before planning; separate facts, assumptions, requirements and technical suggestions. Read [new-work-evidence.md](references/new-work-evidence.md).
 4. Write evidence-backed requirements, user-visible BDD scenarios, and an executable plan. Obtain explicit approval for the exact plan before changing product files.
 5. Freeze the installed Skills fingerprint and selected base. If the user explicitly chooses a remote, save its name, URL, base branch, and full SHA; otherwise use the current local base commit and do not require a remote.
 
@@ -20,7 +20,7 @@ Megin operates on exactly one Git repository: the current repository root or one
 - `requirements` and `planning`: inspect one Repo, identify unknowns, record user-visible behavior and project knowledge needs, and prepare an executable plan. No product writes.
 - `approval`: present scope, files, scenarios, checks, base commit, and delivery steps. Wait for approval of that exact version.
 - `implementation`: claim the Repo with `repo_workspace.py claim` before product writes. Follow BDD/TDD for each behavior and preserve unrelated changes. Before every product write, run `repo_workspace.py check` with the same Work ID and writer.
-- `review`: hand the frozen snapshot to a fresh, independent, read-only reviewer. The reviewer checks implementation, tests, allowed paths, and the approved plan. Do not review your own changes.
+- `review`: hand the frozen snapshot to a fresh, independent, read-only reviewer. The reviewer checks implementation, tests, allowed paths, and the approved plan. Do not review your own changes. Initial review is round 0; after a failure allow at most three correction/re-review attempts (rounds 1?3), each with a new independent reviewer. Stop early on approval; after the third failed correction report incomplete and preserve all evidence. Resume never resets the count. If an independent agent/context is unavailable, set `awaiting_review` and do not self-approve.
 - `verification`: run every approved command from its recorded working directory. Record raw output, exit code, and test counts. Any failure or snapshot change requires repair and a fresh review.
 - `acceptance`: present the approved user operations and expected results. Wait for the user's response to the exact Work ID and acceptance version. Do not stage or commit before acceptance.
 - `delivery`: stage only accepted paths, run the delivery gate, commit the feature on its approved branch, then integrate locally with `git merge --no-ff`. Run the completion gate and release the Repo lock only after the completed record is saved.

@@ -36,6 +36,14 @@ def export_receipt(repo: Path, work_id: str) -> dict:
         record_paths.add(value["path"])
     for check in evidence["checks"]:
         record_paths.add(check["output"]["path"])
+    from quality_policy import NEW_CONTRACTS, evidence_paths, read_json
+    if contract.get("schema") in NEW_CONTRACTS:
+        record_paths.update((evidence_paths(contract) | evidence_paths(evidence)) & records)
+        record_paths.add(contract["approval_ref"])
+        # Include references inside discovery, approval and every review attempt.
+        for relative in list(record_paths):
+            if relative.endswith(".json") and relative in records:
+                record_paths.update(evidence_paths(read_json(repo / relative)) & records)
     file_digests = []
     for relative in sorted(record_paths):
         path = repo / q.canonical_relative(relative)

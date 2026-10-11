@@ -5,7 +5,7 @@ Every new Work ID belongs to exactly one Git repository. Store its status record
 ```markdown
 # Megin workflow: <short title>
 
-- schema: megin-repo-workflow/v1
+- schema: megin-repo-workflow/v2
 - work_id: work-YYYYMMDD-<lowercase-slug>
 - repository: .
 - base_branch: <local base branch>

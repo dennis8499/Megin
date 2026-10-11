@@ -92,7 +92,7 @@ def validate_plan(repo: Path, work_id: str, purpose: str) -> tuple[dict, dict]:
     if not quality_gate.WORK_ID_PATTERN.fullmatch(work_id):
         raise InvalidWorkspace("invalid Work ID")
     fields, contract, _records = quality_gate.load_contract(repo, work_id)
-    if fields.get("schema") != "megin-repo-workflow/v1":
+    if fields.get("schema") not in ("megin-repo-workflow/v1", "megin-repo-workflow/v2"):
         raise InvalidWorkspace("Repo lock requires megin-repo-workflow/v1")
     if fields.get("work_id") != work_id:
         raise InvalidWorkspace("workflow Work ID mismatch")
@@ -100,6 +100,21 @@ def validate_plan(repo: Path, work_id: str, purpose: str) -> tuple[dict, dict]:
         "implementation", "active",
     ):
         raise InvalidWorkspace("claim requires an approved implementation/active workflow")
+    from quality_policy import validate_contract
+    try:
+        validate_contract(repo, work_id, fields, contract, _records,
+                          live=purpose == "claim" and not (repo / ".megin/workspace.lock.json").exists())
+    except (ValueError, OSError, TypeError, KeyError) as exc:
+        raise InvalidWorkspace(f"approved discovery/plan policy: {exc}") from exc
+    if contract.get("schema") == "megin-repo-quality-contract/v2":
+        quality = quality_gate.evidence_file(repo, work_id, contract["quality_ref"])
+        if quality.is_file():
+            from quality_policy import validate_reviews
+            try:
+                recorded = quality_gate.read_json(quality)
+                validate_reviews(repo, work_id, contract, _records, recorded, recorded.get("snapshot"), "review")
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                raise InvalidWorkspace(f"review history policy: {exc}") from exc
     expected = contract.get("skills_sha256")
     actual = fingerprint(repo)["sha256"]
     if not isinstance(expected, str) or actual != expected:

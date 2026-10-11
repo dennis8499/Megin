@@ -19,3 +19,7 @@ Project knowledge remains in the selected Repo. The requirements record belongs 
 ## Exit criteria
 
 Planning may begin when the desired behavior and user-visible scenarios are clear, important risks and dependencies are recorded, and every behavior-changing question is answered or explicitly accepted as an assumption. Otherwise keep the record in `requirements` with `status: awaiting_user` and name the blocking decision.
+
+## Complete neutral exploration for new work
+
+Before selecting an implementation, clarify the problem, audience, outcome and observable acceptance. Inventory the entire selected repository from current source: entrypoints, capabilities, normal/failure flows, dependencies and gaps. Separate source-backed facts, unconfirmed assumptions, user requirements and technical suggestions. Ask only for decisions that change behavior or acceptance. Follow `new-work-evidence.md` to freeze inventory, per-file and per-entrypoint coverage and the exact requirements revision. A complete scanner reconciliation is not proof of semantic exhaustiveness; the independent reviewer checks the traces.

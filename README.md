@@ -25,3 +25,7 @@ New records use `megin-repo-workflow/v1`, `megin-repo-quality-contract/v1`, and 
 Version 0.5.0 adds optional [fixed committed inputs, scenario tracing and runner preflight](.agents/skills/megin/references/verification-extensions.md) to the v1 contracts. Completed work can export a [historical delivery receipt](.agents/skills/megin/references/delivery-receipts.md) for a fixed MergeReviewer review. These tools use `--repo` and `--work-id` and keep human acceptance in the native workflow.
 
 GitlabWorkSpace carries a separate overlay for Group scanning, cross-Repo work, centralized records, locks, GitLab issues, and merge requests. Those capabilities are not part of this native Megin package.
+
+## 0.6.0 工作契約
+
+新工作使用原生 v2：中立需求探索、完整功能盤點、明確計畫核准、需求與 BDD/TDD 追溯，以及追加式獨立審查歷程。初審另計，最多三次修正重審；每次使用新的唯讀 reviewer。通過即進入驗證與人工驗收，第三次修正仍失敗則保留證據並回報未完成；續作不重置次數。舊工作沿用原契約與指紋。十二個協作 Skills 完整保留。

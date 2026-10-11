@@ -1,6 +1,6 @@
 # Single-Repo quality evidence and gates
 
-New work uses `megin-repo-quality-contract/v1` and `megin-repo-quality-evidence/v1`. The approved contract is the only source for behavior, paths, commands, selected base, and delivery obligations. `workflow.md` is the status surface. The structural helper is read-only and does not prove test relevance, reviewer independence, or the correctness of a human decision.
+New work uses `megin-repo-quality-contract/v2` and `megin-repo-quality-evidence/v2`. The approved contract is the only source for behavior, paths, commands, selected base, and delivery obligations. `workflow.md` is the status surface. The structural helper is read-only and does not prove test relevance, reviewer independence, or the correctness of a human decision.
 
 ## Contract
 
@@ -12,7 +12,7 @@ The JSON contract records:
 - `allowed_paths`, the approved check list, and exact `process_records`;
 - `quality_ref`, `delivery_ref`, and the approved `skills_sha256`.
 
-Optional `verification_inputs`, `scenario_ids`, `behavior_trace` and
+Required `scenario_ids` and `behavior_trace`, and optional `verification_inputs` and
 `runner_preflight` follow [verification-extensions.md](verification-extensions.md).
 Omitted fields preserve legacy snapshot behavior. Fixed inputs participate in
 review, staged delivery and committed tree digests, and require raw digest proof.
@@ -64,3 +64,5 @@ Completion receipt format:
 The receipt file itself is a declared process record, so it can be updated after acceptance without changing the accepted product snapshot. Run the completion gate after saving it, set `status: complete` only on a passing result, then release the lock through `repo_workspace.py`.
 
 The helper retains compatibility with the Megin source repository's legacy `megin-quality-contract/v1` and `megin-quality-evidence/v1` maintainer fixtures. That compatibility does not change the public single-Repo workflow contract.
+
+Native v2 additionally enforces [new-work-evidence.md](new-work-evidence.md). Native v1 and maintainer v1 remain readable with their original snapshot semantics; never rewrite an in-progress legacy contract to v2.

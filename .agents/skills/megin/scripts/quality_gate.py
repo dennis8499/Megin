@@ -117,7 +117,7 @@ def load_contract(repo: Path, work_id: str) -> tuple[dict[str, str], dict, set[s
         raise InvalidEvidence("workflow plan_version is invalid")
     contract = read_json(work / plan_version / "quality-contract.json")
     contract_schema = contract.get("schema")
-    if (contract_schema not in ("megin-quality-contract/v1", "megin-repo-quality-contract/v1")
+    if (contract_schema not in ("megin-quality-contract/v1", "megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2")
             or contract.get("work_id") != work_id
             or contract.get("plan_version") != plan_version):
         raise InvalidEvidence("approved quality contract identity mismatch")
@@ -145,7 +145,7 @@ def load_contract(repo: Path, work_id: str) -> tuple[dict[str, str], dict, set[s
         record_set.add(canonical)
     if len(record_set) != len(records):
         raise InvalidEvidence("duplicate process record paths")
-    if contract_schema == "megin-repo-quality-contract/v1":
+    if contract_schema in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2"):
         if (not isinstance(contract.get("base_branch"), str)
                 or not contract["base_branch"]
                 or not isinstance(contract.get("base_commit"), str)
@@ -167,11 +167,14 @@ def load_contract(repo: Path, work_id: str) -> tuple[dict[str, str], dict, set[s
         if (not isinstance(contract.get("skills_sha256"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}", contract["skills_sha256"])):
             raise InvalidEvidence("single-repository contract needs the approved Skills fingerprint")
-        if fields.get("schema") == "megin-repo-workflow/v1" and (
+        if fields.get("schema") in ("megin-repo-workflow/v1", "megin-repo-workflow/v2") and (
             fields.get("quality_ref") != contract.get("quality_ref")
             or fields.get("delivery_ref") != delivery_ref
         ):
             raise InvalidEvidence("workflow and contract evidence references differ")
+    if ((contract_schema == "megin-repo-quality-contract/v2")
+            != (fields.get("schema") == "megin-repo-workflow/v2")):
+        raise InvalidEvidence("native v2 contract requires matching workflow v2")
     from behavior_trace import validate_trace
     from verification_inputs import validate_inputs
     validate_trace(contract)
@@ -253,8 +256,8 @@ def snapshot(repo: Path, work_id: str) -> dict[str, object]:
     inputs = fixed_inputs(repo, contract)
     entries = with_inputs(worktree_entries(repo, work_id, records), inputs)
     result = {
-        "schema": ("megin-repo-quality-snapshot/v1"
-                   if contract.get("schema") == "megin-repo-quality-contract/v1"
+        "schema": (("megin-repo-quality-snapshot/v2" if contract.get("schema") == "megin-repo-quality-contract/v2" else "megin-repo-quality-snapshot/v1")
+                   if contract.get("schema") in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2")
                    else "megin-quality-snapshot/v1"),
         "branch": line(repo, "branch", "--show-current"),
         "head": line(repo, "rev-parse", "HEAD"),
@@ -396,8 +399,8 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
     evidence = read_json(quality_path)
     plan_version = fields["plan_version"]
     expected_evidence_schema = (
-        "megin-repo-quality-evidence/v1"
-        if contract.get("schema") == "megin-repo-quality-contract/v1"
+        ("megin-repo-quality-evidence/v2" if contract.get("schema") == "megin-repo-quality-contract/v2" else "megin-repo-quality-evidence/v1")
+        if contract.get("schema") in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2")
         else "megin-quality-evidence/v1"
     )
     if (evidence.get("schema"), evidence.get("work_id"), evidence.get("plan_version")) != (
@@ -408,7 +411,7 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
     current = snapshot(repo, work_id)
     digest = current["product_sha256"]
     reasons: list[str] = []
-    if contract.get("schema") == "megin-repo-quality-contract/v1":
+    if contract.get("schema") in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2"):
         if (contract["base_branch"] != fields.get("base_branch")
                 or contract["base_commit"] != fields.get("base_commit")
                 or contract["feature_branch"] != fields.get("feature_branch")):
@@ -420,7 +423,7 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
         raise InvalidEvidence("workflow base_commit is not a full Git SHA")
     if line(repo, "rev-parse", base_branch) != base_commit:
         reasons.append("base branch advanced")
-    if gate == "delivery" and contract.get("schema") == "megin-repo-quality-contract/v1":
+    if gate == "delivery" and contract.get("schema") in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2"):
         _check_remote_base(repo, contract, reasons)
     if evidence.get("snapshot") != digest:
         reasons.append("product or approved-contract snapshot changed")
@@ -462,6 +465,8 @@ def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
         require_pass=gate in ("acceptance", "delivery"),
     )
     validate_input_evidence(repo, work_id, records, contract, evidence, reasons)
+    from quality_policy import validate_evidence
+    validate_evidence(repo, work_id, fields, contract, records, evidence, digest, gate, reasons)
 
     if gate in ("review", "acceptance"):
         staged = product_paths(
@@ -592,9 +597,9 @@ def _tree_digest(repo: Path, commit: str, records: set[str], work_id: str, input
 def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> dict[str, object]:
     """Verify the accepted feature commit and its local --no-ff integration."""
     fields, contract, records = load_contract(repo, work_id)
-    if contract.get("schema") != "megin-repo-quality-contract/v1":
+    if contract.get("schema") not in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2"):
         raise InvalidEvidence("completion gate is available for megin-repo-quality-contract/v1")
-    if fields.get("schema") != "megin-repo-workflow/v1" or fields.get("work_id") != work_id:
+    if fields.get("schema") != ("megin-repo-workflow/v2" if contract.get("schema") == "megin-repo-quality-contract/v2" else "megin-repo-workflow/v1") or fields.get("work_id") != work_id:
         raise InvalidEvidence("workflow is not the matching megin-repo-workflow/v1 record")
     if fields.get("phase") != "delivery" or fields.get("status") not in ("active", "complete"):
         raise InvalidEvidence("completion requires the delivery phase")
@@ -608,7 +613,7 @@ def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> d
     delivery = read_json(delivery_path)
     reasons: list[str] = []
     if (evidence.get("schema"), evidence.get("work_id"), evidence.get("plan_version")) != (
-        "megin-repo-quality-evidence/v1", work_id, fields.get("plan_version"),
+        ("megin-repo-quality-evidence/v2" if contract.get("schema") == "megin-repo-quality-contract/v2" else "megin-repo-quality-evidence/v1"), work_id, fields.get("plan_version"),
     ):
         raise InvalidEvidence("quality evidence identity mismatch")
     accepted_snapshot = evidence.get("snapshot")
@@ -644,6 +649,20 @@ def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> d
         require_pass=True,
     )
     validate_input_evidence(repo, work_id, records, contract, evidence, reasons)
+    from quality_policy import validate_evidence
+    def delivered_test(relative):
+        commit = delivery.get("feature_commit", "")
+        rows = git(repo, "ls-tree", "-z", commit, "--", relative).split(b"\0")
+        if len(rows) != 2 or not rows[0]:
+            raise InvalidEvidence("delivered TDD test is missing")
+        metadata, name = rows[0].split(b"\t", 1)
+        mode, kind, _blob = metadata.decode("ascii").split()
+        if name.decode("utf-8") != relative or kind != "blob" or mode not in ("100644", "100755"):
+            raise InvalidEvidence("delivered TDD test is not a regular blob")
+        return git(repo, "cat-file", "blob", commit + ":" + relative)
+
+    validate_evidence(repo, work_id, fields, contract, records, evidence, accepted_snapshot, "completion", reasons,
+                      test_reader=delivered_test if historical else None)
     writer = evidence.get("writer")
     writer_context = writer.get("context") if isinstance(writer, dict) else None
     writer_snapshot = writer.get("snapshot") if isinstance(writer, dict) else None

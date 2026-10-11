@@ -26,7 +26,7 @@ python .agents/skills/megin/scripts/repo_workspace.py release --repo <Repo> --wo
 
 ## Work record and gates
 
-The workflow header uses `schema: megin-repo-workflow/v1`; the approved plan uses `megin-repo-quality-contract/v1`; gate evidence uses `megin-repo-quality-evidence/v1`. The contract freezes one Repo's `base_branch`, `base_commit`, optional `remote_name` and `remote_url`, `feature_branch`, `allowed_paths`, checks, `process_records`, `quality_ref`, `delivery_ref`, and `skills_sha256`. All evidence files must be predeclared under the Work ID's `evidence/` directory.
+The workflow header uses `schema: megin-repo-workflow/v2`; the approved plan uses `megin-repo-quality-contract/v2`; gate evidence uses `megin-repo-quality-evidence/v2`. The contract freezes one Repo's `base_branch`, `base_commit`, optional `remote_name` and `remote_url`, `feature_branch`, `allowed_paths`, checks, `process_records`, `quality_ref`, `delivery_ref`, and `skills_sha256`. All evidence files must be predeclared under the Work ID's `evidence/` directory.
 
 1. Approval precedes product writes. The exact plan includes behavior scenarios, implementation scope, check commands, review, user acceptance, and delivery.
 2. Implementation follows BDD/TDD and changes only approved paths. Keep one writer and protect the Repo with the lock.

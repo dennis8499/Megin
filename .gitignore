@@ -33,3 +33,4 @@ env/
 /_testtemp/
 /.validation-tmp/
 /tmp*/
+/dist/
