@@ -34,3 +34,4 @@ env/
 /.validation-tmp/
 /tmp*/
 /dist/
+/.test-dependencies/

@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import test_quality_policy as policy_tests
@@ -56,7 +57,9 @@ class NativeV2Tests(legacy.RepoWorkflowTests):
         for name in ('scan.json', 'discovery.json', 'approval.json', 'approval.md',
                      'red.log', 'green.log', 'review-attempt-0.json', 'review-0.md'):
             self.assertIn(f'docs/work/{REPO_WORK_ID}/evidence/{name}', paths)
-        binding_path = Path(__file__).resolve().parents[3] / 'MergeReviewer/skills/merge-reviewer/scripts/delivery_binding.py'
+        binding_root = Path(os.environ.get('MEGIN_TEST_MERGE_REVIEWER_SCRIPTS',
+            str(Path(__file__).resolve().parents[3] / 'MergeReviewer/skills/merge-reviewer/scripts')))
+        binding_path = binding_root / 'delivery_binding.py'
         spec = importlib.util.spec_from_file_location('independent_binding', binding_path)
         binding = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(binding)
@@ -76,6 +79,6 @@ class NativeV2Tests(legacy.RepoWorkflowTests):
         contract['schema'] = 'megin-repo-quality-contract/v1'
         path.write_text(json.dumps(contract), encoding='utf-8')
         with self.assertRaisesRegex(q.InvalidEvidence, 'matching workflow'):
-            q.load_contract(self.repo, REPO_WORK_ID)
+            q.load_contract(self.repo.resolve(), REPO_WORK_ID)
         with self.assertRaises(q.InvalidEvidence):
             repo_workspace.claim(self.repo, REPO_WORK_ID, 'writer-1')
