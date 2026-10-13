@@ -1,6 +1,6 @@
 # Workflow records
 
-Use the complete Repo v3 / Group v5 headers in [workspace-workflow.md](workspace-workflow.md). One Work ID belongs to one selected root and keeps workflow.md, requirements.md, plan-<version>/plan.md, quality-contract.json and evidence beneath docs/work/<Work ID>/.
+Use the complete Repo v3 / Group v6 headers in [workspace-workflow.md](workspace-workflow.md). One Work ID belongs to one selected root and keeps workflow.md, requirements.md, plan-<version>/plan.md, quality-contract.json and evidence beneath docs/work/<Work ID>/.
 
 workflow.md is the status surface. Preserve dated progress and the earliest incomplete action. Requirements precedes architecture, which precedes planning and exact-plan approval. Only approved change Repos appear in the Group workflow/contract; discovery and architecture still cover all valid Repos.
 

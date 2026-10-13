@@ -11,6 +11,8 @@ Start from a new independent read-only context after the writer freezes a snapsh
 
 Inspect exact requirements, architecture, approved plan, changed paths, code, tests and relevant Repo documentation. Trace REQ → SCN → assertion → code → checks → review → acceptance; check discovery coverage, meaningful assertions, failure cases, remote-master branch identity and cross-Repo compatibility. For fixed inputs, verify tests consume their pinned bytes. Cite file/line findings.
 
+For Group read [group-impact.md](../megin/references/group-impact.md). Review actual diff confirmation against the frozen graph, following direct and indirect unchanged consumers. Inspect API/event/data/package/table/configuration compatibility and exclusion reasons; search terms and aliases need source relationships. New interfaces/consumers require renewed planning. Missing necessary source leaves review incomplete. Structure proves evidence consistency; independently judge whether every semantic interface and consumer was correctly classified.
+
 Run `quality_gate.py check --gate review` with the selected `--repo` or `--group-root` and Work ID. A structural pass does not prove semantic correctness or independence. Record real context/invocation ID, APPROVED or CHANGES_REQUESTED, snapshot and findings; append using `review_history.py`.
 
 Initial review is round 0. Allow at most three correction/re-review attempts, each with a new independent context. Stop early on approval or after failed round 3. Preserve immutable attempts on resume. If a real independent context is unavailable, use `awaiting_review` and stop progression.

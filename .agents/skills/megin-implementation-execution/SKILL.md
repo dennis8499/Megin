@@ -5,6 +5,8 @@ description: Execute an approved Megin Repo or Group plan on remote-master featu
 
 # megin-implementation-execution
 
+For Group follow [group-impact.md](../megin/references/group-impact.md): retain frozen architecture, save separate actual-diff impact confirmation and replay contract searches against implemented bytes and pinned peers before review. Newly affected consumers or uncovered interfaces require renewed planning/approval. Verification-only Repos supply fixed inputs/checks and receive no product changes or branches.
+
 Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
 Read the approved plan. Set `implementation / active`. Run `unified_workflow.py claim`, then `prepare` once with selected root, Work ID and writer. Preparation preflights every target, fetches/rechecks remote master and creates each feature branch. Preserve existing dirty work. On resume retain branches, locks and evidence; verify instead of recreating.

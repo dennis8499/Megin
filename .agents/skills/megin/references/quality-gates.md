@@ -1,6 +1,6 @@
 # Quality gates
 
-New work uses Repo contract/evidence v3 or Group v5. Read [workspace-workflow.md](workspace-workflow.md) for fields and commands and [new-work-evidence.md](new-work-evidence.md) for approval/TDD/review evidence. Gates are read-only; they do not execute project tests, invent user responses or prove actual reviewer independence.
+New work uses Repo contract/evidence v3 or Group v6. Read [workspace-workflow.md](workspace-workflow.md) for fields and commands and [new-work-evidence.md](new-work-evidence.md) for approval/TDD/review evidence. Gates are read-only; they do not execute project tests, invent user responses or prove actual reviewer independence.
 
 - snapshot: digest Git-normalized worktree content plus protected records and committed verification inputs. Group combines selected Repos and central work records.
 - validate-record: validate root, schema pair, exact plan approval, architecture/discovery, selected Repos, dependency graph, checks, paths and Skills fingerprint.

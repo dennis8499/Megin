@@ -1,6 +1,6 @@
 # Historical delivery receipts
 
-## Feature-only v2 receipts (Repo v3 / Group v5)
+## Feature-only v2 receipts (Repo v3 / Group v6)
 
 After completed feature delivery, use `delivery_receipt.py --repo <Repo>` or
 `--group-root <Group>` with `--work-id <ID>`. New exports use

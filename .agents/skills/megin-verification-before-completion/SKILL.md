@@ -5,6 +5,8 @@ description: Prove a Megin change is complete with fresh commands, scenarios, re
 
 # megin-verification-before-completion
 
+For Group read [group-impact.md](../megin/references/group-impact.md). Verify compatibility with affected unchanged and indirect consumers even for one modification Repo; bind results to their pinned source and actual-diff confirmation. Source drift, stale searches, expanded interfaces or unknown necessary external dependencies block acceptance and delivery until renewed evidence/approval.
+
 Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
 Verify the exact approved Work ID/plan/snapshot. Run every approved command from its recorded cwd with original stdout/stderr, exit codes and test counts. Do not substitute convenient checks for obligations. Include declared cross-Repo compatibility tests; checks require nonzero executed tests, no failures and no skips.

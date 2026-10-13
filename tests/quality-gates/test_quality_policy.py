@@ -119,6 +119,11 @@ class PolicyFixture:
         attempt = {'schema': 'megin-review-attempt/v1', 'work_id': WORK, 'requirements_revision': 'req-1',
             'round': number, 'previous_sha256': previous, 'context': context, 'invocation_id': context,
             'reviewer_kind': 'independent_readonly', 'snapshot': self.snapshot, 'verdict': verdict, 'source': raw}
+        if self.contract['schema'] == 'megin-quality-contract/v6':
+            attempt['impact_confirmation_ref'] = self.evidence['impact_confirmation_ref']
+            claims = {k: v['text'] for k, v in raw['claims'].items()}
+            claims['impact_confirmation_sha256'] = '- impact_confirmation_sha256: ' + self.evidence['impact_confirmation_ref']['sha256']
+            attempt['source'] = self.raw(f'review-{number}.md', claims)
         if number:
             attempt['correction_ref'] = self.raw(f'correction-{number}.md', {'repair': 'fixed findings and reran checks'})
         self.evidence['review_history'].append(self.write(f'review-attempt-{number}.json', attempt))

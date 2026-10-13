@@ -1,4 +1,4 @@
-"""Public behavior of the native Repo v3 / Group v5 workflow."""
+"""Public behavior of the native Repo v3 / Group v6 workflow."""
 import copy
 import hashlib
 import json
@@ -34,14 +34,14 @@ def git(repo, *args):
 
 class WorkFixture:
     """Synthetic human/reviewer transcripts are structural test data only."""
-    def __init__(self, temp, group=False, count=1, unmodified=False):
+    def __init__(self, temp, group=False, count=1, unmodified=False, sources=None, selected=None, edges=None, terms=None, aliases=None, files=None):
         self.group, self.temp = group, temp
         self.root = temp / ('group' if group else 'repo')
         self.root.mkdir()
         shutil.copytree(ROOT / '.agents/skills', self.root / '.agents/skills',
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         self.repos, self.remotes, self.bases = {}, {}, {}
-        names = [f'repo-{i}' for i in range(count)] if group else ['.']
+        names = list(sources) if sources else [f'repo-{i}' for i in range(count)] if group else ['.']
         if unmodified:
             names.append('unmodified')
         for name in names:
@@ -50,8 +50,12 @@ class WorkFixture:
             git(repo, 'init', '-b', 'master')
             git(repo, 'config', 'user.name', 'Workflow test')
             git(repo, 'config', 'user.email', 'workflow@example.invalid')
-            (repo / 'app.py').write_text('def main():\n    return "behavior"\n', encoding='utf-8')
+            (repo / 'app.py').write_text(sources[name] if sources else 'def main():\n    return "behavior"\n', encoding='utf-8')
             (repo / 'test_behavior.py').write_text('assert True\n', encoding='utf-8')
+            for relative, content in (files or {}).get(name, {}).items():
+                path = repo / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
             git(repo, 'add', '.')
             git(repo, 'commit', '-m', 'base')
             remote = temp / ('remote-' + ('native' if name == '.' else name) + '.git')
@@ -59,7 +63,7 @@ class WorkFixture:
             git(repo, 'remote', 'add', 'origin', str(remote))
             git(repo, 'push', 'origin', 'master')
             self.repos[name], self.remotes[name], self.bases[name] = repo, remote, git(repo, 'rev-parse', 'HEAD')
-        self.selected = [name for name in names if name != 'unmodified']
+        self.selected = selected if selected is not None else [name for name in names if name != 'unmodified']
         self.f = policy_tests.PolicyFixture(self.root)
         if group:
             (self.root / 'app.py').unlink()
@@ -72,6 +76,8 @@ class WorkFixture:
         from functional_inventory import scan, SCHEMA
         for name, repo in self.repos.items():
             inventory = scan(repo, exclude_paths=policy.SCAN_EXCLUSIONS)
+            if group:
+                inventory['source_commit'] = self.bases[name]
             paths = [x['path'] for x in inventory['included']]
             report = {'schema': SCHEMA, 'snapshot_id': inventory['snapshot_id'],
                       'functions': [{'id': 'FUNC-MAIN', 'outcome': 'result', 'flow': 'input to result',
@@ -98,17 +104,57 @@ class WorkFixture:
                  'allowed_paths': ['app.py', 'test_behavior.py']} for name in self.selected]
         if group:
             contract['repositories'] = rows
+            contract['verification_repositories'] = []
         else:
             contract.update({k: v for k, v in rows[0].items() if k != 'repo_path'})
             contract['allowed_paths'].append(f'docs/work/{WORK}/')
         contract['handoff'] = {'dependencies': {x: [] for x in self.selected}, 'merge_order': self.selected,
-                               'compatibility_check_ids': ['unit'] if len(self.selected) > 1 else [],
+                               'compatibility_check_ids': ['unit'] if len(self.selected) > 1 or edges else [],
                                'independent_reason': 'independent applications', 'partial_delivery': 'resume missing commits'}
         contract['checks'][0]['cwd'] = self.selected[0] if group else '.'
         contract['behavior_trace'][0]['implementation_paths'] = [x + '/app.py' for x in self.selected] if group else ['app.py']
         architecture = {'schema': 'megin-architecture/v1', 'work_id': WORK, 'requirements_revision': 'req-1',
                         'requirements_sha256': contract['requirements_sha256'], 'discovery_sha256': discovery_ref['sha256'],
                         'repositories': architecture_rows}
+        if group:
+            import impact_policy as impact
+            architecture.update(schema='megin-architecture/v2', changed_contracts=[], searches=[], impact_edges=[],
+                                repository_impacts=[], unresolved=[])
+            def cite(name, query):
+                lines = (self.repos[name] / 'app.py').read_text(encoding='utf-8').splitlines()
+                number, line = next((i, line) for i, line in enumerate(lines, 1) if query in line)
+                return {'repo_path': name, 'commit': self.bases[name], 'path': 'app.py', 'line': number, 'text': line}
+            for name in self.selected:
+                identifier = 'CONTRACT-' + name
+                symbols = (terms or {}).get(name, ['def main', 'return'])
+                local_symbols = [symbol for symbol in symbols if symbol in (self.repos[name] / 'app.py').read_text(encoding='utf-8')]
+                architecture['changed_contracts'].append({'id': identifier, 'kind': 'internal', 'repo_path': name,
+                    'description': 'provider behavior or public contract', 'symbols': symbols,
+                    'source': cite(name, local_symbols[0]),
+                    'symbol_sources': [{'symbol': symbol, 'source': cite(name, symbol)} for symbol in local_symbols] +
+                        [{'symbol': symbol, 'source': cite(alias_repo, symbol), 'via': cite(alias_repo, upstream_term),
+                          'reason': 'wrapper exposes this alias after calling the traced upstream contract'}
+                         for changed, alias_repo, symbol, upstream_term in aliases or [] if changed == name]})
+                for candidate, repo in self.repos.items():
+                    for number, query in enumerate(symbols):
+                        architecture['searches'].append({'id': identifier + '-' + candidate + '-' + str(number),
+                            'contract_id': identifier, 'repo_path': candidate, 'commit': self.bases[candidate],
+                            'mode': 'literal', 'query': query, 'matches': impact.search(repo, self.bases[candidate], query)})
+            for changed, provider, consumer, provider_term, consumer_term in edges or []:
+                architecture['impact_edges'].append({'contract_id': 'CONTRACT-' + changed,
+                    'provider': cite(provider, provider_term), 'consumer': cite(consumer, consumer_term),
+                    'reason': 'consumer imports or forwards this source-backed contract', 'check_ids': ['unit']})
+            reached = impact.reachability({x['id']: x for x in architecture['changed_contracts']}, architecture['impact_edges'])
+            for name in self.repos:
+                identifiers = [identifier for identifier, candidates in reached.items() if name in candidates]
+                architecture['repository_impacts'].append({'repo_path': name,
+                    'status': 'affected' if identifiers else 'unaffected',
+                    'reason': 'independent application; same-named local function has no import or shared contract',
+                    'contract_ids': identifiers,
+                    'search_ids': [x['id'] for x in architecture['searches'] if x['repo_path'] == name]})
+                if identifiers and name not in self.selected:
+                    contract['verification_repositories'].append({'repo_path': name, 'base_commit': self.bases[name], 'check_ids': ['unit']})
+            self.f.records.update(self.f.prefix + f'impact-confirmation-{i}.json' for i in range(4))
         contract['architecture_ref'] = self.f.write('architecture.json', architecture)
         for name in ('quality.json', 'delivery.json', 'delivery-gate.json', 'writer.md', 'check.log', 'acceptance.md', 'receipt.json'):
             self.f.records.add(self.f.prefix + name)
@@ -165,12 +211,37 @@ class WorkFixture:
             if label == 'red':
                 claims['assertion'] = self.contract['behavior_trace'][0]['assertion']
             run['output'] = f.raw(label + '.log', claims)
+        if self.group:
+            self.confirm_impact()
         if not evidence['review_history']:
             f.review(verdict)
         self.save_evidence()
 
     def save_evidence(self):
         workflow.save_json(self.root / self.contract['quality_ref'], self.f.evidence)
+
+    def confirm_impact(self):
+        import impact_policy as impact
+        architecture = policy.read_json(self.root / self.contract['architecture_ref']['path'])
+        _, _, repos, records = workflow.load_contract(self.root, WORK, True)
+        summary = impact.diff_summary(self.root, WORK, self.contract, repos, records)
+        changes = []
+        for name, paths in summary['changed_paths'].items():
+            for path in paths:
+                identifiers = [x['id'] for x in architecture['changed_contracts'] if x['repo_path'] == name and x['source']['path'] == path]
+                changes.append({'repo_path': name, 'path': path, 'kind': 'internal', 'reason': 'approved behavior implemented', 'contract_ids': identifiers})
+        value = {'schema': 'megin-impact-confirmation/v1', 'work_id': WORK, 'plan_version': 'plan-1',
+                 'requirements_revision': 'req-1', 'architecture_sha256': self.contract['architecture_ref']['sha256'],
+                 'snapshot': self.f.snapshot, **summary, 'changes': changes,
+                 'contract_ids': sorted({i for x in changes for i in x['contract_ids']}),
+                 'repository_impacts': architecture['repository_impacts'], 'unresolved': []}
+        value['searches'] = impact.confirmation_searches(self.root, WORK, self.contract, repos, records, value['contract_ids'])
+        previous = self.f.evidence.get('impact_confirmation_ref')
+        name = f'impact-confirmation-{len(self.f.evidence["review_history"])}.json'
+        if previous and policy.read_json(self.root / previous['path']).get('snapshot') == self.f.snapshot:
+            name = Path(previous['path']).name
+        self.f.evidence['impact_confirmation_ref'] = self.f.write(name, value)
+        self.save_evidence()
 
     def accept(self):
         self.set_phase('verification')

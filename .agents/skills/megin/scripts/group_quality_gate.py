@@ -1,4 +1,4 @@
-"""Native Group v5 adapter; legacy Group work stays on its original package."""
+"""Native Group v6 adapter; legacy Group work stays on its original package."""
 from pathlib import Path
 import unified_workflow as workflow
 from workspace_context import group_root as validate_group_root

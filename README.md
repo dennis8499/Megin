@@ -27,7 +27,7 @@ Invoke `$megin` from a Git root for Repo mode or from a non-Git root containing 
 
 ## Contracts and compatibility
 
-Version 0.7.0 introduces Repo workflow/quality v3, Group workflow/quality v5, architecture evidence and feature-only v2 receipts. See [workspace workflow](.agents/skills/megin/references/workspace-workflow.md), [quality gates](.agents/skills/megin/references/quality-gates.md) and [receipts](.agents/skills/megin/references/delivery-receipts.md).
+Version 0.8.0 adds Group workflow/quality v6 and architecture/v2: fixed-source cross-Repo impact searches, indirect unchanged consumers, compatibility checks and separate actual-diff confirmation. Repo v3 and historical v2 receipts remain supported. See [Group impact evidence](.agents/skills/megin/references/group-impact.md), [workspace workflow](.agents/skills/megin/references/workspace-workflow.md), [quality gates](.agents/skills/megin/references/quality-gates.md) and [receipts](.agents/skills/megin/references/delivery-receipts.md).
 
 Legacy Repo v1/v2 records remain readable without changing their approval/fingerprint/snapshot/local-merge rules. Existing Group v1–v4 work continues with its original GitlabWorkSpace package until complete. GitLab Issue/MR and simulated-work integrations stay in GitlabWorkSpace. Current MergeReviewer consumes legacy v1 receipts; v2 receipt support is a separate integration update.
 

@@ -1,6 +1,6 @@
 # Remote-master feature branch policy
 
-New Repo v3 and Group v5 work follows [workspace-workflow.md](workspace-workflow.md). Only selected change Repos get `feature/<Work ID>`; Group discovery still includes unchanged Repos.
+New Repo v3 and Group v6 work follows [workspace-workflow.md](workspace-workflow.md). Only selected change Repos get `feature/<Work ID>`; Group discovery still includes unchanged Repos.
 
 Select remotes by explicit instruction, configured override/default, origin, then a unique remote. Missing/ambiguous remotes require clarification. Pin live `refs/heads/master` with git ls-remote, credential-free remote identity and full SHA during planning. Main, local HEAD and remote-tracking refs cannot substitute. No remote or master means no development branch.
 

@@ -1,4 +1,11 @@
-# Native Repo v3 / Group v5 workflow
+# Native Repo v3 / Group v6 workflow
+
+Group v6 requires [group-impact.md](group-impact.md) in addition to the shared
+workflow below. Its architecture is v2, every Repo has fixed source, unchanged
+affected consumers are verification_repositories, and actual-diff confirmation
+is mandatory at all review/acceptance/delivery gates. Repo v3 stays on
+architecture/v1. Completed Group v5 supports historical receipt export only;
+unfinished old work must keep its original installed package and fingerprint.
 
 ## Roots and phases
 
@@ -45,13 +52,13 @@ Repo v3:
 - delivery_ref: docs/work/<work-id>/evidence/delivery.json
 ~~~
 
-Group uses `schema: megin-skills-workflow/v5`, replaces the five Repo branch/remote fields with `repositories: repo-a,repo-b` in contract order, and keeps the other shared fields. Use only the approved change set here. Status values: active, awaiting_user, awaiting_review, blocked, needs_revision, complete. Preserve a dated progress ledger below the header.
+Group uses `schema: megin-skills-workflow/v6`, replaces the five Repo branch/remote fields with `repositories: repo-a,repo-b` in contract order, and keeps the other shared fields. Use only the approved change set here. Status values: active, awaiting_user, awaiting_review, blocked, needs_revision, complete. Preserve a dated progress ledger below the header.
 
 ## Architecture evidence
 
 After requirements, scan each Repo with `functional_inventory.scan(repo, exclude_paths=quality_policy.SCAN_EXCLUSIONS)`. For potential change Repos whose source differs from remote master, use baseline with an empty external scratch directory (--group-root plus --repo-path for Group). It fetches/rechecks immutable master objects, copies regular source blobs without checkout filters/hooks/product writes, and emits scan JSON with source_commit and visible baseline_exclusions for links/submodules. Read the materialized files and reconcile their architecture; scanner output alone is not exploration.
 
-Save scans and reconciled reports in megin-discovery/v1. Complete file/entrypoint coverage is mandatory. Claim and subsequent gates compare each selected Repo's frozen source inventory/entrypoints with its pinned master objects, allowing standard LF/CRLF representations. Unchanged Group Repos use current source and live claim checks. Baseline drift requires fresh exploration, architecture and exact-plan approval. Preparation fetches/rechecks again after approval.
+Save scans and reconciled reports in megin-discovery/v1. Complete file/entrypoint coverage is mandatory. Group discovery pins source_commit for every Repo. Claim and subsequent gates compare frozen source inventory/entrypoints with the pinned objects, allowing standard LF/CRLF representations. Unchanged Group Repos also need clean HEAD/source snapshots to remain unchanged at live gates; historical export reads the original commits. Baseline drift requires fresh exploration, architecture and exact-plan approval. Preparation fetches/rechecks again after approval.
 
 The contract's `architecture_ref` is a hashed, predeclared evidence reference to:
 
@@ -76,11 +83,11 @@ The contract's `architecture_ref` is a hashed, predeclared evidence reference to
 }
 ~~~
 
-Group uses real Repo names and covers every discovery Repo. Component/test paths are Repo-relative inventoried source paths. Other lists describe source-backed findings; use explicit empty lists where appropriate and explain gaps in the summary. New product paths can appear in impact_paths.
+Group uses real Repo names, architecture/v2 and covers every discovery Repo; add the mandatory contract/search/graph/disposition fields from group-impact.md. The v1 sample above describes Repo mode only. Component/test paths are Repo-relative inventoried source paths. Empty architectural impact evidence cannot replace Group dispositions. New product paths can appear in impact_paths.
 
 ## Approved quality contract
 
-Repo `megin-repo-quality-contract/v3` retains native v2 fields, adds hashed `architecture_ref`, requires nonempty remote_name/remote_url, base_branch master and delivery_mode feature_handoff. Group `megin-quality-contract/v5` uses the same common discovery/approval/TDD fields and a nonempty `repositories` array of:
+Repo `megin-repo-quality-contract/v3` retains native v2 fields, adds hashed `architecture_ref`, requires nonempty remote_name/remote_url, base_branch master and delivery_mode feature_handoff. Group `megin-quality-contract/v6` uses the same common discovery/approval/TDD fields and a nonempty `repositories` array of:
 
 ~~~json
 {
@@ -102,7 +109,7 @@ Native allowed_paths also includes the Work ID directory for protected requireme
 
 Predeclare quality.json, delivery.json, delivery-gate.json, discovery/scans, architecture, approval and its raw transcript, raw writer/check/TDD/acceptance outputs, review-attempt-0.json through -3.json, all review/correction outputs, and receipt.json when requested. All process_records stay under this Work ID's evidence directory. Never broaden after approval.
 
-Quality evidence uses `megin-repo-quality-evidence/v3` or `megin-quality-evidence/v5`. Reuse the v2/v4 writer/check/TDD/review fields. Human acceptance additionally requires actor_kind human, literal response and timestamp. Raw claims bind work_id, version, snapshot, verdict, timestamp and JSON-encoded response. Fixtures and simulated actors cannot supply a real human decision.
+Quality evidence uses `megin-repo-quality-evidence/v3` or `megin-quality-evidence/v6`. Reuse the v2/v4 writer/check/TDD/review fields. Human acceptance additionally requires actor_kind human, literal response and timestamp. Raw claims bind work_id, version, snapshot, verdict, timestamp and JSON-encoded response. Fixtures and simulated actors cannot supply a real human decision.
 
 ## Explicit mutations and gates
 

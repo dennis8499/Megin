@@ -1,4 +1,4 @@
-"""Repo v3 / Group v5: approved remote-master work and feature-only delivery.
+"""Repo v3 / Group v6: approved remote-master work and feature-only delivery.
 
 Gates only inspect evidence. prepare/deliver/claim/release are explicit mutations.
 Human approval and reviewer independence must come from real host contexts.
@@ -27,8 +27,9 @@ STATUSES = {'active', 'awaiting_user', 'awaiting_review', 'blocked', 'needs_revi
 SHA = re.compile(r'(?:[0-9a-f]{40}|[0-9a-f]{64})\Z')
 
 
-def schemas(group):
-    return (('megin-skills-workflow/v5', 'megin-quality-contract/v5', 'megin-quality-evidence/v5')
+def schemas(group, legacy=False):
+    version = 5 if legacy else 6
+    return ((f'megin-skills-workflow/v{version}', f'megin-quality-contract/v{version}', f'megin-quality-evidence/v{version}')
             if group else ('megin-repo-workflow/v3', 'megin-repo-quality-contract/v3', 'megin-repo-quality-evidence/v3'))
 
 
@@ -40,7 +41,8 @@ def load_contract(root, work_id, group=False):
     version = fields.get('plan_version', '')
     p.require(q.PLAN_VERSION_PATTERN.fullmatch(version), 'invalid plan version')
     contract = p.read_json(p.path_inside(root, f'docs/work/{work_id}/{version}/quality-contract.json'))
-    workflow_schema, contract_schema, _ = schemas(group)
+    legacy = group and fields.get('schema') == 'megin-skills-workflow/v5' and fields.get('status') == 'complete'
+    workflow_schema, contract_schema, _ = schemas(group, legacy)
     p.require(fields.get('schema') == workflow_schema and contract.get('schema') == contract_schema,
               'workflow and quality contract versions must match')
     p.require(fields.get('work_id') == work_id and contract.get('work_id') == work_id
@@ -82,24 +84,49 @@ def load_contract(root, work_id, group=False):
             p.require(fields.get(key) == contract.get(key), f'workflow {key} differs from contract')
     else:
         p.require(fields.get('repositories') == ','.join(row['repo_path'] for row in rows), 'workflow selected Repo list differs')
+    verification = verification_repositories(root, contract, repos, group)
+    check_repos = names | {x['repo_path'] for x in verification}
     checks = contract.get('checks')
     p.require(isinstance(checks, list) and checks and all(isinstance(x, dict) for x in checks), 'approved checks missing')
     ids = [x.get('id') for x in checks]
     p.require(all(isinstance(x, str) and x for x in ids) and len(set(ids)) == len(ids), 'duplicate or invalid check IDs')
     for item in checks:
         p.require(item.get('kind') in ('test', 'command') and isinstance(item.get('command'), str) and item['command']
-                  and item.get('cwd') in ({'.'} | names), 'invalid approved check or cwd')
+                  and item.get('cwd') in ({'.'} | check_repos), 'invalid approved check or cwd')
+    for row in verification:
+        p.require(set(row['check_ids']) <= set(ids), 'verification Repo references unknown check IDs')
     validate_handoff_contract(contract, list(names), set(ids))
     from behavior_trace import validate_trace
     validate_trace(contract)
     for probe in contract.get('runner_preflight', []):
-        p.require(probe['cwd'] in ({'.'} | names), 'runner cwd must identify the workspace or a selected Repo')
+        p.require(probe['cwd'] in ({'.'} | check_repos), 'runner cwd must identify the workspace or a selected/verification Repo')
     for trace in contract.get('behavior_trace', []):
         for relative in trace['implementation_paths']:
             q.canonical_relative(relative)
             p.require(not group or relative.split('/')[0] in names, 'scenario path must belong to a selected Repo')
     fixed_inputs(root, contract, repos, group)
     return fields, contract, repos, records
+
+
+def verification_repositories(root, contract, repos, group):
+    if not group or contract.get('schema') != 'megin-quality-contract/v6':
+        return []
+    rows = contract.get('verification_repositories')
+    p.require(isinstance(rows, list) and all(isinstance(x, dict) for x in rows), 'verification_repositories must be explicit')
+    available, selected, seen, result = context.repositories(root), {x['repo_path'] for x in repos}, set(), []
+    for row in rows:
+        name = row.get('repo_path')
+        p.require(isinstance(name, str) and name in available and name not in selected and name not in seen,
+                  'verification Repo must be a distinct unchanged Group repository')
+        seen.add(name)
+        p.require(isinstance(row.get('base_commit'), str) and SHA.fullmatch(row['base_commit']), 'verification Repo fixed commit missing')
+        ids = row.get('check_ids')
+        p.require(isinstance(ids, list) and ids and all(isinstance(x, str) and x for x in ids)
+                  and len(ids) == len(set(ids)), 'verification Repo needs explicit compatibility check IDs')
+        p.require(not any(k in row for k in ('feature_branch', 'allowed_paths', 'remote_name', 'remote_url')),
+                  'verification Repo must not receive delivery or write authority')
+        result.append({**row, 'repo': available[name]})
+    return result
 
 
 def fixed_inputs(root, contract, repos, group):
@@ -111,10 +138,10 @@ def fixed_inputs(root, contract, repos, group):
     if inputs is None:
         return []
     p.require(isinstance(inputs, list), 'verification inputs must be an array')
-    available = {x['repo_path']: x['repo'] for x in repos}
+    available = {x['repo_path']: x['repo'] for x in repos + verification_repositories(root, contract, repos, group)}
     result, seen = [], set()
     for item in inputs:
-        p.require(isinstance(item, dict) and item.get('repo_path') in available, 'fixed input Repo is not selected')
+        p.require(isinstance(item, dict) and item.get('repo_path') in available, 'fixed input Repo is not selected or approved for verification')
         repo_path = item['repo_path']
         value = {k: v for k, v in item.items() if k != 'repo_path'}
         for normalized in validate_inputs(available[repo_path], [value], ids):
@@ -185,10 +212,14 @@ def snapshot(root, work_id, group=False, kind='worktree', commits=None):
         if kind != 'commit':
             details[name].update(branch=context.git(repo, 'branch', '--show-current'), head=context.git(repo, 'rev-parse', 'HEAD'))
         all_entries.extend([{**x, 'path': name + '/' + x['path']} for x in entries] if group else entries)
+    for row in verification_repositories(root, contract, repos, group):
+        entries = product_entries(row['repo'], root, work_id, records, True, 'commit', row['base_commit'])
+        all_entries.extend({**x, 'path': '@verification-repositories/' + row['repo_path'] + '/' + x['path']} for x in entries)
     inputs = fixed_inputs(root, contract, repos, group)
     all_entries.extend(input_entries(inputs))
     all_entries.extend(protected(root, work_id, records, group))
-    return {'schema': 'megin-quality-snapshot/v5' if group else 'megin-repo-quality-snapshot/v3',
+    version = contract['schema'].rsplit('/', 1)[1]
+    return {'schema': 'megin-quality-snapshot/' + version if group else 'megin-repo-quality-snapshot/v3',
             'work_id': work_id, 'product_sha256': q.digest_entries(all_entries), 'repositories': details,
             'path_count': len(all_entries), 'verification_inputs_sha256': p.canonical_digest(inputs)}
 
@@ -200,6 +231,8 @@ def fingerprint(root):
 
 def approved(root, work_id, group=False, live=False, historical=False):
     fields, contract, repos, records = load_contract(root, work_id, group)
+    p.require(historical or not group or contract['schema'] == 'megin-quality-contract/v6',
+              'legacy Group work requires its original installed package; completed v5 supports historical export only')
     p.validate_contract(root, work_id, fields, contract, records, live=live, historical=historical)
     if not historical:
         p.require(fingerprint(root) == contract['skills_sha256'], 'installed Skills fingerprint changed')
@@ -222,8 +255,9 @@ def _writer_and_checks(root, work_id, fields, contract, records, evidence, diges
     p.validate_evidence(root, work_id, fields, contract, records, evidence, digest, gate, reasons,
                         test_reader=test_reader)
     if contract.get('verification_inputs') is not None:
-        _, _, repos, _ = load_contract(root, work_id, contract['schema'] == schemas(True)[1])
-        inputs = fixed_inputs(root, contract, repos, contract['schema'] == schemas(True)[1])
+        group = contract['schema'].startswith('megin-quality-contract/')
+        _, _, repos, _ = load_contract(root, work_id, group)
+        inputs = fixed_inputs(root, contract, repos, group)
         expected = p.canonical_digest(inputs)
         bound = {identifier for item in inputs for identifier in item['check_ids']}
         for result in evidence.get('checks', []):
@@ -265,7 +299,7 @@ def check(root, work_id, gate, group=False, historical=False, require_staged=Tru
                   and (fields['status'] != 'complete' or gate == 'completion'), 'workflow cannot progress in this status')
         evidence = p.read_json(p.path_inside(root, contract['quality_ref']))
         p.require((evidence.get('schema'), evidence.get('work_id'), evidence.get('plan_version')) ==
-                  (schemas(group)[2], work_id, contract['plan_version']), 'quality evidence identity mismatch')
+                  (schemas(group, contract['schema'] == 'megin-quality-contract/v5')[2], work_id, contract['plan_version']), 'quality evidence identity mismatch')
         delivery = p.read_json(p.path_inside(root, contract['delivery_ref'])) if gate == 'completion' else None
         if delivery is not None and fields['status'] == 'complete':
             p.require(delivery.get('status') == 'complete' and delivery.get('completion_ok') is True
@@ -274,6 +308,10 @@ def check(root, work_id, gate, group=False, historical=False, require_staged=Tru
         current = snapshot(root, work_id, group, 'commit' if historical else 'worktree', commits)
         digest = current['product_sha256']
         p.require(evidence.get('snapshot') == digest, 'product or approved-contract snapshot changed')
+        if group:
+            from impact_policy import validate_confirmation
+            validate_confirmation(root, work_id, contract, repos, records, evidence, digest,
+                                  commits if gate == 'completion' else None)
 
         def test_reader(relative):
             if group:

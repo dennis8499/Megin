@@ -13,8 +13,8 @@ import stat
 from pathlib import Path, PurePosixPath
 
 NEW_CONTRACTS = {'megin-repo-quality-contract/v2', 'megin-quality-contract/v4',
-                 'megin-repo-quality-contract/v3', 'megin-quality-contract/v5'}
-UNIFIED_CONTRACTS = {'megin-repo-quality-contract/v3', 'megin-quality-contract/v5'}
+                 'megin-repo-quality-contract/v3', 'megin-quality-contract/v5', 'megin-quality-contract/v6'}
+UNIFIED_CONTRACTS = {'megin-repo-quality-contract/v3', 'megin-quality-contract/v5', 'megin-quality-contract/v6'}
 SCAN_EXCLUSIONS = ('docs/work', '.megin', '.agents/skills')
 
 
@@ -169,7 +169,30 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
                     and isinstance(g.get('reason'), str) and g['reason'].strip() for g in result['gaps']),
                 'functional gaps need resolution or explicit nonblocking disposition')
         selected = ({'.': contract} if native else {x['repo_path']: x for x in contract['repositories']})
-        if contract['schema'] in UNIFIED_CONTRACTS and row['repo_path'] in selected:
+        if contract['schema'] == 'megin-quality-contract/v6':
+            from source_baseline import validate as validate_baseline
+            commit = inventory.get('source_commit')
+            require(isinstance(commit, str), 'Group discovery needs fixed source commits for every Repo')
+            if row['repo_path'] in selected:
+                require(commit == selected[row['repo_path']]['base_commit'], 'selected Repo discovery source differs from approved base')
+            validate_baseline(repo, commit, inventory)
+            if not historical and row['repo_path'] not in selected:
+                from functional_inventory import scan
+                from unified_workflow import product_entries
+                import workspace_context as context
+                require(context.git(repo, 'rev-parse', 'HEAD') == commit, 'unchanged impact source HEAD drifted')
+                # Scanner coverage deliberately excludes binaries/generated
+                # files; approved checks may still consume them. Compare the
+                # complete Git-normalized product tree, including tracked
+                # binary/mode/deletion and nonignored untracked inputs.
+                baseline = product_entries(repo, root, work_id, records, True, 'commit', commit)
+                current_product = product_entries(repo, root, work_id, records, True)
+                import quality_gate as q
+                require(q.digest_entries(current_product) == q.digest_entries(baseline),
+                        'unchanged impact product bytes drifted')
+                current = scan(repo, exclude_paths=SCAN_EXCLUSIONS)
+                require(current['snapshot_id'] == inventory['snapshot_id'], 'unchanged impact source snapshot drifted')
+        elif contract['schema'] in UNIFIED_CONTRACTS and row['repo_path'] in selected:
             from source_baseline import validate as validate_baseline
             validate_baseline(repo, selected[row['repo_path']]['base_commit'], inventory)
         elif live:
@@ -196,8 +219,9 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
 
 def validate_architecture(root, work_id, contract, records, discovery):
     architecture = read_json(reference(root, work_id, records, contract.get('architecture_ref')))
+    schema = 'megin-architecture/v2' if contract['schema'] == 'megin-quality-contract/v6' else 'megin-architecture/v1'
     require((architecture.get('schema'), architecture.get('work_id'), architecture.get('requirements_revision')) ==
-            ('megin-architecture/v1', work_id, contract['requirements_revision']), 'architecture identity mismatch')
+            (schema, work_id, contract['requirements_revision']), 'architecture identity mismatch')
     require(architecture.get('discovery_sha256') == contract['discovery_sha256']
             and architecture.get('requirements_sha256') == contract['requirements_sha256'],
             'architecture must bind current requirements and discovery')
@@ -221,6 +245,9 @@ def validate_architecture(root, work_id, contract, records, discovery):
             require(isinstance(row.get(key), list) and all(isinstance(x, str) and x.strip() for x in row[key]),
                     f'architecture {key} must be an explicit list')
         require(all(x in paths for x in row['test_paths']), 'architecture test path is not inventoried')
+    if schema == 'megin-architecture/v2':
+        from impact_policy import validate_architecture as validate_impact
+        validate_impact(root, work_id, contract, records, architecture, discovery)
 
 
 def validate_tdd(root, work_id, contract, records, evidence, *, test_reader=None):
@@ -246,13 +273,13 @@ def validate_tdd(root, work_id, contract, records, evidence, *, test_reader=None
         require(isinstance(relative, str) and '\\' not in relative and relative
                 and not PurePosixPath(relative).is_absolute() and PurePosixPath(relative).as_posix() == relative
                 and not any(p in ('.', '..') or ':' in p for p in PurePosixPath(relative).parts), 'unsafe TDD test path')
-        if contract.get('schema') == 'megin-quality-contract/v5':
+        if contract.get('schema') in ('megin-quality-contract/v5', 'megin-quality-contract/v6'):
             name, separator, child = relative.partition('/')
             require(separator and child and name in {x['repo_path'] for x in contract['repositories']},
                     'Group TDD test must belong to a selected Repo and use its prefix')
         if contract.get('schema') in UNIFIED_CONTRACTS and test_reader is None:
             import quality_gate as q
-            group = contract['schema'] == 'megin-quality-contract/v5'
+            group = contract['schema'] in ('megin-quality-contract/v5', 'megin-quality-contract/v6')
             if group:
                 name, _, child = relative.partition('/')
                 repo = path_inside(root, name)
@@ -318,11 +345,20 @@ def validate_reviews(root, work_id, contract, records, evidence, snapshot, gate,
                 'review verdict/snapshot invalid')
         if number:
             reference(root, work_id, records, attempt.get('correction_ref'))
-        raw_claims(root, work_id, records, attempt.get('source'), {
+        claims = {
             'context': f'- context: {context}', 'verdict': f'- verdict: {attempt["verdict"]}',
             'snapshot': f'- snapshot: {attempt["snapshot"]}', 'round': f'- round: {number}',
             'previous_sha256': f'- previous_sha256: {previous}',
-        })
+        }
+        if contract['schema'] == 'megin-quality-contract/v6':
+            impact_ref = attempt.get('impact_confirmation_ref')
+            impact = read_json(reference(root, work_id, records, impact_ref))
+            require(impact.get('schema') == 'megin-impact-confirmation/v1'
+                    and impact.get('work_id') == work_id and impact.get('snapshot') == attempt['snapshot']
+                    and impact.get('architecture_sha256') == contract['architecture_ref']['sha256'],
+                    'review attempt must retain its exact actual impact confirmation')
+            claims['impact_confirmation_sha256'] = '- impact_confirmation_sha256: ' + impact_ref['sha256']
+        raw_claims(root, work_id, records, attempt.get('source'), claims)
         previous, latest = ref['sha256'], attempt
         contexts.add(context)
     if latest is not None:
@@ -330,6 +366,9 @@ def validate_reviews(root, work_id, contract, records, evidence, snapshot, gate,
                 'latest review summary differs from append-only history')
         require(allow_exhausted or not (len(history) == 4 and latest['verdict'] != 'APPROVED'),
                 'three corrections exhausted; preserve evidence and report incomplete')
+        if contract['schema'] == 'megin-quality-contract/v6' and latest['snapshot'] == snapshot:
+            require(latest['impact_confirmation_ref'] == evidence.get('impact_confirmation_ref'),
+                    'actual impact changed after the latest independent review')
     if gate in ('acceptance', 'delivery', 'completion'):
         require(latest is not None and latest['verdict'] == 'APPROVED' and latest['snapshot'] == snapshot
                 and latest['requirements_revision'] == contract['requirements_revision'],

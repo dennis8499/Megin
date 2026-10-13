@@ -2,7 +2,7 @@
 
 ## Runtime
 
-Install the thirteen-Skill package with install_skills.py --target <root> [--check]. New Repo v3 / Group v5 work uses the same source, independent of GitlabWorkSpace. Installation blocks unfinished work and active locks. Preserve original installed packages for legacy/in-progress work.
+Install the thirteen-Skill package with install_skills.py --target <root> [--check]. New Repo v3 / Group v6 work uses the same source, independent of GitlabWorkSpace. Installation blocks unfinished work and active locks. Preserve original installed packages for legacy/in-progress work.
 
 Read [workspace-workflow.md](.agents/skills/megin/references/workspace-workflow.md) for headers, architecture/quality fields and examples. quality_gate.py snapshot|validate-record|check is read-only. unified_workflow.py detect|inventory|resolve|fingerprint is read-only; claim|prepare|check|deliver|release are explicit workflow operations. Each root selection is mutually exclusive --repo / --group-root; the workflow helper can detect cwd when neither is supplied.
 
@@ -26,4 +26,4 @@ Run Windows/Linux CI. The archive builder uses stable paths, timestamps and file
 
 ## Compatibility
 
-Keep the legacy native/maintainer schema paths intact. New work uses Repo v3/Group v5 rather than silently strengthening old approvals. New architecture/remote-master/feature-handoff semantics are mandatory under those versions. GitlabWorkSpace's existing Group packages and external integrations are maintained separately.
+Keep legacy schema paths intact. New work uses Repo v3/Group v6; Group v6 requires architecture/v2 and source-backed cross-Repo impact confirmation. Completed Group v5 records remain historically exportable. Unfinished old work keeps its original package/fingerprint; installation checks Group and child Repo workflows plus common-dir locks before replacing Skills. GitlabWorkSpace bundles this native core and retains its MR review adapter separately.
