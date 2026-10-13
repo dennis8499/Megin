@@ -1,17 +1,14 @@
 ---
 name: megin-technical-planning
-description: Turn a clarified Megin request into an implementation-ready plan. Use for technical design, task breakdown, interfaces, tests, migration or delivery planning, 技術規劃、拆解任務、實作計畫; do not mutate product files before approval.
+description: Turn clarified Megin requirements and explored architecture into an executable Repo or Group plan. Use for technical design, tasks, interfaces, tests, migration and delivery planning; require approval before product writes.
 ---
 
+# megin-technical-planning
 
-# Megin technical planning
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md), [../megin/references/branch-policy.md](../megin/references/branch-policy.md), and [../megin/references/quality-gates.md](../megin/references/quality-gates.md). Plan one Git repository only.
+Begin after requirements and architecture are complete. Bind their exact revisions and hashed records. Select only Repos needing changes while retaining complete Group discovery. Map each requirement to BDD scenarios, observable assertions, implementation paths and exact check commands/cwd. Include knowledge updates, failures, independent review, human acceptance and feature-only delivery.
 
-Turn approved requirements and BDD scenarios into an executable plan with ordered tasks, Repo-relative allowed paths, interfaces, test assertions, exact commands and working directories, knowledge updates, independent review, user acceptance, and local delivery. Record the current base branch and full SHA. The remote is optional; include exact remote name/URL and base SHA only when the user explicitly selects it.
+Run `unified_workflow.py resolve` per selected Repo. Pin credential-free remote identity and live master SHA with no main/local-HEAD fallback. Record dependency graph, order, compatibility checks and partial-delivery instructions in `handoff`; explain independent multi-Repo work.
 
-Compute the installed Skills fingerprint and include it in `megin-repo-quality-contract/v2`. Predeclare every process record, including quality evidence and delivery result, before capturing a snapshot. The plan and contract must agree on Work ID, version, branch, paths, checks, and acceptance. Present risks, assumptions, and user-visible delivery behavior for explicit approval. Do not write product files before approval.
-
-For reproducible verification, use the optional fields in [verification-extensions.md](../megin/references/verification-extensions.md): pin input bytes to commits in this Repo, map every SCN to observable assertions and checks, and declare exact read-only runner probes. Predeclare `evidence/receipt.json` when a historical delivery receipt is requested.
-
-New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.
+Freeze the thirteen-Skill fingerprint and every future evidence path before approval. Use Repo v3 / Group v5. Present Work ID, version, scope, scenarios, architecture, commands, base SHAs and delivery for explicit human approval. Save the literal response with exact plan and canonical contract digests. Missing/stale discovery, architecture or approval blocks writer claim.

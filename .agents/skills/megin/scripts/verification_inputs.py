@@ -126,7 +126,9 @@ def materialize_inputs(repo: Path, inputs, check_ids: set[str], destination: Pat
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, required=True)
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--repo", type=Path)
+    selection.add_argument("--group-root", type=Path)
     parser.add_argument("--work-id", required=True)
     parser.add_argument("--destination", type=Path, required=True)
     args = parser.parse_args()
@@ -135,9 +137,30 @@ def main() -> int:
         from repo_workspace import validate_repo, InvalidWorkspace
         if not WORK_ID_PATTERN.fullmatch(args.work_id):
             raise ValueError("invalid Work ID")
-        _, contract, _ = load_contract(validate_repo(args.repo), args.work_id)
-        result = materialize_inputs(args.repo, contract.get("verification_inputs"),
-                                    {c["id"] for c in contract["checks"]}, args.destination)
+        if args.group_root:
+            from unified_workflow import load_contract as load_unified, fixed_inputs
+            root = args.group_root.resolve()
+            _, contract, repos, _ = load_unified(root, args.work_id, group=True)
+            values = fixed_inputs(root, contract, repos, True)
+            destination = args.destination.absolute()
+            no_links(destination)
+            if destination.resolve().is_relative_to(root) or destination.exists() and (
+                    not destination.is_dir() or any(destination.iterdir())):
+                raise ValueError('materialization destination must be empty and outside the Group')
+            by_name = {x['repo_path']: x['repo'] for x in repos}
+            payload = [(x['repo_path'], x['commit'], file['path'],
+                        git_bytes(by_name[x['repo_path']], 'cat-file', 'blob', x['commit'] + ':' + file['path']))
+                       for x in values for file in x['files']]
+            destination.mkdir(parents=True, exist_ok=True)
+            for name, commit, path, raw in payload:
+                target = destination / name / commit / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+            result = {'schema': 'megin-verification-inputs/v1', 'sha256': canonical_digest(values), 'inputs': values}
+        else:
+            _, contract, _ = load_contract(validate_repo(args.repo), args.work_id)
+            result = materialize_inputs(args.repo, contract.get("verification_inputs"),
+                                        {c["id"] for c in contract["checks"]}, args.destination)
         print(json.dumps(result, ensure_ascii=False))
         return 0
     except (ValueError, OSError, InvalidEvidence, InvalidWorkspace) as exc:

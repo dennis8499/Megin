@@ -1,13 +1,24 @@
-# New-work evidence (native v2 / Group v4)
+# New-work evidence (Repo v3 / Group v5; legacy v2/v4)
 
-New native work uses `megin-repo-workflow/v2`,
-`megin-repo-quality-contract/v2` and `megin-repo-quality-evidence/v2`.
-The GitlabWorkSpace Group overlay uses workflow, quality contract and quality
-evidence v4 with the same policy. Existing v1 native and v1–v3 Group work retain
+New native work uses `megin-repo-workflow/v3`,
+`megin-repo-quality-contract/v3` and `megin-repo-quality-evidence/v3`.
+Native Group work uses workflow, quality contract and evidence v5. Read
+[workspace-workflow.md](workspace-workflow.md) for roots, architecture evidence,
+mandatory remote master, common-dir locks and feature-only delivery.
+Existing v1/v2 native and v1–v4 Group work retain
 their original schema, installed fingerprint, snapshot and approval. Never
 restart a Work ID to erase failed reviews or bypass an upgrade lock.
 
 ## Discovery and approval
+
+Requirements first settles problem, audience, outcome and observable acceptance.
+Then `phase: architecture` performs complete source reconciliation and produces
+a hashed `architecture_ref` using `megin-architecture/v1`. Architecture binds the
+requirements digest, discovery digest and each Repo's frozen source snapshot;
+its components cite inventoried paths and it records flows, entrypoints,
+dependencies, tests and impact. Both discovery and architecture cover every
+valid Group Repo. Only the plan's implementation set gets branches. Missing or
+stale architecture blocks new v3/v5 approval and writer claim.
 
 Before product writes, run `functional_inventory.scan(root,
 exclude_paths=quality_policy.SCAN_EXCLUSIONS)` using the bundled modules.
@@ -16,6 +27,14 @@ visible scanner exclusions, not silently claimed as explored product code.
 Store stdout/JSON under this Work ID's declared `evidence/` paths. A Group
 discovery covers every real direct-child Git repository, including unaffected
 Repos; its implementation contract can select a smaller approved set.
+
+For v3/v5 selected Repos, frozen discovery must describe the pinned remote master
+source, not a lagging local branch. Use the workspace baseline helper to fetch
+objects and explore regular source in an external scratch directory without
+changing product branches. Preserve source_commit and baseline_exclusions when
+present. Claim/gates compare inventory bytes and entrypoints with that commit.
+An unchanged Group Repo can retain current-source discovery. Missing quality
+summaries with retained review attempts block writes instead of resetting history.
 
 `megin-discovery/v1` contains `work_id`, `requirements_revision`, nonempty
 `problem`, `audience`, `outcome`, `acceptance`; separate arrays `facts`,
@@ -39,7 +58,7 @@ a `functional_report` following `codebase-functional-exploration/v1`:
   and a concrete `reason`; unrelated runtime unknowns must not force an invented
   requirement or unrelated repair. Record binary, secret, dependency and other exclusions.
 
-Keep all existing native/Group contract fields. Add `requirements_revision`,
+Keep all applicable native/Group contract fields. Require `requirements_revision`,
 `requirements_ref`, raw `requirements_sha256`, hashed `discovery_ref`, matching
 `discovery_sha256`, `approval_ref`, `max_corrections: 3`, and `review_records`.
 The latter is exactly four predeclared paths

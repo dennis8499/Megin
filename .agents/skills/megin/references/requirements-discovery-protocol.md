@@ -1,25 +1,13 @@
-# Single-Repo requirements discovery protocol
+# Requirements discovery protocol
 
-Discover the user's desired behavior in one explicitly selected Git repository. The selected Repo is the current Git root or a Repo the user names; never enumerate sibling folders to infer a larger scope. If the selected path is ambiguous, ask which single Repo to inspect before reading files.
+Select the Repo/Group root using [repository-workflow.md](repository-workflow.md). First pass is read-only. Clarify problem, audience, outcome, constraints and observable acceptance before prescribing a solution.
 
-## Evidence pass
+Resolve discoverable facts by reading applicable instructions, current behavior, meaningful tests and documentation. Use relevant primary research when facts are externally defined; preserve source paths, versions and uncertainty. Do not invent research obligations for ordinary local facts.
 
-1. Confirm the Git root and read its `AGENTS.md`, `Codex.md`, README, and relevant local instructions.
-2. Read the current source, meaningful tests, configuration, and project knowledge for the reported behavior. Use version history or external primary sources only when needed to establish compatibility or provenance.
-3. Record exact Repo-relative paths, observed behavior, test results, branch and full HEAD SHA, and dirty-worktree paths. Preserve relevant user statements as requirements evidence.
-4. Separate confirmed behavior, hypotheses, unknowns, constraints, and decisions. Never treat an unreadable or missing source as proof that a capability is absent.
-5. Ask focused questions only for decisions that change user-visible behavior, compatibility, scope, or acceptance. Do not ask questions already answered by repository evidence or the user.
+In Group mode safely enumerate all real direct-child Git roots and record their purposes/relationships; do not follow links or restrict discovery to configured Repos. In Repo mode stay within the selected root. Keep facts, assumptions, requirements and technical suggestions separate. Give every requirement a REQ ID. Ask the highest-impact prerequisite-ready product question when unresolved behavior/scope/acceptance blocks progress.
 
-## Requirements record
+Save requirements.md with source-backed current behavior, scope/exclusions, decisions, risks and observable scenarios. Blocking assumptions/questions keep requirements/awaiting_user; no planning handoff until intent is stable. Nonblocking uncertainty needs a reason and remains visible.
 
-Write `docs/work/<Work ID>/requirements.md` using [requirements-template.md](requirements-template.md). Describe the problem and desired outcome, source-backed current behavior, included and excluded behavior, unresolved questions, risks, and observable Given/When/Then scenarios. Identify relevant error, boundary, recovery, and compatibility cases. Keep each scenario traceable to evidence and a later check.
+Hand off to architecture exploration, which performs full file/entrypoint reconciliation, freezes discovery and creates architecture evidence before planning. Technical planning chooses actual change Repos, fixes BDD/check/path obligations and obtains exact-plan human approval. Discovery completion is not implementation approval.
 
-Project knowledge remains in the selected Repo. The requirements record belongs to that Work ID and is not a substitute for durable documentation. If a requirement clearly needs changes in another repository, describe the dependency and ask whether the user wants a separate Repo workflow; do not inspect or modify that other repository under this contract.
-
-## Exit criteria
-
-Planning may begin when the desired behavior and user-visible scenarios are clear, important risks and dependencies are recorded, and every behavior-changing question is answered or explicitly accepted as an assumption. Otherwise keep the record in `requirements` with `status: awaiting_user` and name the blocking decision.
-
-## Complete neutral exploration for new work
-
-Before selecting an implementation, clarify the problem, audience, outcome and observable acceptance. Inventory the entire selected repository from current source: entrypoints, capabilities, normal/failure flows, dependencies and gaps. Separate source-backed facts, unconfirmed assumptions, user requirements and technical suggestions. Ask only for decisions that change behavior or acceptance. Follow `new-work-evidence.md` to freeze inventory, per-file and per-entrypoint coverage and the exact requirements revision. A complete scanner reconciliation is not proof of semantic exhaustiveness; the independent reviewer checks the traces.
+Project knowledge stays in established Repo documentation; centralized Group work records reference it. Historical work preserves its original discovery contract.

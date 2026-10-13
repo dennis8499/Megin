@@ -28,7 +28,7 @@ def recover(root, work_id, contract, records, evidence):
 
 def append(root, work_id, contract, records, evidence, attempt):
     if contract.get('schema') not in NEW_CONTRACTS:
-        raise ValueError('append requires a native v2 or Group v4 contract')
+        raise ValueError('append requires a supported evidence-policy contract')
     validate_reviews(root, work_id, contract, records, evidence, evidence.get('snapshot'), 'review')
     history = evidence.get('review_history', [])
     number = len(history)

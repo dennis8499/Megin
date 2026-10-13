@@ -3,13 +3,12 @@ name: megin-test-driven-development
 description: Run Megin's outside-in behavior red-green-refactor loop for an approved task. Use for TDD, BDD, regression coverage, test-first development, 測試驅動、回歸測試; do not expand scope or waive a failing obligation.
 ---
 
+# megin-test-driven-development
 
-# Megin test-driven development
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md). Follow the approved behavior scenarios and test conventions in the selected Repo.
+Use the approved scenarios and project test conventions. Before every write run `unified_workflow.py check` with exactly one selected root, Work ID and writer.
 
-For each behavior, identify an assertion that would fail before the implementation, run it and preserve its output, then make the smallest implementation change and rerun it. A syntax/import/setup failure is not evidence that the behavior test is red. Add relevant boundary and failure cases. Run focused and approved broader checks, recording exact commands, working directories, exit codes, and test counts.
+For each SCN preserve an assertion-failing red before implementation, make the smallest change and preserve passing green with the same test digest. Import/setup/environment failures, zero executed tests and skipped tests do not count. Keep exact commands, cwd, execution sequence, exit codes, counts and raw claim locators. Add meaningful boundary/failure coverage and run approved broader checks. For Group tests, paths are Group-relative and cwd identifies the Group or a selected Repo.
 
-Before each file write, verify the Repo lock with `repo_workspace.py check --repo <Repo> --work-id <Work ID> --writer <identity>`. Keep tests and code within approved paths. Do not stage or commit. Handoff: red/green evidence tied to the same approved scenario and current snapshot.
-
-For native v2, [new-work-evidence.md](../megin/references/new-work-evidence.md) requires one valid raw red/green cycle per BDD scenario. A red must execute a test and fail its intended assertion; import, setup, environment, zero-test and skipped-test failures do not count. Keep exact command, cwd, counts, sequence and unchanged test digest in both raw outputs.
+Keep one valid raw red/green cycle per BDD scenario and bind final check output to the current combined snapshot. Repairs require TDD evidence and a fresh independent review within the retained correction cap. Do not stage or commit.

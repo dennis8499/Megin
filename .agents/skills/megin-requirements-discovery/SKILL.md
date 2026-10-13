@@ -1,15 +1,14 @@
 ---
 name: megin-requirements-discovery
-description: Explore and clarify a repository change before implementation. Use for requirements, scope, product behavior, feature requests, 新功能需求、需求整理、範圍釐清; do not use for an already-approved implementation, pure explanation, or a bug diagnosis.
+description: Clarify Repo or Group requirements before architecture exploration. Use for requirements, scope, product behavior, feature requests, 新功能需求、需求整理、範圍釐清; do not implement an unapproved solution.
 ---
 
+# megin-requirements-discovery
 
-# Megin requirements discovery
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md), [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md), and [../megin/references/requirements-discovery-protocol.md](../megin/references/requirements-discovery-protocol.md). Discover requirements in exactly one selected Git repository.
+Apply [requirements-discovery-protocol.md](../megin/references/requirements-discovery-protocol.md). First pass is read-only. Clarify problem, audience, outcome, constraints and observable acceptance without prescribing implementation. Read current behavior, instructions, tests and documentation to resolve discoverable facts. Cite locations and distinguish facts, assumptions, requirements and suggestions.
 
-First pass is read-only. Read Repo-local instructions, current source, meaningful tests, documentation, and relevant `docs/` knowledge. Cite exact paths and observations for current behavior; distinguish source evidence, user statements, and assumptions. Ask focused questions where a product decision remains unresolved. Do not inspect siblings or infer that a similarly named Repo is in scope.
+In Group mode inventory every valid direct-child Repo and its purpose, retaining unchanged Repos in the requirements master. Repo mode stays in its selected root. Ask focused product questions when behavior/scope/acceptance remains ambiguous; preserve blockers in `requirements / awaiting_user`.
 
-Record the user problem, desired outcome, current behavior, scope, exclusions, decisions, risks, and observable scenarios in `docs/work/<Work ID>/requirements.md`. Identify compatibility, accessibility, security, migration, and failure cases where applicable. Keep unknowns visible and block planning when they change behavior or acceptance. Handoff: source-backed requirements and open decisions for the selected Repo.
-
-For new work, read [new-work-evidence.md](../megin/references/new-work-evidence.md). First clarify problem, audience, outcome and acceptance neutrally. Inventory every current-source file and candidate entrypoint, then trace capabilities, flows, dependencies and gaps across the entire selected Repo. Keep facts, assumptions, requirements and technical suggestions separate; do not convert suggestions into requirements. Preserve the frozen scan and reconciled functional report before requesting plan approval.
+Write `docs/work/<Work ID>/requirements.md` with REQ IDs, scope, exclusions, decisions and scenarios. Once intent is stable, hand off to `$megin-architecture-exploration` for complete functional/source reconciliation before planning. No branch creation or product writes occur here.

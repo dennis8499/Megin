@@ -1,15 +1,14 @@
 ---
 name: megin-implementation-execution
-description: Execute an approved Megin work package in the bound checkout with one writer, bounded TDD evidence, and a fresh review handoff. Use for approved implementation, coding, 實作、開發、套用已核准計畫; do not start without an exact plan approval.
+description: Execute an approved Megin Repo or Group plan on remote-master feature branches with one writer, TDD evidence and a fresh review handoff. Use for approved implementation and coding; require exact-plan approval.
 ---
 
+# megin-implementation-execution
 
-# Megin implementation execution
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md), [../megin/references/quality-gates.md](../megin/references/quality-gates.md), and the approved plan. Accept work only after explicit approval of its exact version, scope, scenarios, commands, base commit, and delivery steps.
+Read the approved plan. Set `implementation / active`. Run `unified_workflow.py claim`, then `prepare` once with selected root, Work ID and writer. Preparation preflights every target, fetches/rechecks remote master and creates each feature branch. Preserve existing dirty work. On resume retain branches, locks and evidence; verify instead of recreating.
 
-Before the first product write, claim the selected Repo with `repo_workspace.py claim --repo <Repo> --work-id <Work ID> --writer <identity>`. Before every product write, run the matching `check`. Verify the approved feature branch, allowed paths, and Skills fingerprint. Keep one writer, preserve unrelated dirty changes, and do not write outside the selected Repo.
+Before every product write run `unified_workflow.py check` with the same identity. Follow approved paths/dependency order and `$megin-test-driven-development`. Preserve raw command/cwd/output/count evidence. Scope, baseline or Skills changes require replanning.
 
-Use the TDD Skill for each behavior. Record focused checks and raw output. Keep changes within approved paths; a scope, base, or Skills change requires replanning. When implementation is complete, run the read-only `review` gate with `--repo <Repo> --work-id <Work ID>` and hand the exact snapshot to a fresh reviewer. Do not stage, commit, merge, or claim completion before verification and user acceptance.
-
-New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.
+Run the read-only review gate and hand the frozen combined snapshot, approved records and raw evidence to a fresh independent reviewer. Repairs follow TDD/lock checks. Preserve append-only attempts and the three-correction cap. Stage and commit only during accepted delivery.

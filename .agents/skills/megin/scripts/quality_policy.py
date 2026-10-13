@@ -12,7 +12,9 @@ import re
 import stat
 from pathlib import Path, PurePosixPath
 
-NEW_CONTRACTS = {'megin-repo-quality-contract/v2', 'megin-quality-contract/v4'}
+NEW_CONTRACTS = {'megin-repo-quality-contract/v2', 'megin-quality-contract/v4',
+                 'megin-repo-quality-contract/v3', 'megin-quality-contract/v5'}
+UNIFIED_CONTRACTS = {'megin-repo-quality-contract/v3', 'megin-quality-contract/v5'}
 SCAN_EXCLUSIONS = ('docs/work', '.megin', '.agents/skills')
 
 
@@ -136,7 +138,7 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
             'every discovered requirement must have a BDD scenario')
     rows = discovery.get('repositories')
     require(isinstance(rows, list) and all(isinstance(x, dict) for x in rows), 'discovery repositories missing')
-    native = contract['schema'] == 'megin-repo-quality-contract/v2'
+    native = contract['schema'].startswith('megin-repo-')
     paths = [x.get('repo_path') for x in rows]
     require(all(isinstance(x, str) and x for x in paths) and len(set(paths)) == len(paths),
             'discovery repository paths missing or duplicate')
@@ -153,6 +155,11 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
         and not is_link(p) and (p / '.git').exists()
     }
     require(set(paths) == expected, 'discovery must cover every selected-root repository')
+    if contract['schema'] in UNIFIED_CONTRACTS:
+        if not native and not historical:
+            from workspace_context import repositories
+            require(set(paths) == set(repositories(root)), 'discovery must cover every valid Group repository')
+        validate_architecture(root, work_id, contract, records, discovery)
     for row in rows:
         repo = root if row['repo_path'] == '.' else path_inside(root, row['repo_path'])
         inventory = read_json(reference(root, work_id, records, row.get('scan_ref')))
@@ -161,7 +168,11 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
         require(all(isinstance(g, dict) and g.get('status') == 'nonblocking'
                     and isinstance(g.get('reason'), str) and g['reason'].strip() for g in result['gaps']),
                 'functional gaps need resolution or explicit nonblocking disposition')
-        if live:
+        selected = ({'.': contract} if native else {x['repo_path']: x for x in contract['repositories']})
+        if contract['schema'] in UNIFIED_CONTRACTS and row['repo_path'] in selected:
+            from source_baseline import validate as validate_baseline
+            validate_baseline(repo, selected[row['repo_path']]['base_commit'], inventory)
+        elif live:
             current = scan(repo, exclude_paths=SCAN_EXCLUSIONS)
             require(current['snapshot_id'] == inventory['snapshot_id'], 'discovery source snapshot is stale')
     approval = read_json(reference(root, work_id, records, {'path': contract.get('approval_ref'),
@@ -181,6 +192,35 @@ def validate_contract(root, work_id, fields, contract, records, *, live=False, h
         'plan_sha256': f'- plan_sha256: {approval["plan_sha256"]}',
         'contract_sha256': f'- contract_sha256: {approval["contract_sha256"]}',
     })
+
+
+def validate_architecture(root, work_id, contract, records, discovery):
+    architecture = read_json(reference(root, work_id, records, contract.get('architecture_ref')))
+    require((architecture.get('schema'), architecture.get('work_id'), architecture.get('requirements_revision')) ==
+            ('megin-architecture/v1', work_id, contract['requirements_revision']), 'architecture identity mismatch')
+    require(architecture.get('discovery_sha256') == contract['discovery_sha256']
+            and architecture.get('requirements_sha256') == contract['requirements_sha256'],
+            'architecture must bind current requirements and discovery')
+    rows = architecture.get('repositories')
+    require(isinstance(rows, list) and all(isinstance(x, dict) for x in rows), 'architecture repositories missing')
+    expected = {x['repo_path']: x for x in discovery['repositories']}
+    names = [x.get('repo_path') for x in rows]
+    require(len(names) == len(set(names)) and set(names) == set(expected), 'architecture must cover discovery repositories')
+    for row in rows:
+        source = expected[row['repo_path']]
+        require(row.get('snapshot_id') == source['functional_report']['snapshot_id'], 'architecture source snapshot changed')
+        require(isinstance(row.get('summary'), str) and row['summary'].strip(), 'architecture summary missing')
+        require(isinstance(row.get('components'), list) and row['components'], 'architecture components missing')
+        paths = {x['path'] for x in source['functional_report']['coverage']}
+        for component in row['components']:
+            require(isinstance(component, dict) and isinstance(component.get('name'), str) and component['name'].strip()
+                    and isinstance(component.get('paths'), list) and component['paths']
+                    and all(isinstance(p, str) and p in paths for p in component['paths']),
+                    'architecture component must cite inventoried source paths')
+        for key in ('data_flows', 'entrypoints', 'dependencies', 'test_paths', 'impact_paths'):
+            require(isinstance(row.get(key), list) and all(isinstance(x, str) and x.strip() for x in row[key]),
+                    f'architecture {key} must be an explicit list')
+        require(all(x in paths for x in row['test_paths']), 'architecture test path is not inventoried')
 
 
 def validate_tdd(root, work_id, contract, records, evidence, *, test_reader=None):
@@ -206,6 +246,23 @@ def validate_tdd(root, work_id, contract, records, evidence, *, test_reader=None
         require(isinstance(relative, str) and '\\' not in relative and relative
                 and not PurePosixPath(relative).is_absolute() and PurePosixPath(relative).as_posix() == relative
                 and not any(p in ('.', '..') or ':' in p for p in PurePosixPath(relative).parts), 'unsafe TDD test path')
+        if contract.get('schema') == 'megin-quality-contract/v5':
+            name, separator, child = relative.partition('/')
+            require(separator and child and name in {x['repo_path'] for x in contract['repositories']},
+                    'Group TDD test must belong to a selected Repo and use its prefix')
+        if contract.get('schema') in UNIFIED_CONTRACTS and test_reader is None:
+            import quality_gate as q
+            group = contract['schema'] == 'megin-quality-contract/v5'
+            if group:
+                name, _, child = relative.partition('/')
+                repo = path_inside(root, name)
+            else:
+                repo, child = root, relative
+            included = {x.decode('utf-8') for x in q.git(repo, 'ls-files', '--cached', '--others',
+                        '--exclude-standard', '-z', '--', child).split(b'\0') if x}
+            require(child in included and not child.startswith(('.agents/skills/', '.megin/'))
+                    and (group or not q.process_record(child, work_id, records)),
+                    'TDD test must be part of the accepted product snapshot, not ignored or process metadata')
         content = test_reader(relative) if test_reader else path_inside(root, relative).read_bytes()
         digests = {hashlib.sha256(content).hexdigest()}
         if test_reader and b'\r' not in content and b'\0' not in content:
@@ -289,7 +346,7 @@ def validate_evidence(root, work_id, fields, contract, records, evidence, snapsh
         validate_tdd(root, work_id, contract, records, evidence, test_reader=test_reader)
         validate_reviews(root, work_id, contract, records, evidence, snapshot, gate)
     except (ValueError, OSError, KeyError, TypeError) as exc:
-        reasons.append(f'v2/v4 evidence policy: {exc}')
+        reasons.append(f'evidence policy: {exc}')
 
 
 def evidence_paths(value):

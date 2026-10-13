@@ -136,6 +136,12 @@ def read_lock(path: Path) -> dict:
 
 def claim(repo: Path, work_id: str, writer: str) -> dict[str, object]:
     repo = validate_repo(repo)
+    if quality_gate._unified_repo(repo, work_id):
+        from unified_workflow import claim as unified_claim
+        return unified_claim(repo, work_id, writer)
+    from workspace_lock import repo_lock
+    if repo_lock(repo).exists():
+        raise InvalidWorkspace('Repo is owned by a unified workflow; preserve its common-dir lock')
     fields, _contract = validate_plan(repo, work_id, "claim")
     if not writer.strip() or any(ord(char) < 32 for char in writer):
         raise InvalidWorkspace("writer identity must be non-empty and contain no control characters")
@@ -164,6 +170,9 @@ def claim(repo: Path, work_id: str, writer: str) -> dict[str, object]:
 
 def check_owner(repo: Path, work_id: str, writer: str) -> dict[str, object]:
     repo = validate_repo(repo)
+    if quality_gate._unified_repo(repo, work_id):
+        from unified_workflow import check_owner as unified_check
+        return unified_check(repo, work_id, writer)
     _fields_value, _contract = validate_plan(repo, work_id, "check")
     value = read_lock(_lock_path(repo))
     if value.get("work_id") != work_id or value.get("writer") != writer:
@@ -176,6 +185,9 @@ def check_owner(repo: Path, work_id: str, writer: str) -> dict[str, object]:
 
 def release(repo: Path, work_id: str, writer: str) -> dict[str, object]:
     repo = validate_repo(repo)
+    if quality_gate._unified_repo(repo, work_id):
+        from unified_workflow import release as unified_release
+        return unified_release(repo, work_id, writer)
     fields = _fields(repo / "docs" / "work" / work_id / "workflow.md")
     if fields.get("phase") != "delivery" or fields.get("status") != "complete":
         raise InvalidWorkspace("Repo lock can be released only after a completed delivery")

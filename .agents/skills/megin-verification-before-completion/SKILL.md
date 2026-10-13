@@ -3,15 +3,12 @@ name: megin-verification-before-completion
 description: Prove a Megin change is complete with fresh commands, scenarios, review evidence, and snapshot checks. Use for final verification, release readiness, 完成前驗證、驗證交付; do not skip failed or stale obligations.
 ---
 
+# megin-verification-before-completion
 
-# Megin verification before completion
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md) and [../megin/references/quality-gates.md](../megin/references/quality-gates.md). Verify only the exact approved Work ID, plan, and snapshot in the selected Repo.
+Verify the exact approved Work ID/plan/snapshot. Run every approved command from its recorded cwd with original stdout/stderr, exit codes and test counts. Do not substitute convenient checks for obligations. Include declared cross-Repo compatibility tests; checks require nonzero executed tests, no failures and no skips.
 
-Run every approved check from its recorded working directory and preserve raw output, exit code, and test counts. Include relevant static, contract, regression, and full-suite checks already named by the plan. Do not substitute a convenient passing check for an approved obligation. Compare the snapshot before and after; any change requires a fresh review and verification.
+When declared, use fixed committed inputs and exact read-only runner probes from [verification-extensions.md](../megin/references/verification-extensions.md). Bind their digests in structured and raw output. Resolve runner failures before proceeding.
 
-When declared, run the [runner preflight and fixed-input helpers](../megin/references/verification-extensions.md) before checks. Use the materialized committed bytes, bind their digest in both structured results and raw output, and preserve each SCN's observable assertion. Resolve runner failures before proceeding.
-
-Run the read-only `acceptance` gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate acceptance`. This gate checks current evidence and independent review; it does not represent user acceptance. Report failures with exact evidence and keep the workflow out of delivery until all checks pass.
-
-New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.
+Set verification/acceptance phase and run the read-only `acceptance` gate with the selected root and Work ID. This checks review and automated evidence; it is not human acceptance. Any changed snapshot needs repair, a new independent review and fresh verification within the existing correction cap.

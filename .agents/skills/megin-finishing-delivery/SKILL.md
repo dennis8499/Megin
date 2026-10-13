@@ -1,17 +1,16 @@
 ---
 name: megin-finishing-delivery
-description: Finish a verified and human-accepted Megin change with source-backed knowledge review and approved local delivery in one Repo. Use for final delivery, commit preparation, 交付收尾、建立本機 commit、驗收交接; do not run before acceptance or publish externally.
+description: Submit verified human-accepted Megin changes as local feature commits in one Repo or a Group. Use for final delivery and commit preparation; leave branches for the user's merge decision without publishing.
 ---
 
+# megin-finishing-delivery
 
-# Megin finishing and delivery
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md), [../megin/references/quality-gates.md](../megin/references/quality-gates.md), and [../megin/references/branch-policy.md](../megin/references/branch-policy.md). This stage runs only after fresh independent review, passing verification, and explicit user acceptance.
+Start after independent APPROVED review, fresh passing checks and explicit human acceptance of exact Work ID/version/snapshot. Set `delivery / active`. Run `unified_workflow.py deliver` with the same root/Work ID/writer. It validates evidence before staging, rechecks all remote master SHAs, stages accepted paths, saves the delivery gate and creates one feature commit per Repo in dependency order.
 
-Confirm the Work ID, approved feature branch, accepted snapshot, allowed paths, and Repo lock. Stage only the accepted product paths. Run the `delivery` gate with `--repo <Repo> --work-id <Work ID>`; when the plan selected a remote, require its exact URL and base SHA to remain unchanged. Save the exact gate stdout, exit code, and SHA-256 in the predeclared delivery record.
+Completion verifies each feature commit directly descends from pinned master and combined committed content matches acceptance. New work requires no local master movement or merge commit. Save completion, mark complete and release locks after the completion gate passes. Leave each Repo on its feature branch. Do not push, merge, create MRs, deploy, delete branches or clean worktrees.
 
-Commit the accepted feature snapshot on the approved feature branch. Switch to the approved local base branch and integrate with `git merge --no-ff <feature-branch>`. Record full feature and merge SHAs. Run the `completion` gate; it checks the accepted tree, feature parent, exact two merge parents, merge tree, base pointer, and optional remote. Only after it passes, set `phase: delivery`, `status: complete`, then release the lock with `repo_workspace.py release`. Keep the lock on any failure. Native delivery is local; do not push or create a pull/merge request.
+Partial failure retains accepted commits/locks. Resume `deliver` to finish missing commits, including recovery from a crash after Git commit but before its record. Never recreate/reset a delivered commit. Remote/base or snapshot drift needs renewed approval/review/verification/acceptance.
 
-When requested, export the [historical delivery receipt](../megin/references/delivery-receipts.md) after completion. Archive only at the predeclared `evidence/receipt.json`; preserve a different existing receipt and report its mismatch.
-
-New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.
+When requested export historical v2 receipts with `delivery_receipt.py --repo|--group-root`; read [delivery-receipts.md](../megin/references/delivery-receipts.md). Legacy work retains its original package/rules.

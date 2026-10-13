@@ -1,17 +1,13 @@
-# Single-Repo branch and delivery policy
+# Remote-master feature branch policy
 
-Select exactly one Git root and state its purpose and current evidence in the requirements record. Record the current local base branch and full commit SHA. The user may explicitly select a remote; if so, record its exact remote name, credential-free URL, base branch, and full remote SHA. A remote is optional and must not be inferred as a requirement merely because a Repo has one configured.
+New Repo v3 and Group v5 work follows [workspace-workflow.md](workspace-workflow.md). Only selected change Repos get `feature/<Work ID>`; Group discovery still includes unchanged Repos.
 
-Create `feature/<Work ID>` from the approved base only after the plan is approved and the Repo lock is claimed. Every Git command must target the selected Repo. Before each product write, check lock ownership and the installed Skills fingerprint. Preserve unrelated changes. Never reset, stash, overwrite, force-update, push, or change a branch without explicit user authorization.
+Select remotes by explicit instruction, configured override/default, origin, then a unique remote. Missing/ambiguous remotes require clarification. Pin live `refs/heads/master` with git ls-remote, credential-free remote identity and full SHA during planning. Main, local HEAD and remote-tracking refs cannot substitute. No remote or master means no development branch.
 
-The approved plan names each behavior, allowed path, quality check, exact command and working directory, relevant knowledge update, and delivery step. Follow the approved dependency order within this Repo. A local base advance, branch change, changed selected remote URL or SHA, Skills drift, or product snapshot drift invalidates the relevant approvals and requires new review, verification, and acceptance.
+After plan approval acquire common-dir Repo locks and the Group lock when applicable. Preparation checks all targets before branch creation, fetches master with an empty refmap (ignoring configured destination mappings), verifies FETCH_HEAD against the approved SHA, rechecks all remote tips, then creates each feature branch from that exact commit. No local master or tracking branch is updated by these fetches. Stop before switching any target if checkout would replace tracked installed Skills, configuration or current-work records. Switching uses a temporary command-only hooksPath to prevent post-checkout hooks from staging or rewriting content. Preserve pre-existing dirty work and conflicting branches. Do not reset, stash, force-update or overwrite them. Resume verified existing branches without recreating them.
 
-After independent review, automated verification, and explicit human acceptance, stage only accepted product paths. Run the delivery gate before committing. Save the exact passing gate output and exit code in the predeclared `delivery_ref`. Commit the accepted feature snapshot on `feature/<Work ID>`. Then switch to the approved local base branch and integrate with:
+Before each product write verify lock, feature branch, base and installed Skills fingerprint. Recheck selected remotes before delivery. Changed remote URL/master SHA invalidates downstream approval/evidence: replan, obtain approval and repeat review/verification/acceptance, retaining review history and its correction cap.
 
-```text
-git merge --no-ff feature/<Work ID>
-```
+After independent review, tests and human acceptance, create one feature commit per selected Repo in approved dependency order. Completion verifies direct descent from the pinned remote master and exact accepted trees. Leave branches for the user to merge later. Local master may be ahead, behind or absent and is not moved. Do not push, merge, create MRs, deploy or delete branches during native delivery.
 
-Save the full feature and merge commit SHAs in the delivery result. The completion gate verifies that the feature commit directly descends from the approved base, its tree matches the accepted snapshot, the merge has exactly the approved base and feature commits as parents, and the local base points to that merge with matching content. Only then set the workflow to `phase: delivery`, `status: complete`, and release the Repo lock.
-
-Do not push or create a pull/merge request as part of native delivery. Keep commit and merge local; publishing is a separate user-directed action.
+Legacy Repo v1/v2 and Group v1–v4 work keeps its original package/approval/branch policy; finish it before upgrading. Historical local-merge receipts remain readable.

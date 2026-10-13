@@ -1,6 +1,6 @@
 interface:
-  display_name: "Megin delivery workflow"
+  display_name: "Megin Repo and Group workflow"
   short_description: "Run a complete Skills-only delivery workflow"
-  default_prompt: "Use $megin to guide this repository change from requirements through acceptance and local delivery."
+  default_prompt: "Use $megin to guide this Repo or Group change through requirements, architecture, approved planning, BDD/TDD, independent review, human acceptance and remote-master feature delivery."
 policy:
   allow_implicit_invocation: true

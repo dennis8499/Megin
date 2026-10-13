@@ -3,13 +3,10 @@ name: megin-behavior-contract
 description: Define executable behavior scenarios shared by Megin planning, tests, review, and human acceptance. Use for Gherkin, BDD, acceptance criteria, 行為契約、驗收情境; do not invent behavior outside the approved requirements.
 ---
 
+# megin-behavior-contract
 
-# Megin behavior contract
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [language-policy.md](../megin/references/language-policy.md), [repository-workflow.md](../megin/references/repository-workflow.md), and [branch-policy.md](../megin/references/branch-policy.md) before creating or updating feature files.
+Write observable Given/When/Then scenarios derived from the clarified requirements. Keep Gherkin keywords and IDs in English and descriptions in the user's language. Cover relevant normal, boundary, failure, retry and recovery cases without inventing behavior.
 
-Write observable Given/When/Then scenarios for one selected Repo. Keep Gherkin keywords, Work IDs, paths, and control identifiers in English; write scenario descriptions in the user's language. Derive every scenario from approved requirements. Include relevant normal, boundary, failure, retry, and recovery behavior. Do not invent behavior or turn implementation details into user outcomes.
-
-Store feature files and their step definitions within the approved Repo paths. Map each scenario to an assertion and an approved quality command. Preserve existing project conventions and avoid duplicating coverage without a reason. Handoff: reviewed scenarios with traceability to requirements, implementation paths, test commands, and human acceptance operations.
-
-New native v2 work must satisfy [new-work-evidence.md](../megin/references/new-work-evidence.md); legacy work keeps its original schema and fingerprint. Missing or stale discovery, exact-plan approval, scenario/TDD evidence or review history blocks progression.
+Planning freezes scenarios before approval; implementation executes them afterward. Map every REQ to SCNs, observable assertions, approved checks/cwd and implementation paths. In Group mode prefix implementation/test paths with the selected Repo name and cover cross-Repo contracts. Keep feature/step files within approved paths. Handoff scenarios for planning, BDD/TDD, review and human acceptance.

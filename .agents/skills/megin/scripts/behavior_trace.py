@@ -87,7 +87,9 @@ def preflight(repo: Path, contract: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, required=True)
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--repo", type=Path)
+    selection.add_argument("--group-root", type=Path)
     parser.add_argument("--work-id", required=True)
     args = parser.parse_args()
     try:
@@ -95,8 +97,13 @@ def main() -> int:
         from repo_workspace import validate_repo, InvalidWorkspace
         if not WORK_ID_PATTERN.fullmatch(args.work_id):
             raise ValueError("invalid Work ID")
-        repo = validate_repo(args.repo)
-        _, contract, _ = load_contract(repo, args.work_id)
+        if args.group_root:
+            from unified_workflow import load_contract as load_unified
+            repo = args.group_root.resolve()
+            _, contract, _, _ = load_unified(repo, args.work_id, group=True)
+        else:
+            repo = validate_repo(args.repo)
+            _, contract, _ = load_contract(repo, args.work_id)
         validate_trace(contract)
         result = preflight(repo, contract)
         print(json.dumps(result, ensure_ascii=False))

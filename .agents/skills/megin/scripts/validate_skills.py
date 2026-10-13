@@ -21,6 +21,7 @@ from pathlib import Path
 EXPECTED = (
     "megin",
     "megin-requirements-discovery",
+    "megin-architecture-exploration",
     "megin-technical-planning",
     "megin-bug-diagnosis",
     "megin-project-knowledge",
@@ -45,16 +46,18 @@ def frontmatter(path: Path) -> tuple[str, str]:
 def package_files(root: Path) -> dict[str, bytes]:
     """Return the exact files that belong in the distributable archive."""
     repository = root.parent.parent
-    readme = repository / "README.md"
-    if readme.is_symlink():
-        raise ValueError(f"package README must not be a symlink: {readme}")
-    if not readme.is_file():
-        raise ValueError(f"missing package README: {readme}")
     if root.is_symlink():
         raise ValueError(f"Skills root must not be a symlink: {root}")
     skills_root = root.resolve()
 
-    files = {"README.md": readme.read_bytes()}
+    files = {}
+    for name in ("README.md", "OPERATIONS.md"):
+        document = repository / name
+        if document.is_symlink() or not document.is_file():
+            raise ValueError(f"package document must be a regular file: {document}")
+        # Root documentation links target the repository layout in source and
+        # the flat Skills layout in the archive. Keep installed-path examples.
+        files[name] = document.read_bytes().replace(b'](.agents/skills/', b'](')
     version = repository / "VERSION"
     if version.is_file():
         files["VERSION"] = version.read_bytes()
@@ -192,6 +195,14 @@ def validate(root: Path) -> list[str]:
         for path in (root / name).rglob("*"):
             if path.is_file() and path.name != "validate_skills.py":
                 text = path.read_text(encoding="utf-8", errors="replace")
+                if path.suffix.lower() == '.md':
+                    for target in re.findall(r'\]\(([^)]+)\)', text):
+                        target = target.split('#', 1)[0].strip('<>')
+                        if not target or '://' in target:
+                            continue
+                        linked = (path.parent / target).resolve()
+                        if not linked.is_relative_to(root.resolve()) or not linked.is_file():
+                            errors.append(f'{path}: missing or unsafe local reference {target}')
                 for token in forbidden:
                     if token in text:
                         errors.append(f"{path}: forbidden legacy reference {token}")

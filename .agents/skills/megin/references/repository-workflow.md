@@ -1,38 +1,13 @@
-# Single-repository workflow contract
+# Megin repository and Group workflow
 
-Megin runs from one Git repository root. Each Work ID belongs to that Repo and stores its readable workflow, requirements, plan, and evidence under `docs/work/<Work ID>/`. Do not scan parent or sibling folders for other Repos. Keep project-specific knowledge in the selected Repo's existing documentation structure.
+For new work read [workspace-workflow.md](workspace-workflow.md). Repo v3 and Group v5 share requirements → architecture → planning → approval → implementation/BDD/TDD → independent review → verification → human acceptance → feature-only delivery.
 
-## Base and branch
+Repo mode selects one Git root and stores records there. Group mode selects a non-Git root, explores every valid direct-child Repo and centralizes records; only approved change Repos get branches. Every change Repo requires a pinned live remote master. Both modes use common-dir Repo locks, with an additional Group lock, and all thirteen Skills installed at the selected root.
 
-At planning time, record the selected Repo's root, current branch, full base commit, proposed `feature/<Work ID>` branch, allowed paths, exact checks, and their working directories. A repository with no remote is fully supported. Use its approved local base commit and never run remote commands. When the user explicitly selects a remote, freeze its name, URL, base branch, and full base SHA. The delivery gate checks that exact remote URL and `git ls-remote` base SHA again before a commit is made. Remote-tracking refs alone are not evidence of the current remote tip.
+Plan approval precedes product writes; human acceptance precedes staging/commits. Initial review is round 0 with at most three corrections, each reviewed in a new independent read-only context; stop early on approval, retain failed/exhausted history on resume.
 
-Preserve unrelated dirty work. Before implementation, confirm the approved base commit and create or verify the feature branch. Do not reset, stash, force-update, or overwrite existing user changes. A moved local base or selected remote base invalidates the approval and requires a new plan and acceptance cycle.
+Use exactly one of --repo / --group-root in quality_gate.py and unified_workflow.py. The former is read-only. The latter exposes explicit claim/prepare/check/deliver/release operations. Read [quality-gates.md](quality-gates.md), [branch-policy.md](branch-policy.md) and [new-work-evidence.md](new-work-evidence.md).
 
-## Repo lock and Skills fingerprint
+## Legacy compatibility
 
-The quality contract records the SHA-256 fingerprint of every installed Megin Skill file. Compute it with `repo_workspace.py fingerprint --repo <Repo>` before approval. Compare it on resume and at each gate. Fingerprint drift requires reapproval and fresh review, verification, and acceptance.
-
-Before the first product write, claim the Repo:
-
-```text
-python .agents/skills/megin/scripts/repo_workspace.py claim --repo <Repo> --work-id <Work ID> --writer <writer identity>
-```
-
-Before each product write, run the matching `check` command. The lock has no timeout; a waiting user, interruption, or blocked task does not release it. Continue only with the recorded Work ID and writer. Do not delete the lock manually. Release it only after the delivery record says `complete` and the completion gate passes:
-
-```text
-python .agents/skills/megin/scripts/repo_workspace.py release --repo <Repo> --work-id <Work ID> --writer <writer identity>
-```
-
-## Work record and gates
-
-The workflow header uses `schema: megin-repo-workflow/v2`; the approved plan uses `megin-repo-quality-contract/v2`; gate evidence uses `megin-repo-quality-evidence/v2`. The contract freezes one Repo's `base_branch`, `base_commit`, optional `remote_name` and `remote_url`, `feature_branch`, `allowed_paths`, checks, `process_records`, `quality_ref`, `delivery_ref`, and `skills_sha256`. All evidence files must be predeclared under the Work ID's `evidence/` directory.
-
-1. Approval precedes product writes. The exact plan includes behavior scenarios, implementation scope, check commands, review, user acceptance, and delivery.
-2. Implementation follows BDD/TDD and changes only approved paths. Keep one writer and protect the Repo with the lock.
-3. Review and verification bind the same product snapshot. Any code, test, plan, or Skills change invalidates downstream evidence.
-4. Acceptance is the user's confirmation of the displayed Work ID, version, operations, and expected results. It is not inferred from passing automated checks.
-5. After acceptance, stage only accepted product paths and run the `delivery` gate. Save its exact stdout, exit code, and SHA-256 in the predeclared delivery record. Commit the accepted product snapshot on the feature branch.
-6. Switch to the approved base branch and run `git merge --no-ff <feature-branch>`. Save the full feature and merge commit SHAs in the delivery record. Run the `completion` gate; it verifies the saved delivery receipt, accepted tree, feature commit, exact merge parents, merge tree, and optional remote base. Set `status: complete` only after it passes, then release the Repo lock.
-
-Delivery remains local. Native Megin does not push, create a pull/merge request, coordinate another Repo, or publish changes. Historical work records remain readable in place; new work uses this contract.
+Repo v1/v2 records remain readable by their original native gate logic, with optional remotes and local --no-ff delivery. Their fingerprints/approval/snapshot semantics do not change. Group v1–v4 work continues on its existing GitlabWorkSpace package. Never migrate an unfinished Work ID or replace its installed Skills. Installation blocks unfinished work/locks; once complete, new work uses v3/v5.

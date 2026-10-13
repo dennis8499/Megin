@@ -117,6 +117,10 @@ def load_contract(repo: Path, work_id: str) -> tuple[dict[str, str], dict, set[s
         raise InvalidEvidence("workflow plan_version is invalid")
     contract = read_json(work / plan_version / "quality-contract.json")
     contract_schema = contract.get("schema")
+    if contract_schema == "megin-repo-quality-contract/v3" or fields.get('schema') == 'megin-repo-workflow/v3':
+        from unified_workflow import load_contract as load_unified
+        fields, contract, _repos, records = load_unified(repo, work_id, group=False)
+        return fields, contract, records
     if (contract_schema not in ("megin-quality-contract/v1", "megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2")
             or contract.get("work_id") != work_id
             or contract.get("plan_version") != plan_version):
@@ -252,6 +256,9 @@ def validate_input_evidence(repo, work_id, records, contract, evidence, reasons)
 
 
 def snapshot(repo: Path, work_id: str) -> dict[str, object]:
+    if _unified_repo(repo, work_id):
+        from unified_workflow import snapshot as unified_snapshot
+        return unified_snapshot(repo, work_id, group=False)
     _fields, contract, records = load_contract(repo, work_id)
     inputs = fixed_inputs(repo, contract)
     entries = with_inputs(worktree_entries(repo, work_id, records), inputs)
@@ -388,6 +395,9 @@ def validate_recorded_checks(
 
 
 def check(repo: Path, work_id: str, gate: str) -> dict[str, object]:
+    if _unified_repo(repo, work_id):
+        from unified_workflow import check as unified_check
+        return unified_check(repo, work_id, gate, group=False)
     if gate == "completion":
         return check_completion(repo, work_id)
     fields, contract, records = load_contract(repo, work_id)
@@ -595,6 +605,9 @@ def _tree_digest(repo: Path, commit: str, records: set[str], work_id: str, input
 
 
 def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> dict[str, object]:
+    if _unified_repo(repo, work_id):
+        from unified_workflow import check as unified_check
+        return unified_check(repo, work_id, 'completion', group=False, historical=historical)
     """Verify the accepted feature commit and its local --no-ff integration."""
     fields, contract, records = load_contract(repo, work_id)
     if contract.get("schema") not in ("megin-repo-quality-contract/v1", "megin-repo-quality-contract/v2"):
@@ -767,6 +780,10 @@ def check_completion(repo: Path, work_id: str, *, historical: bool = False) -> d
     }
 
 
+def _unified_repo(repo, work_id):
+    return workflow_fields(Path(repo) / 'docs/work' / work_id / 'workflow.md').get('schema') == 'megin-repo-workflow/v3'
+
+
 def _workspace_extension():
     """Load a host-specific extension when the selected workspace supplies one."""
     import importlib.util
@@ -799,7 +816,7 @@ def main() -> int:
             raise InvalidEvidence("invalid Work ID")
         if args.action == "check" and not args.gate:
             raise InvalidEvidence("check requires --gate")
-        if args.action == "snapshot" and args.gate:
+        if args.action != "check" and args.gate:
             raise InvalidEvidence("--gate is valid only with check")
         if bool(args.repo) == bool(getattr(args, "group_root", None)):
             raise InvalidEvidence("provide exactly one of --repo or the installed workspace root")
@@ -811,10 +828,14 @@ def main() -> int:
             repo = args.repo.resolve()
             if not repo.is_dir() or Path(line(repo, "rev-parse", "--show-toplevel")).resolve() != repo:
                 raise InvalidEvidence("--repo must identify the Git repository root")
-            result = snapshot(repo, args.work_id) if args.action == "snapshot" else check(repo, args.work_id, args.gate)
+            if args.action == 'validate-record':
+                from unified_workflow import validate_record
+                result = validate_record(repo, args.work_id, group=False)
+            else:
+                result = snapshot(repo, args.work_id) if args.action == "snapshot" else check(repo, args.work_id, args.gate)
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 1 if result.get("ok") is False else 0
-    except (InvalidEvidence, OSError, UnicodeError, ValueError, KeyError) as exc:
+    except (InvalidEvidence, OSError, UnicodeError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 

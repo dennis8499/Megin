@@ -19,6 +19,9 @@ from verification_inputs import canonical_digest, no_links
 
 def export_receipt(repo: Path, work_id: str) -> dict:
     repo = validate_repo(repo)
+    if q._unified_repo(repo, work_id):
+        from unified_workflow import export_receipt as unified_export
+        return unified_export(repo, work_id)
     if not q.WORK_ID_PATTERN.fullmatch(work_id):
         raise q.InvalidEvidence("invalid Work ID")
     result = q.check_completion(repo, work_id, historical=True)
@@ -94,14 +97,35 @@ def write_receipt(repo: Path, work_id: str, output: Path, receipt: dict) -> None
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, required=True)
+    selection = parser.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--repo", type=Path)
+    selection.add_argument("--group-root", type=Path)
     parser.add_argument("--work-id", required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     try:
-        receipt = export_receipt(args.repo, args.work_id)
+        if args.group_root:
+            from unified_workflow import export_receipt as unified_export
+            receipt = unified_export(args.group_root, args.work_id, group=True)
+        else:
+            receipt = export_receipt(args.repo, args.work_id)
         if args.output:
-            write_receipt(args.repo, args.work_id, args.output, receipt)
+            if args.group_root:
+                from unified_workflow import load_contract
+                root = args.group_root.resolve()
+                _, _, _, records = load_contract(root, args.work_id, group=True)
+                expected = f'docs/work/{args.work_id}/evidence/receipt.json'
+                if expected not in records or args.output.absolute() != root / expected:
+                    raise q.InvalidEvidence('receipt output must be the dedicated predeclared evidence/receipt.json')
+                no_links(args.output)
+                if args.output.exists():
+                    if q.read_json(args.output) != receipt:
+                        raise q.InvalidEvidence('refusing to overwrite a different existing receipt')
+                else:
+                    from unified_workflow import save_json
+                    save_json(args.output, receipt)
+            else:
+                write_receipt(args.repo, args.work_id, args.output, receipt)
         else:
             print(json.dumps(receipt, ensure_ascii=False, indent=2))
         return 0

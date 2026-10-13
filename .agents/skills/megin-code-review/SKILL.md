@@ -3,15 +3,14 @@ name: megin-code-review
 description: Perform a fresh read-only review of an approved Megin snapshot. Use for code review, quality review, scope review, knowledge integrity, 審查、檢視修改、品質檢查; do not edit, commit, delegate, or approve your own changes.
 ---
 
+# megin-code-review
 
-# Megin code review
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md) and [../megin/references/quality-gates.md](../megin/references/quality-gates.md). Start from a fresh, independent, read-only context after the writer reports a frozen snapshot. The reviewer must not have authored the implementation.
+Start from a new independent read-only context after the writer freezes a snapshot. The reviewer must not have authored the implementation. Do not edit, stage, commit, delegate the review or self-approve.
 
-Inspect the approved plan, changed paths, implementation, tests, and relevant Repo documentation. Trace each promised behavior to code and meaningful assertions. Look for correctness defects, regressions, unsafe input handling, missing failure cases, and stale or unsupported claims. Cite exact file and line locations. Do not modify files or stage changes.
+Inspect exact requirements, architecture, approved plan, changed paths, code, tests and relevant Repo documentation. Trace REQ → SCN → assertion → code → checks → review → acceptance; check discovery coverage, meaningful assertions, failure cases, remote-master branch identity and cross-Repo compatibility. For fixed inputs, verify tests consume their pinned bytes. Cite file/line findings.
 
-For contracts with [verification extensions](../megin/references/verification-extensions.md), verify every scenario's observable assertion, implementation paths and check mapping. Confirm tests consume the pinned input bytes and that raw output binds their digest; structural completeness alone does not prove behavior.
+Run `quality_gate.py check --gate review` with the selected `--repo` or `--group-root` and Work ID. A structural pass does not prove semantic correctness or independence. Record real context/invocation ID, APPROVED or CHANGES_REQUESTED, snapshot and findings; append using `review_history.py`.
 
-Run the read-only review gate with `quality_gate.py check --repo <Repo> --work-id <Work ID> --gate review`. A passing structural gate does not substitute for reasoning about behavior. Record the reviewer context, `APPROVED` or `CHANGES_REQUESTED`, snapshot, findings, and raw evidence. Handoff only when the review is complete; any repair requires a new snapshot and independent review.
-
-New work follows [new-work-evidence.md](../megin/references/new-work-evidence.md). Verify discovery, exact-plan human approval, requirement → BDD → assertion → code → checks → review → human acceptance traceability and valid raw red/green output. Initial review is round 0, followed by at most three corrections; each review uses a new independent read-only context. Append the attempt with `review_history.py`; never replace or delete an earlier attempt. Stop on approval or after a failed round 3; preserve the incomplete result.
+Initial review is round 0. Allow at most three correction/re-review attempts, each with a new independent context. Stop early on approval or after failed round 3. Preserve immutable attempts on resume. If a real independent context is unavailable, use `awaiting_review` and stop progression.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Megin architecture exploration"
+  short_description: "Explore source architecture before planning"
+  default_prompt: "Use $megin-architecture-exploration to trace components, flows, dependencies, tests and change impact after requirements discovery."
+policy:
+  allow_implicit_invocation: true

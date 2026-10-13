@@ -1,9 +1,17 @@
 # Fixed inputs and observable verification
 
-The existing v1 quality contracts accept optional `verification_inputs`,
+Legacy v1 quality contracts accept optional `verification_inputs`,
 `scenario_ids`, `behavior_trace` and `runner_preflight`. Omitting them preserves
 the existing snapshot format and gate behavior. Approve additions as part of the
 exact plan before capturing evidence.
+
+New Repo v3 / Group v5 contracts always require scenario_ids and behavior_trace
+with REQ IDs and Given/When/Then. Fixed inputs and runner_preflight remain
+optional. Both helpers accept mutually exclusive --repo / --group-root.
+Group input entries add repo_path to select an approved Repo; input file paths
+remain relative to that Repo. Materialized Group bytes are namespaced as
+<destination>/<repo_path>/<commit>/<path>, and scenario implementation/test paths
+are Group-relative. Probes use the Group root or an approved Repo name as cwd.
 
 ## Fixed input bytes
 

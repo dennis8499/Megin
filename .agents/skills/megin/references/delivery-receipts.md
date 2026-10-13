@@ -1,4 +1,24 @@
-# Historical single-Repo delivery receipts
+# Historical delivery receipts
+
+## Feature-only v2 receipts (Repo v3 / Group v5)
+
+After completed feature delivery, use `delivery_receipt.py --repo <Repo>` or
+`--group-root <Group>` with `--work-id <ID>`. New exports use
+`megin-repo-delivery-receipt/v2` or `megin-delivery-receipt/v2`. They bind the
+accepted combined snapshot, every base/feature commit, architecture, exact-plan
+approval, frozen scans, raw TDD/check/acceptance output and append-only review
+history. Feature commits have the approved remote master as their sole parent;
+there is no merge commit. Historical checks use delivered objects and protected
+records, independent of later product edits, branches, Skills or remote tips.
+
+Use stdout by default. `--output` is restricted to the predeclared
+`docs/work/<ID>/evidence/receipt.json`; preserve different existing receipts.
+Repeated identical export succeeds. Current MergeReviewer supports the legacy
+v1 format only. Its v2 integration is a separate update; never relabel a v2
+receipt to bypass version checks. Receipts prove local recorded delivery, not
+publication or merge.
+
+## Legacy native v1 receipts
 
 After the completion gate passes and `workflow.md` records `status: complete`,
 export `megin-repo-delivery-receipt/v1`:

@@ -3,11 +3,10 @@ name: megin-bug-diagnosis
 description: Diagnose a suspected bug with read-only evidence before repair. Use for bugs, errors, regressions, failures, 錯誤、異常、回歸、失效; do not implement a fix during diagnosis or confuse an explanation request with a repair request.
 ---
 
+# megin-bug-diagnosis
 
-# Megin bug diagnosis
+Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
 
-Read [../megin/references/language-policy.md](../megin/references/language-policy.md) and [../megin/references/repository-workflow.md](../megin/references/repository-workflow.md) before investigating. Work only in the selected Git repository.
+Diagnosis is read-only until exact-plan approval. Reproduce the symptom with a focused check, then trace relevant source, tests and documentation. Select Repo/Group mode using the shared contract. Repo mode stays in its root; Group mode may trace its valid Repos and cross-Repo dependencies.
 
-Reproduce the reported symptom with a focused check, then trace the relevant code path, existing tests, and project documentation. Separate observed facts from hypotheses. Report the smallest evidence-backed cause, affected behavior, regression scenario, and proposed repair. Diagnosis is read-only until the user has approved an implementation plan. Do not scan sibling repositories or change files during diagnosis.
-
-When evidence is incomplete, identify the next observation that would distinguish the remaining causes. Handoff: reproduction command and output, source locations, root-cause evidence, and a regression test proposal.
+Separate observations from hypotheses. Report reproduction command/output, smallest evidence-backed cause, affected behavior and regression scenario. Identify the next discriminating observation when evidence is incomplete. Repair follows requirements → architecture → planning → approval → BDD/TDD → independent review → verification → human acceptance → feature delivery.
