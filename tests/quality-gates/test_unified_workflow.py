@@ -296,7 +296,7 @@ class UnifiedWorkflowTests(unittest.TestCase):
     def test_group_one_and_multiple_targets_leave_unmodified_repo_alone(self):
         for count in (1, 2):
             with self.subTest(count=count), tempfile.TemporaryDirectory() as temporary:
-                f = WorkFixture(Path(temporary), group=True, count=count, unmodified=True)
+                f = WorkFixture(Path(temporary).resolve(), group=True, count=count, unmodified=True)
                 f.implement()
                 f.accept()
                 result = workflow.deliver(f.root, WORK, 'writer', True)
