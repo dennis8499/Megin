@@ -28,7 +28,7 @@ class GroupImpactTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.temp = Path(temporary.name)
+        self.temp = Path(temporary.name).resolve()
 
     def architecture(self, f, value):
         f.contract['architecture_ref'] = f.f.write('architecture.json', value)

@@ -272,7 +272,7 @@ class UnifiedWorkflowTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        self.temp = Path(temporary.name)
+        self.temp = Path(temporary.name).resolve()
 
     def make(self, **kwargs):
         return WorkFixture(self.temp, **kwargs)
