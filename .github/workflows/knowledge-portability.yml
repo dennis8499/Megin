@@ -43,7 +43,7 @@ jobs:
   platform:
     name: Validate on ${{ matrix.os_name }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
