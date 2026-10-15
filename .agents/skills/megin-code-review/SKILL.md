@@ -1,18 +1,28 @@
 ---
 name: megin-code-review
-description: Perform a fresh read-only review of an approved Megin snapshot. Use for code review, quality review, scope review, knowledge integrity, 審查、檢視修改、品質檢查; do not edit, commit, delegate, or approve your own changes.
+description: Independently review an approved frozen Megin snapshot against requirements, scope, behavior and evidence. Use for a Megin Work ID's review or re-review; the reviewer must be a fresh read-only context that did not author the changes.
 ---
 
-# megin-code-review
+# Megin code review
 
-Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
+Read [repository-workflow.md](../megin/references/repository-workflow.md) for root/resume and stage contracts,
+then [language-policy.md](../megin/references/language-policy.md) for human-readable output.
 
-Start from a new independent read-only context after the writer freezes a snapshot. The reviewer must not have authored the implementation. Do not edit, stage, commit, delegate the review or self-approve.
+1. Start in a new independent read-only context after the writer freezes a snapshot.
+   Review directly without edits, staging, commits or further delegation. The author cannot
+   self-approve; without a separate context, set `awaiting_review` and stop progression.
+2. Inspect exact requirements, architecture, approved plan, changed paths, code, tests and docs.
+   Trace REQ → SCN → assertion → code → checks → review → acceptance. Check discovery coverage,
+   effective assertions, failure cases, remote-master identity and compatibility. Fixed-input
+   tests must consume pinned bytes. Cite file/line findings.
+3. In Group, apply [group-impact.md](../megin/references/group-impact.md): reconcile actual diff
+   with the frozen graph and direct/indirect unchanged consumers. Judge API/event/data/package/
+   table/configuration compatibility and exclusion reasons from fixed searches and relationships.
+   New interfaces/consumers need renewed planning; missing necessary source keeps review incomplete.
+4. Run `quality_gate.py check --gate review` for the selected root/Work ID. Record the real
+   context/invocation ID, snapshot, findings and `APPROVED` or `CHANGES_REQUESTED`; append via
+   `review_history.py`. Structural success proves consistency, not semantic correctness or independence.
 
-Inspect exact requirements, architecture, approved plan, changed paths, code, tests and relevant Repo documentation. Trace REQ → SCN → assertion → code → checks → review → acceptance; check discovery coverage, meaningful assertions, failure cases, remote-master branch identity and cross-Repo compatibility. For fixed inputs, verify tests consume their pinned bytes. Cite file/line findings.
-
-For Group read [group-impact.md](../megin/references/group-impact.md). Review actual diff confirmation against the frozen graph, following direct and indirect unchanged consumers. Inspect API/event/data/package/table/configuration compatibility and exclusion reasons; search terms and aliases need source relationships. New interfaces/consumers require renewed planning. Missing necessary source leaves review incomplete. Structure proves evidence consistency; independently judge whether every semantic interface and consumer was correctly classified.
-
-Run `quality_gate.py check --gate review` with the selected `--repo` or `--group-root` and Work ID. A structural pass does not prove semantic correctness or independence. Record real context/invocation ID, APPROVED or CHANGES_REQUESTED, snapshot and findings; append using `review_history.py`.
-
-Initial review is round 0. Allow at most three correction/re-review attempts, each with a new independent context. Stop early on approval or after failed round 3. Preserve immutable attempts on resume. If a real independent context is unavailable, use `awaiting_review` and stop progression.
+Finish with an immutable attempt: initial round 0, at most three corrections/re-reviews,
+each in a new context. Stop early on approval; failed round 3 remains incomplete.
+Resume preserves history and the same cap.

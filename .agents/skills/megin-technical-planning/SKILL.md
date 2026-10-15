@@ -1,16 +1,29 @@
 ---
 name: megin-technical-planning
-description: Turn clarified Megin requirements and explored architecture into an executable Repo or Group plan. Use for technical design, tasks, interfaces, tests, migration and delivery planning; require approval before product writes.
+description: Freeze an executable plan from completed Megin requirements and architecture. Use for a Megin Work ID's paths, BDD assertions, checks, remote-master bases, dependencies and exact-plan approval.
 ---
 
-# megin-technical-planning
+# Megin technical planning
 
-Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
+Read [repository-workflow.md](../megin/references/repository-workflow.md) for root/resume and stage contracts,
+then [language-policy.md](../megin/references/language-policy.md) for human-readable output.
 
-Begin after requirements and architecture are complete. Bind their exact revisions and hashed records. Select only Repos needing changes while retaining complete Group discovery. Map each requirement to BDD scenarios, observable assertions, implementation paths and exact check commands/cwd. Include knowledge updates, failures, independent review, human acceptance and feature-only delivery.
+1. Bind exact completed requirements/architecture revisions and hashed records. Select only
+   change Repos while retaining complete Group discovery. Map each REQ to BDD scenarios,
+   assertions, implementation/knowledge paths and exact check commands/cwd. Plan failure cases,
+   independent review, human acceptance and feature-only delivery.
+2. Run `unified_workflow.py resolve` per selected Repo; pin credential-free remote identity
+   and live master SHA. Neither `main` nor local HEAD substitutes. Record dependency graph,
+   order, compatibility checks and partial-delivery instructions in `handoff`; explain
+   independent multi-Repo work.
+3. In Group, apply [group-impact.md](../megin/references/group-impact.md): freeze architecture/v2
+   graph and every disposition. Add affected unchanged consumers to `verification_repositories`
+   with fixed commits/checks even for one change Repo. Separate the cyclic impact graph from
+   the modification-only delivery DAG; predeclare actual-diff impact confirmation. Unknown
+   necessary impact blocks planning/approval.
+4. Freeze all thirteen Skills' fingerprint and every future evidence path using Repo v3 /
+   Group v6. Present Work ID/version, scope, scenarios, architecture, checks, remote identity,
+   base SHAs and delivery for explicit human approval before product writes.
 
-Run `unified_workflow.py resolve` per selected Repo. Pin credential-free remote identity and live master SHA with no main/local-HEAD fallback. Record dependency graph, order, compatibility checks and partial-delivery instructions in `handoff`; explain independent multi-Repo work.
-
-In Group follow [group-impact.md](../megin/references/group-impact.md). Freeze the planned architecture/v2 impact graph and every Repo disposition. Add affected unchanged consumers to verification_repositories with fixed commits and compatibility checks, even when only one Repo changes. Keep the cyclic impact graph separate from the modification-only delivery DAG. Predeclare separate actual-diff impact confirmation; unresolved impact blocks planning/approval.
-
-Freeze the thirteen-Skill fingerprint and every future evidence path before approval. Use Repo v3 / Group v6. Present Work ID, version, scope, scenarios, architecture, commands, base SHAs and delivery for explicit human approval. Save the literal response with exact plan and canonical contract digests. Missing/stale discovery, architecture or approval blocks writer claim.
+Finish when the human's literal response binds exact plan and canonical contract digests.
+Missing or stale discovery, architecture or approval blocks writer claim.

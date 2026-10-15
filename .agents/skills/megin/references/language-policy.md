@@ -38,7 +38,7 @@ step text in Traditional Chinese.
 
 The shared business rules for research triggers, source evidence, capability coverage, prerequisite-ready question
 selection, completion, and recovery are in
-[requirements-discovery-protocol.md](requirements-discovery-protocol.md). Before requirements discovery or any
+[requirements-discovery-protocol.md](requirements-discovery-protocol.md). During requirements discovery and before its architecture
 handoff, apply that protocol and write its revision, blockers, and source references in the Work ID. If a protocol
 condition is not met, ask exactly one question in Traditional Chinese, keep `phase: requirements` and
 `status: awaiting_user`, and do not claim requirements are complete or create a planning handoff. This section keeps

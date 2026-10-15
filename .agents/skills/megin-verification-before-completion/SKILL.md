@@ -1,16 +1,26 @@
 ---
 name: megin-verification-before-completion
-description: Prove a Megin change is complete with fresh commands, scenarios, review evidence, and snapshot checks. Use for final verification, release readiness, 完成前驗證、驗證交付; do not skip failed or stale obligations.
+description: Verify an approved Megin snapshot using its exact checks, scenario evidence and independent review. Use before Megin human acceptance/delivery or after a snapshot changes; failed or stale obligations remain incomplete.
 ---
 
-# megin-verification-before-completion
+# Megin verification before completion
 
-For Group read [group-impact.md](../megin/references/group-impact.md). Verify compatibility with affected unchanged and indirect consumers even for one modification Repo; bind results to their pinned source and actual-diff confirmation. Source drift, stale searches, expanded interfaces or unknown necessary external dependencies block acceptance and delivery until renewed evidence/approval.
+Read [repository-workflow.md](../megin/references/repository-workflow.md) for root/resume and stage contracts,
+then [language-policy.md](../megin/references/language-policy.md) for human-readable output.
 
-Read [repository-workflow.md](../megin/references/repository-workflow.md), [workspace-workflow.md](../megin/references/workspace-workflow.md), [new-work-evidence.md](../megin/references/new-work-evidence.md) and [language-policy.md](../megin/references/language-policy.md).
+1. Verify exact approved Work ID/plan/snapshot. Run every approved command from recorded cwd,
+   retaining original stdout/stderr, exit codes and test counts. Execute declared compatibility
+   checks; test checks require nonzero execution, no failures and no skips. Keep each obligation
+   rather than substituting a convenient check.
+2. For Group, apply [group-impact.md](../megin/references/group-impact.md) to direct/indirect
+   unchanged consumers, even with one change Repo. Bind compatibility to pinned source and
+   actual-diff confirmation. Drift, stale searches, new interfaces or unknown necessary
+   external dependencies block acceptance/delivery pending renewed evidence/approval.
+3. When declared, apply [verification-extensions.md](../megin/references/verification-extensions.md)
+   for fixed committed inputs and exact read-only runner probes; bind digests in structured
+   and raw output, and resolve runner failures.
 
-Verify the exact approved Work ID/plan/snapshot. Run every approved command from its recorded cwd with original stdout/stderr, exit codes and test counts. Do not substitute convenient checks for obligations. Include declared cross-Repo compatibility tests; checks require nonzero executed tests, no failures and no skips.
-
-When declared, use fixed committed inputs and exact read-only runner probes from [verification-extensions.md](../megin/references/verification-extensions.md). Bind their digests in structured and raw output. Resolve runner failures before proceeding.
-
-Set verification/acceptance phase and run the read-only `acceptance` gate with the selected root and Work ID. This checks review and automated evidence; it is not human acceptance. Any changed snapshot needs repair, a new independent review and fresh verification within the existing correction cap.
+Finish by setting verification/acceptance phase and passing the read-only `acceptance` gate
+for the selected root/Work ID. It validates automated evidence and independent review;
+the human decision remains separate. Snapshot changes need repair, fresh review and
+verification within the existing correction cap.
