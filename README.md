@@ -4,6 +4,8 @@ Megin is a development workflow for **one Git repository or a local Group of rep
 
 Every change Repo requires a live remote `master`. Megin pins its exact SHA, fetches/rechecks it after plan approval, and develops on `feature/<Work ID>`. All accepted Repos remain on feature branches for your later merge decision.
 
+All thirteen Skills use the shared [output language and style policy](.agents/skills/megin/references/language-policy.md): Traditional Chinese, result-first Concise replies and work artifacts, with complete required records and raw evidence. Requested explanations remain full length.
+
 ## Install and upgrade
 
 Download `megin-skills.zip` from the [Releases page](https://github.com/dennis8499/Megin/releases) and unpack it into a temporary directory. From that unpacked directory run:
