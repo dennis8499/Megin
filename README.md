@@ -6,6 +6,10 @@ Every change Repo requires a live remote `master`. Megin pins its exact SHA, fet
 
 All thirteen Skills use the shared [output language and style policy](.agents/skills/megin/references/language-policy.md): Traditional Chinese, result-first Concise replies and work artifacts, with complete required records and raw evidence. Requested explanations remain full length.
 
+## 0.8.1 update
+
+All thirteen Skills use the shared Concise policy and load stage guidance on demand. Routing, completion criteria and workflow examples are clarified; Repo v3, Group v6 and architecture/v2 remain compatible.
+
 ## Install and upgrade
 
 Download `megin-skills.zip` from the [Releases page](https://github.com/dennis8499/Megin/releases) and unpack it into a temporary directory. From that unpacked directory run:
