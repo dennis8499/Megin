@@ -1,78 +1,140 @@
 name: Megin Skills portability
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
-    paths:
-      - ".agents/skills/**"
-      - "README.md"
-      - "OPERATIONS.md"
-      - "VERSION"
-      - "megin-skills.zip"
-      - ".github/workflows/knowledge-portability.yml"
-      - ".gitattributes"
-      - ".gitignore"
-      - "tests/quality-gates/**"
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: release-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+  actions: read
 
 jobs:
-  skills:
-    name: Validate Skills bundle
+  select:
+    name: Select exact main CI proof
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    outputs:
+      reuse_run_id: ${{ steps.proof.outputs.reuse_run_id }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-      - name: Validate Skills source and distributable archive
-        run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
-      - name: Check pull-request whitespace
-        shell: bash
+          python-version: '3.14'
+      - name: Reuse only complete trusted main proof within seven days
+        id: proof
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            git diff --check "$PR_BASE_SHA...$GITHUB_SHA"
-          else
-            git diff --check "$GITHUB_SHA^" "$GITHUB_SHA"
-          fi
+          GH_TOKEN: ${{ github.token }}
+        run: python -X utf8 -B scripts/release_ci.py select --output "$GITHUB_OUTPUT"
 
-  platform:
-    name: Validate on ${{ matrix.os_name }}
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+  build:
+    needs: select
+    if: ${{ always() && (needs.select.result == 'skipped' || (needs.select.result == 'success' && needs.select.outputs.reuse_run_id == '')) }}
+    name: Validate [${{ matrix.cell }}]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os_name: linux
-            runner: ubuntu-latest
-          - os_name: windows
-            runner: windows-latest
+          - cell: source-py3.13
+            os: ubuntu-latest
+            python-version: '3.13'
+          - cell: linux-py3.13
+            os: ubuntu-latest
+            python-version: '3.13'
+          - cell: windows-py3.13
+            os: windows-latest
+            python-version: '3.13'
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact source
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-      - name: Check out the fixed reviewer integration-test dependency
+          python-version: ${{ matrix.python-version }}
+      - name: Check out fixed reviewer integration dependency
+        if: matrix.cell != 'source-py3.13'
         uses: actions/checkout@v4
         with:
           repository: dennis8499/MergeReviewer
           ref: fc08cf5706334264f289633aa80ed6ee34a09911
           path: .test-dependencies/merge-reviewer
           persist-credentials: false
-      - name: Check runtime prerequisites
-        run: |
-          python --version
-          git --version
       - name: Validate Skills source and distributable archive
         run: python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --archive megin-skills.zip
-      - name: Validate legacy and native Repo/Group workflows
+      - name: Check source whitespace
+        if: matrix.cell == 'source-py3.13'
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git diff --check "$PR_BASE_SHA...$GITHUB_SHA"
+          else
+            git show --format= --check HEAD
+          fi
+      - name: Validate all legacy and native Repo/Group workflows
+        if: matrix.cell != 'source-py3.13'
         env:
           MEGIN_TEST_MERGE_REVIEWER_SCRIPTS: ${{ github.workspace }}/.test-dependencies/merge-reviewer/skills/merge-reviewer/scripts
-        run: python -X utf8 -B -m unittest discover -s tests/quality-gates -p "test_*.py" -v
+        run: python -X utf8 -B scripts/run_unittest.py --workers 2 --output .tmp/release-unittest.json
+      - name: Stage exact canonical distribution
+        if: matrix.cell == 'linux-py3.13'
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp megin-skills.zip dist/megin-skills.zip
+      - name: Test release provenance and publication contracts
+        run: python -X utf8 -B scripts/test_release_ci.py -v
+      - name: Record complete cell and canonical asset provenance
+        run: python -X utf8 -B scripts/release_ci.py record --cell "${{ matrix.cell }}" --artifact-dir ".release-ci/${{ matrix.cell }}"
+      - name: Save exact validated proof and assets for fourteen days
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-ci-${{ github.sha }}-${{ matrix.cell }}-${{ github.run_attempt }}
+          path: .release-ci/${{ matrix.cell }}/*
+          retention-days: 14
+          include-hidden-files: true
+          if-no-files-found: error
+
+  publish:
+    name: Promote verified bytes to formal Release
+    needs: [select, build]
+    if: ${{ always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && needs.select.result == 'success' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && needs.select.outputs.reuse_run_id != '')) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Verify proof and publish idempotently without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REUSE_RUN_ID: ${{ needs.select.outputs.reuse_run_id }}
+        run: python -X utf8 -B scripts/release_ci.py publish --run-id "$REUSE_RUN_ID" --fallback-current-run --output release-publication.json
+      - name: Save verified formal asset digests
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-publication-${{ github.sha }}-${{ github.run_attempt }}
+          path: release-publication.json
+          retention-days: 14
+          if-no-files-found: error

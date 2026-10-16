@@ -18,9 +18,22 @@ Optional runner/fixed-input helpers support --repo / --group-root for new contra
 
 ~~~text
 python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py
-python -X utf8 -B -m unittest discover -s tests/quality-gates -p "test_*.py" -v
+python -X utf8 -B scripts/run_unittest.py --output dist/unittest-results.json
 python -X utf8 -B .agents/skills/megin/scripts/validate_skills.py --build-archive megin-skills.zip --archive megin-skills.zip
 ~~~
+
+The test runner defaults to two isolated worker processes. It sorts stable unittest IDs,
+records every test's elapsed time and outcome, and fails if any assigned ID is missing,
+duplicated or unexpected. JSON results include the complete inventory and per-worker raw
+logs. Use `--workers 1` for a serial comparison, `--list` for discovery only, or
+`--shard-index 0 --shard-count 2` (zero-based) for stable CI partitions. `--start-directory`
+and `--pattern` can select a bounded diagnostic suite; release checks use the defaults.
+The original `python -X utf8 -B -m unittest discover -s tests/quality-gates -p "test_*.py" -v`
+entry remains supported. Failed, skipped and expected-failure outcomes retain unittest semantics.
+For local legacy receipt integration, set `MEGIN_TEST_MERGE_REVIEWER_SCRIPTS` to the
+scripts directory of the fixed MergeReviewer commit in `knowledge-portability.yml`.
+The runner checks this fixture before starting the expensive full suite; CI checks
+out that exact dependency automatically.
 
 Run Windows/Linux CI. The archive builder uses stable paths, timestamps and file modes. It includes README/OPERATIONS and rewrites their local documentation links for the flat archive layout; Skill resource bytes remain exact. Record source revision and archive SHA-256 for a release. Do not publish or push as part of local development verification.
 
