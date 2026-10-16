@@ -4,7 +4,7 @@ Megin is a development workflow for **one Git repository or a local Group of rep
 
 Every change Repo requires a live remote `master`. Megin pins its exact SHA, fetches/rechecks it after plan approval, and develops on `feature/<Work ID>`. All accepted Repos remain on feature branches for your later merge decision.
 
-All thirteen Skills use the shared [output language and style policy](.agents/skills/megin/references/language-policy.md): Traditional Chinese, result-first Concise replies and work artifacts, with complete required records and raw evidence. Requested explanations remain full length.
+All thirteen Skills use the shared [output language and style policy](.agents/skills/megin/references/language-policy.md). When `output-style` is installed in the selected Skills root, it selects presentation automatically or follows the user's explicit style, preserving required records and raw evidence. Without it, retain the existing Traditional Chinese, result-first Concise replies and work artifacts. Requested explanations remain full length.
 
 ## 0.8.1 update
 

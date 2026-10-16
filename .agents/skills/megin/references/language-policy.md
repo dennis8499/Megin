@@ -3,6 +3,15 @@
 This policy applies to all thirteen Megin Skills: progress messages, answers, and newly created or
 updated human-readable work artifacts. Read it before responding or writing such artifacts.
 
+## Installed Output Style
+
+Check for `output-style/SKILL.md` under the current selected Skills root. When it
+exists, load `$output-style` before human-readable output; its automatic mode or
+the user's explicit style replaces the Concise presentation section below.
+When it is absent, retain that existing standalone Concise style. The language,
+machine-readable content, required records and requirements waiting rules here
+remain workflow requirements in every mode.
+
 ## Human-readable output
 
 Write progress messages, answers, and newly created or updated `requirements.md`, `workflow.md`, `plan.md`, `bug-diagnosis.md`,
@@ -13,6 +22,8 @@ explicitly requires another natural language, follow that explicit choice and re
 the Work ID.
 
 ## Concise style
+
+This section is the standalone fallback only when `output-style` is not installed.
 
 Follow [Claude Code Concise](https://code.claude.com/docs/en/output-styles#concise)
 across hosts:
