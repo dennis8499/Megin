@@ -1,0 +1,9 @@
+{
+  "candidate": "caca6ba41552382e29e56f9b647c16d2287600b7",
+  "dependencies": {},
+  "previousTag": "v0.8.1",
+  "repository": "Megin",
+  "runId": "20261018T145255Z-40e8e7e0",
+  "schema": "workspace-release/v1",
+  "targetVersion": "0.8.2"
+}
